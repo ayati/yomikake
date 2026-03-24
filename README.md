@@ -2,6 +2,8 @@
 
 ブラウザで動作する、日本語縦書き対応のePubリーダーです。インストール不要で、HTMLファイルを開くだけで使用できます。
 
+**動作サンプル:** https://www.ayati.com/book/epub_viewer.html
+
 ## 特徴
 
 - **縦書き（vertical-rl）** ネイティブ対応
@@ -194,4 +196,4 @@ html, body {
 
 ## ライセンス
 
-[MIT License](LICENSE.md) © 2026 N.Aono
+MIT License © 2026 N.Aono
