@@ -10,9 +10,25 @@ A single-file ePub 3 vertical-text viewer (`epub_viewer.html`) designed for read
 
 **License:** MIT © 2026 N.Aono — see `LICENSE.md`.
 
+## Development
+
+No build step. To open the viewer:
+
+```sh
+# Option A: open directly in browser (bookmarks/localStorage work in file:// mode)
+open epub_viewer.html          # macOS
+xdg-open epub_viewer.html     # Linux
+
+# Option B: serve via HTTP (useful when testing cross-origin behaviour)
+python3 -m http.server 8080
+# then visit http://localhost:8080/epub_viewer.html
+```
+
+There are no automated tests. Manual testing requires a `.epub` or `.kepub` file.
+
 ## Architecture
 
-The entire application lives in `epub_viewer.html` (~900 lines). It follows a modular functional style with a single central state object.
+The entire application lives in `epub_viewer.html` (~985 lines). It follows a modular functional style with a single central state object.
 
 ### State
 
@@ -41,6 +57,9 @@ const state = {
 - **`.kepub`** (Kobo ePub) is supported by treating it as a standard ZIP/ePub.
 - **`THEME_CONTENT` map** holds iframe content colors separately from CSS variables (which only apply to the outer UI). Theme changes re-render the current chapter.
 - **`buildScrollScript()`** returns a self-contained IIFE string baked into the iframe. Chrome RTL `scrollLeft` starts at 0 and goes negative; Firefox starts at max and decreases. The script detects this at runtime via sign check.
+- **`flashNavButtons()`** is called after `renderPage` completes on ePub open. It flashes all 4 nav buttons with accent color for 4 seconds to help users discover the controls. `#btn-scroll-fwd` is handled via inline styles (not CSS class) because its ID-level `background` and `border` override class-based rules at the same specificity level.
+- **`scrollPage()` calls `blur()`** on any focused nav button before sending the scroll postMessage. Without this, clicking `#btn-scroll-fwd` then pressing a keyboard scroll key leaves the button with a persistent `:focus-visible` border (since `#btn-scroll-fwd` has a always-present `border:1px solid` at the ID level).
+- **`prevChapter()` uses `'start'`** as the scroll target. `'end'` is reserved for automatic chapter transitions triggered by scrolling past the chapter boundary (so the reader lands at the end of the previous chapter, matching scroll direction). Explicit chapter button navigation always starts at the beginning.
 
 ### postMessage Protocol
 

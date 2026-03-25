@@ -75,6 +75,9 @@
   .scroll-btn:active { transform:translateX(-50%) scale(.96); }
   #btn-scroll-fwd { bottom:max(8px, env(safe-area-inset-bottom, 8px)); width:360px; height:108px; border:1px solid var(--ui-text); background:rgba(255,255,255,0.04); font-size:20px; opacity:.22; border-radius:24px; }
   #btn-scroll-back { top:8px; }
+  .chapter-btn.nav-hint { opacity:.85; background:var(--accent); border:1px solid var(--accent); color:#fff; }
+  .scroll-btn.nav-hint { opacity:.9; background:var(--accent); border:1px solid var(--accent); color:#fff; }
+  #btn-scroll-fwd:hover { background:rgba(255,255,255,0.08); border-color:var(--ui-text); color:var(--ui-text); }
 
   #statusbar { height:28px; background:var(--ui-bg); border-top:1px solid var(--ui-border); display:flex; align-items:center; padding:0 16px; gap:16px; font-size:12px; color:var(--ui-text); opacity:.8; flex-shrink:0; }
   #page-info { flex:1; text-align:center; }
@@ -354,8 +357,10 @@ async function loadEpub(file) {
       if (state.sidebarOpen) toggleSidebar();
       await renderPage(saved.spineIdx, typeof saved.ratio === 'number' ? saved.ratio : 'start');
       showToast('📖 前回の続きから再開（' + (saved.spineIdx + 1) + ' / ' + state.spine.length + '章）');
+      flashNavButtons();
     } else {
       await renderPage(0);
+      flashNavButtons();
     }
 
   } catch(err) {
@@ -666,10 +671,12 @@ function nextChapter() {
   if (state.currentSpineIdx < state.spine.length-1) renderPage(state.currentSpineIdx+1, 'start');
 }
 function prevChapter() {
-  if (state.currentSpineIdx > 0) renderPage(state.currentSpineIdx-1, 'end');
+  if (state.currentSpineIdx > 0) renderPage(state.currentSpineIdx-1, 'start');
 }
 
 function scrollPage(direction) {
+  const active = document.activeElement;
+  if (active && (active.classList.contains('scroll-btn') || active.classList.contains('chapter-btn'))) active.blur();
   const iframe = document.getElementById('content-iframe');
   if (iframe.contentWindow) {
     iframe.contentWindow.postMessage({type:'EPUB_SCROLL', direction}, '*');
@@ -708,6 +715,20 @@ function flashOverlay() {
   const o = document.getElementById('page-overlay');
   o.classList.add('flash');
   setTimeout(() => o.classList.remove('flash'), 150);
+}
+function flashNavButtons() {
+  const btns = document.querySelectorAll('.chapter-btn, .scroll-btn');
+  const fwd = document.getElementById('btn-scroll-fwd');
+  btns.forEach(b => b.classList.add('nav-hint'));
+  fwd.style.background = 'var(--accent)';
+  fwd.style.borderColor = 'var(--accent)';
+  fwd.style.opacity = '0.9';
+  setTimeout(() => {
+    btns.forEach(b => b.classList.remove('nav-hint'));
+    fwd.style.background = '';
+    fwd.style.borderColor = '';
+    fwd.style.opacity = '';
+  }, 4000);
 }
 function updatePageInfo() {
   const total = state.spine.length, cur = state.currentSpineIdx+1;
