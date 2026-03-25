@@ -331,14 +331,17 @@ async function loadEpub(file) {
     if (navEl) {
       const navItem = state.manifest[navEl.getAttribute('id')];
       if (navItem) {
-        const navXml = await zip.file(navItem.absPath).async('text');
-        // Parse as HTML (lenient)
-        const navDoc = new DOMParser().parseFromString(navXml, 'text/html');
-        navDoc.querySelectorAll('nav a').forEach(a => {
-          const label = a.textContent.trim();
-          const href  = a.getAttribute('href');
-          if (label && href) state.toc.push({label, href});
-        });
+        const navFile = zip.file(navItem.absPath);
+        if (navFile) {
+          const navXml = await navFile.async('text');
+          // Parse as HTML (lenient)
+          const navDoc = new DOMParser().parseFromString(navXml, 'text/html');
+          navDoc.querySelectorAll('nav a').forEach(a => {
+            const label = a.textContent.trim();
+            const href  = a.getAttribute('href');
+            if (label && href) state.toc.push({label, href});
+          });
+        }
       }
     }
 
@@ -646,15 +649,22 @@ function buildScrollScript(scrollTarget) {
 // ══════════════════════════════════════════
 //  Render Page
 // ══════════════════════════════════════════
+let _renderSeq = 0;
 async function renderPage(idx, scrollTarget) {
   if (!state.epub || idx < 0 || idx >= state.spine.length) return;
   if (scrollTarget === undefined) scrollTarget = 'start';
+  const seq = ++_renderSeq;
   state.currentSpineIdx = idx;
   flashOverlay();
 
   const spineItem = state.spine[idx];
-  const xhtmlText = await state.epub.file(spineItem.absPath).async('text');
+  const xhtmlFile = state.epub.file(spineItem.absPath);
+  if (!xhtmlFile) { showToast('⚠️ チャプターファイルが見つかりません: ' + spineItem.absPath); return; }
+  const xhtmlText = await xhtmlFile.async('text');
+  if (seq !== _renderSeq) return;
+
   const srcdoc = await buildSrcdoc(xhtmlText, spineItem.absPath, scrollTarget);
+  if (seq !== _renderSeq) return;
 
   const iframe = document.getElementById('content-iframe');
   // Setting srcdoc directly – no blob URL, no origin issue
