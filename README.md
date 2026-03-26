@@ -2,7 +2,15 @@
 
 ブラウザで動作する、日本語縦書き対応のePubリーダーです。インストール不要で、HTMLファイルを開くだけで使用できます。
 
-**動作サンプル:** https://www.ayati.com/book/epub_viewer.html
+## ファイル構成とブラウザ対応
+
+| ファイル | 対応環境 | 動作サンプル |
+|---------|---------|------------|
+| `epub_viewer.html` | Windows/Android/macOS の Chrome・Edge・Firefox・Safari | https://www.ayati.com/book/epub_viewer.html |
+| `epub_viewer_ios.html` | iPhone・iPad の Safari 専用 | https://www.ayati.com/book/epub_viewer_ios.html |
+
+> **iOS（iPhone・iPad）をお使いの方は `epub_viewer_ios.html` をご使用ください。**
+> iOS Safari のスクロール挙動の制約により、通常版では正しく動作しません。
 
 ## 特徴
 
@@ -14,18 +22,17 @@
 - **しおりエクスポート/インポート**：全冊分のしおりをJSONファイルで書き出し・読み込み（デバイス間の引き継ぎに対応）
 - **レジュームヒント**：前回読んでいた書名をウェルカム画面に表示
 - 目次（TOC）サイドバー
-- キーボードショートカット
-- スマートフォン対応（レスポンシブ）
+- キーボードショートカット（`epub_viewer.html` のみ）
 - 外部サーバー不要（ローカルで動作）
 
 ## 使い方
 
 ### ファイルを開く
 
-`epub_viewer.html` をブラウザで開き、以下のいずれかの方法でePubを読み込みます。
+ブラウザに合ったHTMLファイルを開き、以下のいずれかの方法でePubを読み込みます。
 
 - ツールバーの **「📂 ePubを開く」** ボタンをクリック
-- ePubファイルを画面にドラッグ＆ドロップ
+- ePubファイルを画面にドラッグ＆ドロップ（`epub_viewer.html` のみ）
 
 前回読んでいた本がある場合、ウェルカム画面に書名が表示されます。同じファイルを開くと前回の続きから自動再開します。
 
@@ -33,27 +40,28 @@
 
 #### ページスクロール
 
-| 操作 | 動作 |
-|------|------|
-| `スペース` | 1画面分 前進（次へ） |
-| `Shift + スペース` | 1画面分 後退（前へ） |
-| `↓` / `PageDown` | 前進スクロール |
-| `↑` / `PageUp` | 後退スクロール |
-| 画面下「次へ↓」ボタン | 前進スクロール |
-| 画面上「↑前へ」ボタン | 後退スクロール |
+| 操作 | epub_viewer.html | epub_viewer_ios.html |
+|------|-----------------|---------------------|
+| キーボード `スペース` | 1画面分 前進 | — |
+| キーボード `Shift + スペース` | 1画面分 後退 | — |
+| キーボード `↓` / `PageDown` | 前進スクロール | — |
+| キーボード `↑` / `PageUp` | 後退スクロール | — |
+| 画面下ボタン「次へ↓」 | 前進スクロール | 前進スクロール |
+| 画面上ボタン「↑前へ」 | 後退スクロール | 後退スクロール |
+| 左右スワイプ | — | 前進 / 後退スクロール |
 
 章末尾 / 先頭に達すると自動的に次の章 / 前の章へ移動します。
 
 #### 章切り替え
 
-| 操作 | 動作 |
-|------|------|
-| `←` | 次の章 |
-| `→` | 前の章 |
-| `Home` | 最初の章 |
-| `End` | 最後の章 |
-| 画面右の `›` ボタン | 前の章 |
-| 画面左の `‹` ボタン | 次の章 |
+| 操作 | epub_viewer.html | epub_viewer_ios.html |
+|------|-----------------|---------------------|
+| キーボード `←` | 次の章 | — |
+| キーボード `→` | 前の章 | — |
+| キーボード `Home` | 最初の章 | — |
+| キーボード `End` | 最後の章 | — |
+| 画面右の `›` ボタン | 前の章 | 前の章 |
+| 画面左の `‹` ボタン | 次の章 | 次の章 |
 
 > **縦書きの読み方向について**: 縦書きは右から左へ読み進めます。そのため「次の章」が `←` キー、「前の章」が `→` キーになっています。
 
@@ -87,14 +95,20 @@
 
 ### 動作環境
 
-- 現代的なブラウザ（Chrome / Firefox / Edge / Safari）
-- 外部ライブラリ: **JSZip 3.10.1**（CDNから読み込み、SRI検証済み）
-- ビルド不要・インストール不要
+| ファイル | 動作ブラウザ |
+|---------|------------|
+| `epub_viewer.html` | Chrome・Firefox・Edge（Windows/macOS/Android）、Safari（macOS） |
+| `epub_viewer_ios.html` | Safari（iPhone・iPad）専用 |
+
+外部ライブラリ: **JSZip 3.10.1**（CDNから読み込み、SRI検証済み）
+ビルド不要・インストール不要
 
 ### アーキテクチャ概要
 
+両ファイルとも単一HTMLファイル構成で、基本的なアーキテクチャは共通です。
+
 ```
-epub_viewer.html（単一ファイル）
+epub_viewer.html / epub_viewer_ios.html（単一ファイル）
 │
 ├── CSS               テーマ変数（--bg / --ui-bg / --accent 等、UI部分のみ）
 ├── HTML              ツールバー・サイドバー・iframe・ステータスバー
@@ -110,6 +124,14 @@ epub_viewer.html（単一ファイル）
     ├── exportBookmarks() / (import handler) しおりJSON書き出し・読み込み
     └── showResumeBanner()                   レジュームヒント表示
 ```
+
+### iOS版の実装上の違い（epub_viewer_ios.html）
+
+iOS Safari の iframe 内では `scrollLeft` 代入・`window.scrollTo` が正常動作しないため、スクロールを CSS transform で実装しています。
+
+- `body { position:fixed; writing-mode:vertical-rl; width:max-content }` で縦書き列を body 全体に展開
+- `body.style.transform = translateX(tx)` で列をスライドさせてページ送りを実現
+- scroll API を一切使用しないため iOS Safari の挙動に依存しない
 
 ### ePub解析フロー
 
@@ -127,18 +149,6 @@ epub_viewer.html（単一ファイル）
 
 1. ePub 内の `<script>` 要素を除去（XSS対策）
 2. ePub 由来の `<base>` 要素を除去し `<base href="about:blank">` を挿入（`file://` 環境で未解決相対URLが親ページURLに解決されるのを防止）
-
-描画時に以下のCSSを強制注入します（テーマ色はCSSクラスではなく `THEME_CONTENT` マップから直接取得）：
-
-```css
-html, body {
-  background: <テーマ色>;
-  color: <テーマ文字色>;
-  writing-mode: vertical-rl;
-  font-size: <設定値>%;
-  line-height: <設定値>;
-}
-```
 
 ### テーマと本文色
 
@@ -161,9 +171,9 @@ html, body {
 | `epub_last_book` | 最後に読んだ本のタイトルと bookKey |
 | `epub_settings` | フォント・文字サイズ・行間・テーマ・余白 |
 
-スクロール位置はiframe内で `scroll` イベントを検知し（デバウンス500ms）、`postMessage` で親ウィンドウへ通知して保存します。保存に失敗した場合（ストレージ容量不足等）はトースト通知で警告します。
+スクロール位置はデバウンス500msで保存します。保存に失敗した場合（ストレージ容量不足等）はトースト通知で警告します。
 
-### スクロール制御（RTL対応）
+### スクロール制御（epub_viewer.html）
 
 縦書きのスクロールはブラウザ間で `scrollLeft` の挙動が異なります：
 

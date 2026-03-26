@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>縦書きePub3ビューア</title>
+<title>縦書きePub3ビューア（iOS Safari専用）</title>
 <style>
   :root {
     --bg:#f5f0e8; --paper:#fdf8f0; --text:#1a1008;
@@ -47,7 +47,7 @@
   #welcome h2 { font-size:22px; font-weight:normal; }
   #welcome p { font-size:14px; opacity:.7; text-align:center; line-height:2; }
   #drop-zone { border:2px dashed var(--ui-border); border-radius:12px; padding:32px 48px; text-align:center; cursor:pointer; transition:border-color .2s,background .2s; }
-  #drop-zone:hover, #drop-zone.dragover { border-color:var(--accent); background:rgba(139,58,26,.05); }
+  #drop-zone:hover { border-color:var(--accent); background:rgba(139,58,26,.05); }
   #resume-banner { display:none; text-align:center; width:100%; max-width:480px; border:1px solid var(--ui-border); border-radius:8px; padding:14px 24px; line-height:1.8; }
   #resume-banner .resume-label { font-size:12px; opacity:.6; }
   #resume-banner .resume-title { display:block; font-size:15px; margin:4px 0 6px; }
@@ -186,26 +186,26 @@
       </div>
       <div id="drop-zone" onclick="openFilePicker()">
         <h2>ePubファイルを開く</h2>
-        <p>「ePubを開く」ボタンをクリック<br>またはここにファイルをドラッグ＆ドロップ</p>
+        <p>「ePubを開く」ボタンをタップ</p>
         <p style="margin-top:12px;font-size:12px;opacity:.6;">対応形式: .epub / .kepub</p>
       </div>
-      <p style="font-size:12px;opacity:.5;">スペースキー：次へスクロール　←→：章切替</p>
+      <p style="font-size:12px;opacity:.5;">次へボタン：次へスクロール　‹›ボタン：章切替</p>
     </div>
     <div id="page-container">
       <div id="epub-frame">
         <div id="page-overlay"></div>
         <iframe id="content-iframe" src="about:blank"></iframe>
       </div>
-      <button class="chapter-btn" id="btn-prev" onclick="prevChapter()" title="前の章（→）">
+      <button class="chapter-btn" id="btn-prev" onclick="prevChapter()" title="前の章">
         <span class="cb-arrow">›</span><span class="cb-label">前章</span>
       </button>
-      <button class="chapter-btn" id="btn-next" onclick="nextChapter()" title="次の章（←）">
+      <button class="chapter-btn" id="btn-next" onclick="nextChapter()" title="次の章">
         <span class="cb-arrow">‹</span><span class="cb-label">次章</span>
       </button>
-      <button class="scroll-btn" id="btn-scroll-back" onclick="scrollPage(-1)" title="前へ（↑/Shift+Space）">
+      <button class="scroll-btn" id="btn-scroll-back" onclick="scrollPage(-1)" title="前へ">
         <span>↑</span><span>前へ</span>
       </button>
-      <button class="scroll-btn" id="btn-scroll-fwd" onclick="scrollPage(1)" title="次へ（Space/↓）">
+      <button class="scroll-btn" id="btn-scroll-fwd" onclick="scrollPage(1)" title="次へ">
         <span>次へ</span><span>↓</span>
       </button>
     </div>
@@ -213,7 +213,7 @@
 </div>
 
 <div id="statusbar">
-  <span id="key-hint">スペース/↓：次へスクロール　←→：章切替</span>
+  <span id="key-hint">次へボタン：スクロール　‹›ボタン：章切替</span>
   <span id="page-info">—</span>
   <div id="progress-bar"><div id="progress-fill"></div></div>
 </div>
@@ -246,12 +246,11 @@ const state = {
   bookKey:'',
 };
 
-// テーマ別 ePub 本文エリアの色（iframe 内に直接注入）
 const THEME_CONTENT = {
-  '':      { paper: '#fdf8f0', text: '#1a1008' },  // 標準：温かみのある白
-  sepia:   { paper: '#dfc89a', text: '#2e1a06' },  // セピア：クリーム色系（やや暗め）
-  white:   { paper: '#ffffff', text: '#111111' },  // 白紙：純白
-  dark:    { paper: '#111111', text: '#e8e8e8' },  // ダーク：黒背景・白文字
+  '':      { paper: '#fdf8f0', text: '#1a1008' },
+  sepia:   { paper: '#dfc89a', text: '#2e1a06' },
+  white:   { paper: '#ffffff', text: '#111111' },
+  dark:    { paper: '#111111', text: '#e8e8e8' },
 };
 
 const FONTS = {
@@ -264,24 +263,11 @@ const FONTS = {
 };
 
 // ══════════════════════════════════════════
-//  File Open
+//  File Open（iOS Safari: ファイルピッカーのみ、ドラッグ＆ドロップなし）
 // ══════════════════════════════════════════
 document.getElementById('file-input').addEventListener('change', e => {
   if (e.target.files[0]) loadEpub(e.target.files[0]);
   e.target.value = '';
-});
-document.body.addEventListener('dragover', e => {
-  e.preventDefault();
-  document.getElementById('drop-zone').classList.add('dragover');
-});
-document.body.addEventListener('dragleave', () => {
-  document.getElementById('drop-zone').classList.remove('dragover');
-});
-document.body.addEventListener('drop', e => {
-  e.preventDefault();
-  document.getElementById('drop-zone').classList.remove('dragover');
-  const f = e.dataTransfer.files[0];
-  if (f && (f.name.endsWith('.epub') || f.name.endsWith('.kepub'))) loadEpub(f);
 });
 
 async function loadEpub(file) {
@@ -289,7 +275,6 @@ async function loadEpub(file) {
     const zip = await JSZip.loadAsync(file);
     state.epub = zip;
 
-    // container.xml → OPF path
     const containerEntry = zip.file('META-INF/container.xml');
     if (!containerEntry) throw new Error('META-INF/container.xml が見つかりません。有効な ePub ファイルではない可能性があります。');
     const cXml = await containerEntry.async('text');
@@ -300,13 +285,11 @@ async function loadEpub(file) {
     if (!state.opfPath) throw new Error('rootfile の full-path 属性がありません。');
     state.opfDir  = state.opfPath.includes('/') ? state.opfPath.slice(0, state.opfPath.lastIndexOf('/')+1) : '';
 
-    // OPF
     const opfEntry = zip.file(state.opfPath);
     if (!opfEntry) throw new Error(`OPF ファイルが見つかりません: ${state.opfPath}`);
     const opfXml = await opfEntry.async('text');
     const opfDoc = new DOMParser().parseFromString(opfXml, 'application/xml');
 
-    // manifest
     state.manifest = {};
     opfDoc.querySelectorAll('manifest item').forEach(item => {
       const id = item.getAttribute('id');
@@ -317,14 +300,12 @@ async function loadEpub(file) {
       };
     });
 
-    // spine
     state.spine = [];
     opfDoc.querySelectorAll('spine itemref').forEach(ref => {
       const item = state.manifest[ref.getAttribute('idref')];
       if (item) state.spine.push(item);
     });
 
-    // TOC from nav doc
     state.toc = [];
     const navEl = [...opfDoc.querySelectorAll('manifest item')]
       .find(i => (i.getAttribute('properties')||'').includes('nav'));
@@ -332,19 +313,18 @@ async function loadEpub(file) {
       const navItem = state.manifest[navEl.getAttribute('id')];
       if (navItem) {
         const navFile = zip.file(navItem.absPath);
-        if (!navFile) { console.warn('TOC file missing:', navItem.absPath); }
-        const navXml = navFile ? await navFile.async('text') : '';
-        // Parse as HTML (lenient)
-        const navDoc = new DOMParser().parseFromString(navXml, 'text/html');
-        navDoc.querySelectorAll('nav a').forEach(a => {
-          const label = a.textContent.trim();
-          const href  = a.getAttribute('href');
-          if (label && href) state.toc.push({label, href});
-        });
+        if (navFile) {
+          const navXml = await navFile.async('text');
+          const navDoc = new DOMParser().parseFromString(navXml, 'text/html');
+          navDoc.querySelectorAll('nav a').forEach(a => {
+            const label = a.textContent.trim();
+            const href  = a.getAttribute('href');
+            if (label && href) state.toc.push({label, href});
+          });
+        }
       }
     }
 
-    // UI
     const titleEl = opfDoc.querySelector('metadata > *|title, metadata > title');
     const titleText = titleEl ? titleEl.textContent : file.name;
     document.getElementById('book-title').textContent = titleText;
@@ -352,7 +332,6 @@ async function loadEpub(file) {
     document.getElementById('welcome').style.display = 'none';
     document.getElementById('page-container').classList.add('visible');
     buildTocList();
-    // 最終書名をlocalStorageに保存（レジューム表示用）
     try { localStorage.setItem('epub_last_book', JSON.stringify({ title: titleText, bookKey: state.bookKey })); } catch(e) {}
     const saved = loadSavedPos();
     if (saved && saved.spineIdx > 0 && saved.spineIdx < state.spine.length) {
@@ -435,7 +414,6 @@ async function toDataUri(absPath) {
 }
 
 async function resolveCssText(css, cssDir) {
-  // url('...') or url(...)
   const re = /url\(\s*(['"]?)([^'"\)\s]+)\1\s*\)/g;
   const hits = [];
   let m;
@@ -448,29 +426,23 @@ async function resolveCssText(css, cssDir) {
   return css;
 }
 
-// Parse xhtml/html text, resolve all resources, return HTML string ready for srcdoc
 async function buildSrcdoc(xhtmlText, xhtmlAbsPath, scrollTarget) {
   const dir = xhtmlAbsPath.includes('/')
     ? xhtmlAbsPath.slice(0, xhtmlAbsPath.lastIndexOf('/')+1)
     : '';
 
-  // Always parse as text/html – avoids XML strict errors entirely
   const doc = new DOMParser().parseFromString(xhtmlText, 'text/html');
 
-  // ── ePub 内の <script> を除去（XSS 対策）
-  //    srcdoc iframe には sandbox がないため、ePub 由来のスクリプトが
-  //    localStorage 等にアクセスできてしまう
+  // ePub 内の <script> を除去（XSS 対策）
   doc.querySelectorAll('script').forEach(s => s.remove());
 
-  // ── <base href="about:blank"> を先頭に挿入
-  //    srcdoc の base URL は親ページ(file://)を継承するため、
-  //    ePub内の未解決の相対URLが file://epub_viewer.html に解決されないよう上書きする
+  // <base href="about:blank"> を先頭に挿入
   doc.querySelectorAll('base').forEach(b => b.remove());
   const safeBase = doc.createElement('base');
   safeBase.setAttribute('href', 'about:blank');
   doc.head.insertBefore(safeBase, doc.head.firstChild);
 
-  // ── Resolve <link rel="stylesheet"> → inline <style>
+  // <link rel="stylesheet"> → inline <style>
   for (const link of [...doc.querySelectorAll('link[rel="stylesheet"]')]) {
     const href = link.getAttribute('href') || '';
     if (href.startsWith('data:') || href.startsWith('http')) continue;
@@ -485,12 +457,12 @@ async function buildSrcdoc(xhtmlText, xhtmlAbsPath, scrollTarget) {
     link.parentNode.replaceChild(style, link);
   }
 
-  // ── Resolve <style> blocks
+  // <style> blocks
   for (const style of [...doc.querySelectorAll('style')]) {
     style.textContent = await resolveCssText(style.textContent, dir);
   }
 
-  // ── Resolve <img src>
+  // <img src>
   for (const img of [...doc.querySelectorAll('img')]) {
     const src = img.getAttribute('src') || '';
     if (!src || src.startsWith('data:') || src.startsWith('http')) continue;
@@ -498,36 +470,56 @@ async function buildSrcdoc(xhtmlText, xhtmlAbsPath, scrollTarget) {
     if (uri) img.setAttribute('src', uri);
   }
 
-  // ── Resolve inline style url()
+  // inline style url()
   for (const el of [...doc.querySelectorAll('[style]')]) {
     const s = el.getAttribute('style') || '';
     if (s.includes('url(')) el.setAttribute('style', await resolveCssText(s, dir));
   }
 
-  // ── Inject viewer override styles
+  // ── iOS Safari 向けスタイル注入 ──
+  // 核心設計（iOS Safari のスクロール API を一切使わない transform 方式）:
+  //
+  //   window.scrollTo / scrollLeft / scrollX は iOS Safari の iframe 内で
+  //   挙動が不安定なため、一切使用しない。
+  //
+  //   代わりに body を position:fixed + writing-mode:vertical-rl にして
+  //   body.style.transform = translateX(tx) でコンテンツを横移動させる。
+  //
+  //   body { position:fixed; top:0; bottom:0; left:0; width:max-content }
+  //     → 高さ = viewport 高, 幅 = 全コンテンツ幅（縦書き列の合計）
+  //     → body.offsetWidth = 全列幅（JS で計測可能）
+  //
+  //   transform 規則:
+  //     tx = -maxS : body の右端 = viewport 右端 = column 1 = コンテンツ先頭
+  //     tx = 0     : body の左端 = viewport 左端 = 最終列 = コンテンツ末尾
+  //     前進（右→左）: tx を増加（-maxS → 0）
+  //     後退: tx を減少（0 → -maxS）
   const font   = FONTS[state.fontMode];
   const colors = THEME_CONTENT[state.theme] || THEME_CONTENT[''];
   const paper  = colors.paper;
   const text   = colors.text;
-  const fontRule = font
-    ? 'html,body,p,h1,h2,h3,h4,h5,h6,div,span{font-family:' + font + '!important;}'
-    : '';
+  const fontRule = font ? 'body,body *{font-family:' + font + '!important;}' : '';
   const overrideStyle = doc.createElement('style');
   overrideStyle.id = 'epub-viewer-inject';
   overrideStyle.textContent = [
-    'html,body{background:' + paper + '!important;color:' + text + '!important;}',
-    'html{font-size:' + state.fontSize + '%!important;',
+    'html{height:100%!important;overflow:hidden!important;',
+        'margin:0!important;padding:0!important;',
+        'background:' + paper + '!important;}',
+    'body{position:fixed!important;top:0!important;bottom:0!important;left:0!important;',
+        'width:max-content!important;min-width:100vw!important;max-width:none!important;',
+        'overflow:visible!important;',
+        'writing-mode:vertical-rl!important;-webkit-writing-mode:vertical-rl!important;',
+        'margin:0!important;padding:0!important;',
+        'background:' + paper + '!important;',
+        'color:' + text + '!important;',
+        'font-size:' + state.fontSize + '%!important;',
         'line-height:' + state.lineHeight + '!important;',
-        'writing-mode:vertical-rl!important;-webkit-writing-mode:vertical-rl!important;}',
-    'body{writing-mode:vertical-rl!important;-webkit-writing-mode:vertical-rl!important;',
-        'line-height:' + state.lineHeight + '!important;}',
+        'opacity:0!important;}', // JS が transform を適用後に表示
     'img{max-width:100%!important;max-height:95vh!important;object-fit:contain!important;}',
     fontRule,
   ].join('');
   doc.head.appendChild(overrideStyle);
 
-  // ── Inject scroll controller script
-  //    (baked-in scrollTarget avoids any async race)
   const scrollScript = doc.createElement('script');
   scrollScript.textContent = buildScrollScript(scrollTarget);
   doc.body.appendChild(scrollScript);
@@ -535,113 +527,120 @@ async function buildSrcdoc(xhtmlText, xhtmlAbsPath, scrollTarget) {
   return '<!DOCTYPE html>\n' + doc.documentElement.outerHTML;
 }
 
+// ══════════════════════════════════════════
+//  Scroll Script（iOS Safari 専用設計 - CSS transform 方式）
+// ══════════════════════════════════════════
 function buildScrollScript(scrollTarget) {
-  // Returns a self-contained IIFE string.
-  // scrollTarget is JSON-stringified to be safe.
-  return [
-    '(function(){',
-    '  var STEP = 0.92;',
-    '  var initTarget = ' + JSON.stringify(scrollTarget) + ';',
-    '',
-    '  function root(){ return document.documentElement; }',
-    '',
-    '  // Chrome RTL: scrollLeft starts at 0 (right edge) and goes negative toward left.',
-    '  // Firefox RTL: scrollLeft starts at max and goes toward 0 at left edge.',
-    '  // Detect by checking sign after a tiny test nudge (non-destructive probe).',
-    '  var _neg = null;',
-    '  function isNeg(){',
-    '    if(_neg !== null) return _neg;',
-    '    var e = root();',
-    '    if(e.scrollWidth <= e.clientWidth){ _neg = false; return false; }',
-    '    _neg = (e.scrollLeft <= 0);',
-    '    return _neg;',
-    '  }',
-    '',
-    '  function applyInit(){',
-    '    var e = root();',
-    '    if(initTarget === "end"){',
-    '      if(isNeg()){ e.scrollLeft = -(e.scrollWidth - e.clientWidth); }',
-    '      else        { e.scrollLeft =  (e.scrollWidth - e.clientWidth); }',
-    '    } else if(typeof initTarget === "number"){',
-    '      var sw = e.scrollWidth, vw = e.clientWidth;',
-    '      if(sw > vw){',
-    '        var pos = initTarget * (sw - vw);',
-    '        e.scrollLeft = isNeg() ? -pos : pos;',
-    '      }',
-    '    } else {',
-    '      e.scrollLeft = 0;',
-    '    }',
-    '  }',
-    '',
-    '  function doScroll(dir){',
-    '    var e = root();',
-    '    var vw = e.clientWidth, sw = e.scrollWidth;',
-    '    if(sw <= vw){ window.parent.postMessage({type:"EPUB_EDGE",direction:dir},"*"); return; }',
-    '    var step = vw * STEP;',
-    '    var cur  = e.scrollLeft;',
-    '    if(isNeg()){',
-    '      var minS = -(sw - vw);',
-    '      if(dir === 1){',
-    '        if(cur <= minS + 2){ window.parent.postMessage({type:"EPUB_EDGE",direction:1},"*"); return; }',
-    '        e.scrollLeft = Math.max(cur - step, minS);',
-    '      } else {',
-    '        if(cur >= -2){ window.parent.postMessage({type:"EPUB_EDGE",direction:-1},"*"); return; }',
-    '        e.scrollLeft = Math.min(cur + step, 0);',
-    '      }',
-    '    } else {',
-    '      var maxS = sw - vw;',
-    '      if(dir === 1){',
-    '        if(cur >= maxS - 2){ window.parent.postMessage({type:"EPUB_EDGE",direction:1},"*"); return; }',
-    '        e.scrollLeft = Math.min(cur + step, maxS);',
-    '      } else {',
-    '        if(cur <= 2){ window.parent.postMessage({type:"EPUB_EDGE",direction:-1},"*"); return; }',
-    '        e.scrollLeft = Math.max(cur - step, 0);',
-    '      }',
-    '    }',
-    '  }',
-    '',
-    '  window.addEventListener("message", function(ev){',
-    '    if(!ev.data || ev.data.type !== "EPUB_SCROLL") return;',
-    '    doScroll(ev.data.direction);',
-    '  });',
-    '',
-    '  // Intercept link clicks: external → new tab, internal → parent navigation',
-    '  document.addEventListener("click", function(ev){',
-    '    var a = ev.target.closest("a");',
-    '    if(!a) return;',
-    '    var href = a.getAttribute("href") || "";',
-    '    if(!href) return;',
-    '    ev.preventDefault();',
-    '    if(href.startsWith("http://") || href.startsWith("https://") || href.startsWith("//")){',
-    '      window.open(href, "_blank", "noopener,noreferrer");',
-    '      return;',
-    '    }',
-    '    if(href.startsWith("#")){ return; }',  // same-page anchor: ignore
-    '    window.parent.postMessage({type:"EPUB_LINK", href:href}, "*");',
-    '  });',
-    '',
-    '  // Report scroll position to parent (for bookmark saving)',
-    '  var posTimer = null;',
-    '  function reportPos(){',
-    '    var e = root();',
-    '    var sw = e.scrollWidth, vw = e.clientWidth;',
-    '    if(sw <= vw){ window.parent.postMessage({type:"EPUB_POS",ratio:0},"*"); return; }',
-    '    var cur = e.scrollLeft;',
-    '    var ratio = isNeg() ? (-cur / (sw - vw)) : (cur / (sw - vw));',
-    '    window.parent.postMessage({type:"EPUB_POS",ratio:Math.max(0,Math.min(1,ratio))},"*");',
-    '  }',
-    '  document.addEventListener("scroll", function(){',
-    '    clearTimeout(posTimer);',
-    '    posTimer = setTimeout(reportPos, 500);',
-    '  }, true);',
-    '',
-    '  // Apply initial scroll after layout settles',
-    '  function init(){ setTimeout(applyInit, 80); }',
-    '  if(document.readyState === "loading")',
-    '    document.addEventListener("DOMContentLoaded", init);',
-    '  else init();',
-    '})();',
-  ].join('\n');
+  // iOS Safari の scroll API を完全に回避し、CSS transform で列をスライドする。
+  //
+  // body { position:fixed; writing-mode:vertical-rl; width:max-content }
+  //   → 縦書き列が body の右端（column 1）から左へ並ぶ
+  //   → body.offsetWidth = 全列幅の合計
+  //   → viewport 幅 = window.innerWidth
+  //   → maxS = body.offsetWidth - window.innerWidth
+  //
+  // transform 規則:
+  //   tx = -maxS : body 右端 = viewport 右端 = column 1 = コンテンツ先頭
+  //   tx = 0     : body 左端 = viewport 左端 = 最終列 = コンテンツ末尾
+  //
+  // 前進（右→左）: tx を増加（-maxS → 0）
+  // 後退（左→右）: tx を減少（0 → -maxS）
+  const t = JSON.stringify(scrollTarget);
+  return `(function(){
+  var STEP = 0.92;
+  var initTarget = ${t};
+  var body = document.body;
+  var tx = 0;
+  var posTimer = null;
+
+  function vw(){ return window.innerWidth; }
+  function cw(){ return body.offsetWidth; }
+  function maxS(){ return Math.max(0, cw() - vw()); }
+
+  function postEdge(d){ window.parent.postMessage({type:'EPUB_EDGE',direction:d},'*'); }
+  function postPos(r){  window.parent.postMessage({type:'EPUB_POS', ratio:r},  '*'); }
+
+  function setTx(x){
+    tx = x;
+    body.style.setProperty('transform','translateX('+x+'px)','important');
+    clearTimeout(posTimer);
+    posTimer = setTimeout(reportPos, 500);
+  }
+
+  function reportPos(){
+    var ms = maxS();
+    if(ms <= 0){ postPos(0); return; }
+    // ratio: 0=先頭(tx=-ms), 1=末尾(tx=0)
+    postPos(Math.max(0, Math.min(1, (tx + ms) / ms)));
+  }
+
+  function applyInit(){
+    var ms = maxS();
+    if(initTarget === 'end'){
+      setTx(0);
+    } else if(typeof initTarget === 'number'){
+      setTx(-(1 - initTarget) * ms);
+    } else {
+      setTx(-ms); // 'start': body の右端を viewport 右端に合わせる
+    }
+    body.style.setProperty('opacity','1','important');
+  }
+
+  function doScroll(dir){
+    var ms = maxS();
+    if(ms <= 0){ postEdge(dir); return; }
+    var step = vw() * STEP;
+    if(dir === 1){ // 前進: tx → 0
+      if(tx >= -2){ postEdge(1); return; }
+      setTx(Math.min(tx + step, 0));
+    } else {       // 後退: tx → -ms
+      if(tx <= -(ms - 2)){ postEdge(-1); return; }
+      setTx(Math.max(tx - step, -ms));
+    }
+  }
+
+  window.addEventListener('message', function(ev){
+    if(!ev.data || ev.data.type !== 'EPUB_SCROLL') return;
+    doScroll(ev.data.direction);
+  });
+
+  // タッチスワイプでページ送り
+  var touchStartX = 0;
+  document.addEventListener('touchstart', function(e){
+    touchStartX = e.touches[0].clientX;
+  }, {passive:true});
+  document.addEventListener('touchend', function(e){
+    var dx = e.changedTouches[0].clientX - touchStartX;
+    if(Math.abs(dx) > 50) doScroll(dx < 0 ? 1 : -1);
+  }, {passive:true});
+
+  document.addEventListener('click', function(ev){
+    var a = ev.target.closest('a');
+    if(!a) return;
+    var href = a.getAttribute('href') || '';
+    if(!href) return;
+    ev.preventDefault();
+    if(href.startsWith('http://')||href.startsWith('https://')||href.startsWith('//')){
+      window.open(href,'_blank','noopener,noreferrer'); return;
+    }
+    if(href.startsWith('#')) return;
+    window.parent.postMessage({type:'EPUB_LINK',href:href},'*');
+  });
+
+  function init(){
+    // body.offsetWidth は layout 完了後でないと正確に取れないため
+    // load イベント後に applyInit を実行
+    function run(){
+      // 1 frame 遅延して layout 確定を待つ
+      requestAnimationFrame(function(){
+        requestAnimationFrame(applyInit);
+      });
+    }
+    if(document.readyState === 'complete') run();
+    else window.addEventListener('load', run, {once:true});
+  }
+  init();
+})();`;
 }
 
 
@@ -666,7 +665,6 @@ async function renderPage(idx, scrollTarget) {
   if (seq !== _renderSeq) return;
 
   const iframe = document.getElementById('content-iframe');
-  // Setting srcdoc directly – no blob URL, no origin issue
   iframe.srcdoc = srcdoc;
 
   updatePageInfo();
@@ -692,7 +690,6 @@ function scrollPage(direction) {
   }
 }
 
-// Messages from iframe: chapter edge detection & scroll position reporting
 window.addEventListener('message', e => {
   if (!e.data) return;
   if (e.data.type === 'EPUB_EDGE') {
@@ -710,7 +707,7 @@ window.addEventListener('message', e => {
 
 function handleIframeLink(href) {
   const base   = href.split('#')[0];
-  if (!base) return; // anchor-only (#id) on same page — no-op
+  if (!base) return;
   const curItem = state.spine[state.currentSpineIdx];
   const curDir  = curItem.absPath.includes('/')
     ? curItem.absPath.slice(0, curItem.absPath.lastIndexOf('/') + 1)
@@ -747,7 +744,7 @@ function updatePageInfo() {
 }
 
 // ══════════════════════════════════════════
-//  Keyboard
+//  Keyboard（Bluetooth キーボード対応）
 // ══════════════════════════════════════════
 document.addEventListener('keydown', e => {
   if (e.target.tagName === 'SELECT' || e.target.tagName === 'INPUT') return;
@@ -812,7 +809,6 @@ function changeFont(v) {
   if (state.spine.length) renderPage(state.currentSpineIdx);
 }
 function changeFontSize(d) {
-  // スモールサイズは10%刻み、大サイズは20%刻みで操作しやすく
   const step = state.fontSize >= 200 ? 20 : 10;
   state.fontSize = Math.max(60, Math.min(400, state.fontSize + d * step));
   document.getElementById('font-size-display').textContent = state.fontSize + '%';
@@ -855,7 +851,7 @@ function openFilePicker() {
 }
 
 // ══════════════════════════════════════════
-//  Resume (レジューム) — localStorage
+//  Resume（レジューム）
 // ══════════════════════════════════════════
 function showResumeBanner() {
   try {
@@ -869,7 +865,7 @@ function showResumeBanner() {
 }
 
 // ══════════════════════════════════════════
-//  Bookmark (しおり)
+//  Bookmark（しおり）
 // ══════════════════════════════════════════
 function loadSavedPos() {
   if (!state.bookKey) return null;
@@ -886,6 +882,7 @@ function savePos(ratio) {
     notifyStorageError();
   }
 }
+
 // ══════════════════════════════════════════
 //  Bookmark Export / Import
 // ══════════════════════════════════════════
@@ -956,19 +953,20 @@ function showToast(msg) {
 //  Help / Modal
 // ══════════════════════════════════════════
 function showHelp() {
-  document.getElementById('modal-title').textContent = '操作ガイド';
+  document.getElementById('modal-title').textContent = '操作ガイド（iOS Safari版）';
   document.getElementById('modal-body').innerHTML = [
-    '<p><strong>📜 ページスクロール（主操作）</strong></p>',
-    '<p>　スペースキー：1画面分 前進スクロール</p>',
-    '<p>　Shift+スペース：1画面分 後退スクロール</p>',
-    '<p>　↓ / PageDown：前進スクロール</p>',
-    '<p>　↑ / PageUp：後退スクロール</p>',
-    '<p>　画面下「次へ↓」・上「↑前へ」ボタン</p>',
+    '<p><strong>📜 ページスクロール</strong></p>',
+    '<p>　画面下「次へ↓」ボタン：前進スクロール</p>',
+    '<p>　画面上「↑前へ」ボタン：後退スクロール</p>',
     '<p>　※章末尾/先頭で自動的に章移動</p>',
     '<br>',
     '<p><strong>📖 章切り替え</strong></p>',
-    '<p>　← キー：次の章　　→ キー：前の章</p>',
-    '<p>　Home：最初の章　　End：最後の章</p>',
+    '<p>　右「›」ボタン：前の章</p>',
+    '<p>　左「‹」ボタン：次の章</p>',
+    '<br>',
+    '<p><strong>🔵 Bluetoothキーボード</strong></p>',
+    '<p>　スペース：次へ　Shift+スペース：前へ</p>',
+    '<p>　← 次の章　→ 前の章</p>',
     '<br>',
     '<p><strong>フォント／テーマ</strong></p>',
     '<p>　ツールバーのセレクトボックスで変更</p>',
