@@ -73,7 +73,7 @@
   .scroll-btn { position:absolute; left:50%; transform:translateX(-50%); width:120px; height:36px; background:transparent; border:none; color:var(--ui-text); cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px; border-radius:20px; transition:background .2s,opacity .2s,border .2s; opacity:.12; z-index:20; font-size:12px; font-family:inherit; }
   .scroll-btn:hover { opacity:.9; background:var(--accent); border:1px solid var(--accent); color:#fff; }
   .scroll-btn:active { transform:translateX(-50%) scale(.96); }
-  #btn-scroll-fwd { bottom:max(8px, env(safe-area-inset-bottom, 8px)); width:360px; height:108px; border:1px solid var(--ui-text); background:rgba(255,255,255,0.04); font-size:20px; opacity:.22; border-radius:24px; }
+  #btn-scroll-fwd { bottom:max(8px, env(safe-area-inset-bottom, 8px)); width:360px; height:210px; border:1px solid var(--ui-text); background:rgba(255,255,255,0.04); font-size:20px; opacity:.22; border-radius:24px; }
   #btn-scroll-back { top:8px; }
   .chapter-btn.nav-hint { opacity:.85; background:var(--accent); border:1px solid var(--accent); color:#fff; }
   .scroll-btn.nav-hint { opacity:.9; background:var(--accent); border:1px solid var(--accent); color:#fff; }
@@ -734,7 +734,7 @@ function flashNavButtons() {
     fwd.style.background = '';
     fwd.style.borderColor = '';
     fwd.style.opacity = '';
-  }, 4000);
+  }, 5000);
 }
 function updatePageInfo() {
   const total = state.spine.length, cur = state.currentSpineIdx+1;
@@ -978,6 +978,7 @@ function showHelp() {
 }
 function closeModal() {
   document.getElementById('modal-overlay').classList.remove('show');
+  flashNavButtons();
 }
 document.getElementById('modal-overlay').addEventListener('click', e => {
   if (e.target === document.getElementById('modal-overlay')) closeModal();

@@ -737,7 +737,7 @@ function flashNavButtons() {
     fwd.style.background = '';
     fwd.style.borderColor = '';
     fwd.style.opacity = '';
-  }, 4000);
+  }, 5000);
 }
 function updatePageInfo() {
   const total = state.spine.length, cur = state.currentSpineIdx+1;
@@ -980,6 +980,7 @@ function showHelp() {
 }
 function closeModal() {
   document.getElementById('modal-overlay').classList.remove('show');
+  flashNavButtons();
 }
 document.getElementById('modal-overlay').addEventListener('click', e => {
   if (e.target === document.getElementById('modal-overlay')) closeModal();

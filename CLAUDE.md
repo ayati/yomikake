@@ -4,7 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-A single-file ePub 3 vertical-text viewer (`epub_viewer.html`) designed for reading Japanese publications. No build system — open the HTML file directly in a browser or serve via HTTP.
+Two-file ePub 3 vertical-text viewer for reading Japanese publications. No build system — open the HTML file directly in a browser or serve via HTTP.
+
+| File | Target |
+|------|--------|
+| `epub_viewer.html` | Chrome / Firefox / Edge (Windows, macOS, Android) and macOS Safari |
+| `epub_viewer_ios.html` | iOS Safari (iPhone / iPad) only — uses CSS transform scroll instead of scroll APIs |
 
 **External dependency:** JSZip 3.10.1 loaded via CDN (`cdnjs.cloudflare.com`).
 
@@ -28,7 +33,7 @@ There are no automated tests. Manual testing requires a `.epub` or `.kepub` file
 
 ## Architecture
 
-The entire application lives in `epub_viewer.html` (~995 lines). It follows a modular functional style with a single central state object.
+Each viewer is a single self-contained HTML file (~992 lines). Both follow a modular functional style with a single central state object. The architecture below describes `epub_viewer.html`; `epub_viewer_ios.html` is identical except for the scroll mechanism (see iOS Viewer section below).
 
 ### State
 
@@ -59,13 +64,21 @@ const state = {
 - **`buildScrollScript()`** returns a self-contained IIFE string baked into the iframe. Two scroll sign conventions exist: Chrome-negative (`scrollLeft=0` at right edge, goes negative left) and positive (`scrollLeft=max` at right edge, `0` at left). The script detects the convention via a universal probe in `applyInit()`: set `scrollLeft=9999999` (a large positive), then read back. Chrome-neg clamps to 0 (right edge); positive mode clamps to max (right edge). In both cases the content is positioned at the start. Read back determines `_neg`. The `doScroll()` else-branch (positive) moves in the opposite numeric direction from the neg-branch but the same visual direction (forward = decrease toward left edge).
 - **iOS Safari scroll compatibility** — injected CSS sets `html { height:100%; overflow-y:hidden }`. Two constraints: (1) `height:100%` (not `100vh`) — iOS Safari resolves `100vh` to full screen height including address bar, making columns too tall; (2) `overflow-x` is NOT set — setting `overflow-x:auto` causes iOS to use an LTR CSS scroll container where the initial position is scrollLeft=0 (left edge = RTL content end = blank). Without it, iOS UIScrollView auto-positions at the RTL start (right edge = content beginning).
 - **`window.scrollTo()` instead of `scrollLeft` assignment** — `document.documentElement.scrollLeft = X` is silently ignored inside iOS Safari iframes (confirmed via diagnostics: probe=0 after setting 9999999). `window.scrollTo(x, 0)` works correctly. All scroll operations use `window.scrollTo`; `window.scrollX` is used for reading (falls back to `scrollLeft` for browsers that don't support `scrollX`).
-- **`document.documentElement.scrollWidth`** — the document root correctly reports `scrollWidth` including left-side (RTL/vertical-rl) overflow in all browsers (unlike a wrapper `div` which excludes RTL left-side overflow, causing `scrollWidth == clientWidth` and immediate `EPUB_EDGE`). Always use `document.documentElement.scrollWidth` for measuring content width.
-- **`document.documentElement.scrollWidth` vs `div.scrollWidth` for RTL** — the document root correctly reports `scrollWidth` including left-side (RTL/vertical-rl) overflow in all browsers. A wrapper `div` with `overflow-x:auto` does NOT include left-side overflow in its `scrollWidth`, causing `scrollWidth == clientWidth` always, which would make every scroll immediately trigger `EPUB_EDGE`. Always scroll `document.documentElement` for this reason.
-- **`flashNavButtons()`** is called after `renderPage` completes on ePub open. It flashes all 4 nav buttons with accent color for 4 seconds to help users discover the controls. `#btn-scroll-fwd` is handled via inline styles (not CSS class) because its ID-level `background` and `border` override class-based rules at the same specificity level.
+- **`document.documentElement.scrollWidth`** — the document root correctly reports `scrollWidth` including left-side (RTL/vertical-rl) overflow in all browsers. A wrapper `div` with `overflow-x:auto` does NOT include left-side overflow in its `scrollWidth`, causing `scrollWidth == clientWidth` always, making every scroll immediately trigger `EPUB_EDGE`. Always use `document.documentElement.scrollWidth` for measuring content width.
+- **`flashNavButtons()`** is called (1) after `renderPage` completes on ePub open, and (2) after `closeModal()` closes the help dialog. It flashes all 4 nav buttons with accent color for 5 seconds to help users discover the controls. `#btn-scroll-fwd` is handled via inline styles (not CSS class) because its ID-level `background` and `border` override class-based rules at the same specificity level.
 - **`scrollPage()` calls `blur()`** on any focused nav button before sending the scroll postMessage. Without this, clicking `#btn-scroll-fwd` then pressing a keyboard scroll key leaves the button with a persistent `:focus-visible` border (since `#btn-scroll-fwd` has a always-present `border:1px solid` at the ID level).
 - **`prevChapter()` uses `'start'`** as the scroll target. `'end'` is reserved for automatic chapter transitions triggered by scrolling past the chapter boundary (so the reader lands at the end of the previous chapter, matching scroll direction). Explicit chapter button navigation always starts at the beginning.
 - **`_renderSeq` (render sequence counter)** guards against race conditions when `renderPage` is called rapidly. Each call captures the current sequence number; after each `await`, the function checks if a newer call has started and returns early if so. This ensures only the last-requested chapter is rendered.
 - **`zip.file()` null checks** — `state.epub.file(absPath)` can return null if the ePub ZIP is missing a declared file. `renderPage` shows a toast and aborts; `loadEpub` skips TOC parsing (the book still opens without a table of contents).
+
+### iOS Viewer (`epub_viewer_ios.html`)
+
+iOS Safari silently ignores both `document.documentElement.scrollLeft` assignment and `window.scrollTo()` inside iframes, so `epub_viewer_ios.html` uses a completely different scroll mechanism — **CSS `transform`** — inside `buildScrollScript()`:
+
+- `body { position:fixed; writing-mode:vertical-rl; width:max-content }` expands all columns into a single body-width block.
+- `body.style.transform = 'translateX(px)'` slides the content to simulate page turns.
+- No scroll API is called anywhere; swipe gesture (`touchstart`/`touchend`) replaces keyboard and button scroll in the iframe.
+- `EPUB_SCROLL`, `EPUB_EDGE`, `EPUB_POS`, and `EPUB_LINK` postMessage protocol is otherwise identical to the main viewer.
 
 ### postMessage Protocol
 
