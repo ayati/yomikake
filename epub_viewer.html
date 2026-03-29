@@ -140,6 +140,13 @@
     <option value="2.8">最広</option>
   </select>
   <div class="tb-sep"></div>
+  <span class="tb-label">組方向:</span>
+  <select id="writing-mode-select" onchange="changeWritingMode(this.value)">
+    <option value="vertical">縦書き</option>
+    <option value="horizontal">横書き</option>
+    <option value="publisher">ePub指定</option>
+  </select>
+  <div class="tb-sep"></div>
   <span class="tb-label">テーマ:</span>
   <select id="theme-select" onchange="changeTheme(this.value)">
     <option value="">標準</option>
@@ -242,6 +249,7 @@ const state = {
   spine:[], manifest:{}, toc:[],
   currentSpineIdx:0,
   fontMode:'publisher', fontSize:100, lineHeight:2.0, theme:'', margin:'full',
+  writingMode:'vertical',  // 'vertical' | 'horizontal' | 'publisher'
   sidebarOpen:true,
   bookKey:'',
 };
@@ -514,14 +522,25 @@ async function buildSrcdoc(xhtmlText, xhtmlAbsPath, scrollTarget) {
     : '';
   const overrideStyle = doc.createElement('style');
   overrideStyle.id = 'epub-viewer-inject';
+  const wm = state.writingMode;
+  // Build writing-mode overrides and blank-end-page padding per mode.
+  // 'vertical'  : force vertical-rl + padding-left:100vw (blank page at reading end)
+  // 'horizontal': force horizontal-tb + padding-bottom:100vh (blank page at bottom)
+  // 'publisher' : no override — let the ePub's own CSS control writing direction
+  const wmHtml = wm === 'vertical'
+    ? 'writing-mode:vertical-rl!important;-webkit-writing-mode:vertical-rl!important;padding-left:100vw!important;'
+    : wm === 'horizontal'
+      ? 'writing-mode:horizontal-tb!important;-webkit-writing-mode:horizontal-tb!important;padding-bottom:100vh!important;'
+      : '';
+  const wmBody = wm === 'vertical'
+    ? 'writing-mode:vertical-rl!important;-webkit-writing-mode:vertical-rl!important;'
+    : wm === 'horizontal'
+      ? 'writing-mode:horizontal-tb!important;-webkit-writing-mode:horizontal-tb!important;'
+      : '';
   overrideStyle.textContent = [
     'html,body{background:' + paper + '!important;color:' + text + '!important;}',
-    'html{font-size:' + state.fontSize + '%!important;',
-        'line-height:' + state.lineHeight + '!important;',
-        'writing-mode:vertical-rl!important;-webkit-writing-mode:vertical-rl!important;',
-        'padding-left:100vw!important;}',
-    'body{writing-mode:vertical-rl!important;-webkit-writing-mode:vertical-rl!important;',
-        'line-height:' + state.lineHeight + '!important;}',
+    'html{font-size:' + state.fontSize + '%!important;line-height:' + state.lineHeight + '!important;' + wmHtml + '}',
+    'body{' + wmBody + 'line-height:' + state.lineHeight + '!important;}',
     'img{max-width:100%!important;max-height:95vh!important;object-fit:contain!important;}',
     fontRule,
   ].join('');
@@ -530,25 +549,173 @@ async function buildSrcdoc(xhtmlText, xhtmlAbsPath, scrollTarget) {
   // ── Inject scroll controller script
   //    (baked-in scrollTarget avoids any async race)
   const scrollScript = doc.createElement('script');
-  scrollScript.textContent = buildScrollScript(scrollTarget);
+  scrollScript.textContent = buildScrollScript(scrollTarget, state.writingMode);
   doc.body.appendChild(scrollScript);
 
   return '<!DOCTYPE html>\n' + doc.documentElement.outerHTML;
 }
 
-function buildScrollScript(scrollTarget) {
-  // Returns a self-contained IIFE string.
-  // scrollTarget is JSON-stringified to be safe.
+function buildScrollScript(scrollTarget, writingMode) {
+  // Returns a self-contained IIFE string baked into the iframe.
+  // writingMode: 'vertical' | 'horizontal' | 'publisher'
+  const t = JSON.stringify(scrollTarget);
+
+  // Shared tail: postMessage listener, link interceptor, scroll-position reporter, init.
+  // Each mode defines its own applyInit / doScroll / reportPos before this block.
+  const SHARED_TAIL = [
+    '  window.addEventListener("message", function(ev){',
+    '    if(!ev.data || ev.data.type !== "EPUB_SCROLL") return;',
+    '    doScroll(ev.data.direction);',
+    '  });',
+    '  document.addEventListener("click", function(ev){',
+    '    var a = ev.target.closest("a");',
+    '    if(!a) return;',
+    '    var href = a.getAttribute("href") || "";',
+    '    if(!href) return;',
+    '    ev.preventDefault();',
+    '    if(href.startsWith("http://") || href.startsWith("https://") || href.startsWith("//")){',
+    '      window.open(href, "_blank", "noopener,noreferrer"); return;',
+    '    }',
+    '    if(href.startsWith("#")){ return; }',
+    '    window.parent.postMessage({type:"EPUB_LINK", href:href}, "*");',
+    '  });',
+    '  var posTimer = null;',
+    '  document.addEventListener("scroll", function(){',
+    '    clearTimeout(posTimer); posTimer = setTimeout(reportPos, 500);',
+    '  }, true);',
+    '  function init(){ setTimeout(applyInit, 80); }',
+    '  if(document.readyState === "loading")',
+    '    document.addEventListener("DOMContentLoaded", init);',
+    '  else init();',
+    '})();',
+  ];
+
+  // ── 横書き (horizontal-tb): vertical scroll axis, padding-bottom:100vh adds blank end-page ──
+  if (writingMode === 'horizontal') {
+    return [
+      '(function(){',
+      '  var STEP = 0.92;',
+      '  var initTarget = ' + t + ';',
+      '  function root(){ return document.documentElement; }',
+      '  function applyInit(){',
+      '    var e = root(), sh = e.scrollHeight, vh = e.clientHeight;',
+      '    if(initTarget === "end"){',
+      '      e.scrollTop = sh > 2*vh ? sh - 2*vh : 0;',
+      '    } else if(typeof initTarget === "number"){',
+      '      if(sh > 2*vh){ e.scrollTop = initTarget * (sh - 2*vh); }',
+      '    } else { e.scrollTop = 0; }',
+      '  }',
+      '  function doScroll(dir){',
+      '    var e = root(), vh = e.clientHeight, sh = e.scrollHeight;',
+      '    // sh includes padding-bottom:100vh for blank-end-page UX.',
+      '    if(sh <= 2*vh){ window.parent.postMessage({type:"EPUB_EDGE",direction:dir},"*"); return; }',
+      '    var step = vh * STEP, cur = e.scrollTop;',
+      '    var maxSReal = sh - 2*vh, maxS = sh - vh;',
+      '    if(dir === 1){',
+      '      if(cur >= maxSReal + 2){ window.parent.postMessage({type:"EPUB_EDGE",direction:1},"*"); return; }',
+      '      e.scrollTop = Math.min(cur + step, maxS);',
+      '    } else {',
+      '      if(cur <= 2){ window.parent.postMessage({type:"EPUB_EDGE",direction:-1},"*"); return; }',
+      '      e.scrollTop = Math.max(cur - step, 0);',
+      '    }',
+      '  }',
+      '  function reportPos(){',
+      '    var e = root(), sh = e.scrollHeight, vh = e.clientHeight;',
+      '    if(sh <= 2*vh){ window.parent.postMessage({type:"EPUB_POS",ratio:0},"*"); return; }',
+      '    var ratio = e.scrollTop / (sh - 2*vh);',
+      '    window.parent.postMessage({type:"EPUB_POS",ratio:Math.max(0,Math.min(1,ratio))},"*");',
+      '  }',
+      ...SHARED_TAIL,
+    ].join('\n');
+  }
+
+  // ── ePub指定 (publisher): writing-mode を実行時に自動検出、余白なし ──
+  if (writingMode === 'publisher') {
+    return [
+      '(function(){',
+      '  var STEP = 0.92;',
+      '  var initTarget = ' + t + ';',
+      '  function root(){ return document.documentElement; }',
+      '  // Detect scroll axis from the computed writing-mode after layout settles.',
+      '  var _axis = null;',
+      '  function axis(){',
+      '    if(_axis) return _axis;',
+      '    var wm = getComputedStyle(root()).writingMode || "";',
+      '    _axis = wm.indexOf("vertical") >= 0 ? "h" : "v";',
+      '    return _axis;',
+      '  }',
+      '  // Chrome/Firefox RTL sign convention for horizontal-scroll (vertical-rl) content.',
+      '  var _neg = null;',
+      '  function isNeg(){',
+      '    if(_neg !== null) return _neg;',
+      '    var e = root();',
+      '    if(e.scrollWidth <= e.clientWidth){ _neg = false; return false; }',
+      '    _neg = (e.scrollLeft <= 0); return _neg;',
+      '  }',
+      '  function applyInit(){',
+      '    var e = root();',
+      '    if(axis() === "h"){',
+      '      var sw = e.scrollWidth, vw = e.clientWidth;',
+      '      if(initTarget === "end"){',
+      '        if(isNeg()){ e.scrollLeft = -(sw-vw); } else { e.scrollLeft = sw-vw; }',
+      '      } else if(typeof initTarget === "number"){',
+      '        if(sw > vw){ var pos = initTarget*(sw-vw); e.scrollLeft = isNeg()?-pos:pos; }',
+      '      } else { e.scrollLeft = 0; }',
+      '    } else {',
+      '      var sh = e.scrollHeight, vh = e.clientHeight;',
+      '      if(initTarget === "end"){ e.scrollTop = Math.max(0, sh-vh); }',
+      '      else if(typeof initTarget === "number"){ if(sh>vh) e.scrollTop = initTarget*(sh-vh); }',
+      '      else { e.scrollTop = 0; }',
+      '    }',
+      '  }',
+      '  function doScroll(dir){',
+      '    var e = root(), step, cur;',
+      '    if(axis() === "h"){',
+      '      var vw = e.clientWidth, sw = e.scrollWidth;',
+      '      if(sw <= vw){ window.parent.postMessage({type:"EPUB_EDGE",direction:dir},"*"); return; }',
+      '      step = vw*STEP; cur = e.scrollLeft;',
+      '      if(isNeg()){',
+      '        var minS = -(sw-vw);',
+      '        if(dir===1){ if(cur<=minS+2){ window.parent.postMessage({type:"EPUB_EDGE",direction:1},"*"); return; } e.scrollLeft=Math.max(cur-step,minS); }',
+      '        else       { if(cur>=-2){    window.parent.postMessage({type:"EPUB_EDGE",direction:-1},"*"); return; } e.scrollLeft=Math.min(cur+step,0); }',
+      '      } else {',
+      '        var maxS = sw-vw;',
+      '        if(dir===1){ if(cur>=maxS-2){ window.parent.postMessage({type:"EPUB_EDGE",direction:1},"*"); return; } e.scrollLeft=Math.min(cur+step,maxS); }',
+      '        else       { if(cur<=2){     window.parent.postMessage({type:"EPUB_EDGE",direction:-1},"*"); return; } e.scrollLeft=Math.max(cur-step,0); }',
+      '      }',
+      '    } else {',
+      '      var vh = e.clientHeight, sh = e.scrollHeight, maxSv = sh-vh;',
+      '      if(sh <= vh){ window.parent.postMessage({type:"EPUB_EDGE",direction:dir},"*"); return; }',
+      '      step = vh*STEP; cur = e.scrollTop;',
+      '      if(dir===1){ if(cur>=maxSv-2){ window.parent.postMessage({type:"EPUB_EDGE",direction:1},"*"); return; } e.scrollTop=Math.min(cur+step,maxSv); }',
+      '      else       { if(cur<=2){      window.parent.postMessage({type:"EPUB_EDGE",direction:-1},"*"); return; } e.scrollTop=Math.max(cur-step,0); }',
+      '    }',
+      '  }',
+      '  function reportPos(){',
+      '    var e = root(), ratio;',
+      '    if(axis() === "h"){',
+      '      var sw = e.scrollWidth, vw = e.clientWidth;',
+      '      if(sw <= vw){ window.parent.postMessage({type:"EPUB_POS",ratio:0},"*"); return; }',
+      '      ratio = isNeg() ? (-e.scrollLeft/(sw-vw)) : (e.scrollLeft/(sw-vw));',
+      '    } else {',
+      '      var sh = e.scrollHeight, vh = e.clientHeight;',
+      '      if(sh <= vh){ window.parent.postMessage({type:"EPUB_POS",ratio:0},"*"); return; }',
+      '      ratio = e.scrollTop / (sh-vh);',
+      '    }',
+      '    window.parent.postMessage({type:"EPUB_POS",ratio:Math.max(0,Math.min(1,ratio))},"*");',
+      '  }',
+      ...SHARED_TAIL,
+    ].join('\n');
+  }
+
+  // ── 縦書き (vertical-rl, default): RTL horizontal scroll, padding-left:100vw adds blank end-page ──
   return [
     '(function(){',
     '  var STEP = 0.92;',
-    '  var initTarget = ' + JSON.stringify(scrollTarget) + ';',
-    '',
+    '  var initTarget = ' + t + ';',
     '  function root(){ return document.documentElement; }',
-    '',
-    '  // Chrome RTL: scrollLeft starts at 0 (right edge) and goes negative toward left.',
-    '  // Firefox RTL: scrollLeft starts at max and goes toward 0 at left edge.',
-    '  // Detect by checking sign after a tiny test nudge (non-destructive probe).',
+    '  // Chrome RTL: scrollLeft=0 at right edge, goes negative leftward.',
+    '  // Firefox RTL: scrollLeft=max at right edge, goes toward 0.',
     '  var _neg = null;',
     '  function isNeg(){',
     '    if(_neg !== null) return _neg;',
@@ -557,7 +724,6 @@ function buildScrollScript(scrollTarget) {
     '    _neg = (e.scrollLeft <= 0);',
     '    return _neg;',
     '  }',
-    '',
     '  function applyInit(){',
     '    var e = root();',
     '    var sw = e.scrollWidth, vw = e.clientWidth;',
@@ -574,7 +740,6 @@ function buildScrollScript(scrollTarget) {
     '      e.scrollLeft = 0;',
     '    }',
     '  }',
-    '',
     '  function doScroll(dir){',
     '    var e = root();',
     '    var vw = e.clientWidth, sw = e.scrollWidth;',
@@ -588,7 +753,6 @@ function buildScrollScript(scrollTarget) {
     '      var minSReal = -(sw - 2*vw);  // real content end; past here is blank',
     '      if(dir === 1){',
     '        // Fire EPUB_EDGE once we are clearly in the blank zone (>= 2px past content end).',
-    '        // The first scroll past minSReal lands in the blank zone and shows the "blank page".',
     '        if(cur <= minSReal - 2){ window.parent.postMessage({type:"EPUB_EDGE",direction:1},"*"); return; }',
     '        e.scrollLeft = Math.max(cur - step, minS);',
     '      } else {',
@@ -596,8 +760,8 @@ function buildScrollScript(scrollTarget) {
     '        e.scrollLeft = Math.min(cur + step, 0);',
     '      }',
     '    } else {',
-    '      var maxS     = sw - vw;       // absolute scroll limit',
-    '      var maxSReal = sw - 2*vw;     // real content end',
+    '      var maxS     = sw - vw;',
+    '      var maxSReal = sw - 2*vw;',
     '      if(dir === 1){',
     '        if(cur >= maxSReal + 2){ window.parent.postMessage({type:"EPUB_EDGE",direction:1},"*"); return; }',
     '        e.scrollLeft = Math.min(cur + step, maxS);',
@@ -607,49 +771,15 @@ function buildScrollScript(scrollTarget) {
     '      }',
     '    }',
     '  }',
-    '',
-    '  window.addEventListener("message", function(ev){',
-    '    if(!ev.data || ev.data.type !== "EPUB_SCROLL") return;',
-    '    doScroll(ev.data.direction);',
-    '  });',
-    '',
-    '  // Intercept link clicks: external → new tab, internal → parent navigation',
-    '  document.addEventListener("click", function(ev){',
-    '    var a = ev.target.closest("a");',
-    '    if(!a) return;',
-    '    var href = a.getAttribute("href") || "";',
-    '    if(!href) return;',
-    '    ev.preventDefault();',
-    '    if(href.startsWith("http://") || href.startsWith("https://") || href.startsWith("//")){',
-    '      window.open(href, "_blank", "noopener,noreferrer");',
-    '      return;',
-    '    }',
-    '    if(href.startsWith("#")){ return; }',  // same-page anchor: ignore
-    '    window.parent.postMessage({type:"EPUB_LINK", href:href}, "*");',
-    '  });',
-    '',
-    '  // Report scroll position to parent (for bookmark saving)',
-    '  var posTimer = null;',
     '  function reportPos(){',
     '    var e = root();',
     '    var sw = e.scrollWidth, vw = e.clientWidth;',
     '    if(sw <= 2*vw){ window.parent.postMessage({type:"EPUB_POS",ratio:0},"*"); return; }',
     '    var cur = e.scrollLeft;',
-    '    // Use real content range (sw - 2*vw) to exclude blank padding from ratio.',
     '    var ratio = isNeg() ? (-cur / (sw - 2*vw)) : (cur / (sw - 2*vw));',
     '    window.parent.postMessage({type:"EPUB_POS",ratio:Math.max(0,Math.min(1,ratio))},"*");',
     '  }',
-    '  document.addEventListener("scroll", function(){',
-    '    clearTimeout(posTimer);',
-    '    posTimer = setTimeout(reportPos, 500);',
-    '  }, true);',
-    '',
-    '  // Apply initial scroll after layout settles',
-    '  function init(){ setTimeout(applyInit, 80); }',
-    '  if(document.readyState === "loading")',
-    '    document.addEventListener("DOMContentLoaded", init);',
-    '  else init();',
-    '})();',
+    ...SHARED_TAIL,
   ].join('\n');
 }
 
@@ -787,11 +917,12 @@ const SETTINGS_KEY = 'epub_settings';
 function saveSettings() {
   try {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify({
-      fontMode:   state.fontMode,
-      fontSize:   state.fontSize,
-      lineHeight: state.lineHeight,
-      theme:      state.theme,
-      margin:     state.margin,
+      fontMode:    state.fontMode,
+      fontSize:    state.fontSize,
+      lineHeight:  state.lineHeight,
+      theme:       state.theme,
+      margin:      state.margin,
+      writingMode: state.writingMode,
     }));
   } catch(e) {
     notifyStorageError();
@@ -807,6 +938,7 @@ function loadSettings() {
     if (s.lineHeight)           { state.lineHeight = s.lineHeight;     document.getElementById('lineh-select').value = String(s.lineHeight); }
     if (s.theme !== undefined)  { state.theme = s.theme;               document.body.className = s.theme ? 'theme-' + s.theme : ''; document.getElementById('theme-select').value = s.theme; }
     if (s.margin)               { state.margin = s.margin;             document.getElementById('margin-select').value = s.margin; applyMargin(s.margin); }
+    if (s.writingMode)          { state.writingMode = s.writingMode;   document.getElementById('writing-mode-select').value = s.writingMode; }
   } catch(e) {}
 }
 
@@ -854,6 +986,11 @@ function changeMargin(v) {
   state.margin = v;
   applyMargin(v);
   saveSettings();
+}
+function changeWritingMode(v) {
+  state.writingMode = v;
+  saveSettings();
+  if (state.spine.length) renderPage(state.currentSpineIdx);
 }
 
 // ══════════════════════════════════════════
