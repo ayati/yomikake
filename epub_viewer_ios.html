@@ -590,9 +590,11 @@ function buildScrollScript(scrollTarget) {
     var ms = maxS();
     if(ms <= 0){ postEdge(dir); return; }
     var step = vw() * STEP;
-    if(dir === 1){ // 前進: tx → 0
-      if(tx >= -2){ postEdge(1); return; }
-      setTx(Math.min(tx + step, 0));
+    if(dir === 1){ // 前進: tx → 0 → blank zone (tx > 0)
+      // tx > 0 は blank zone（body が右にずれ、左側に空白が見える）。
+      // blank zone に 2px 以上入った次の押下で EPUB_EDGE を発火する。
+      if(tx >= 2){ postEdge(1); return; }
+      setTx(Math.min(tx + step, step)); // blank zone 上限 = 1 step 分
     } else {       // 後退: tx → -ms
       if(tx <= -(ms - 2)){ postEdge(-1); return; }
       setTx(Math.max(tx - step, -ms));

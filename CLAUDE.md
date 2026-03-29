@@ -13,7 +13,7 @@ Two-file ePub 3 vertical-text viewer for reading Japanese publications. No build
 
 **External dependency:** JSZip 3.10.1 loaded via CDN (`cdnjs.cloudflare.com`).
 
-**License:** MIT © 2026 N.Aono — see `LICENSE.md`.
+**License:** MIT © 2026 N.Aono — see `LICENSE`.
 
 ## Development
 
@@ -68,6 +68,7 @@ const state = {
 - **`flashNavButtons()`** is called (1) after `renderPage` completes on ePub open, and (2) after `closeModal()` closes the help dialog. It flashes all 4 nav buttons with accent color for 5 seconds to help users discover the controls. `#btn-scroll-fwd` is handled via inline styles (not CSS class) because its ID-level `background` and `border` override class-based rules at the same specificity level.
 - **`scrollPage()` calls `blur()`** on any focused nav button before sending the scroll postMessage. Without this, clicking `#btn-scroll-fwd` then pressing a keyboard scroll key leaves the button with a persistent `:focus-visible` border (since `#btn-scroll-fwd` has a always-present `border:1px solid` at the ID level).
 - **`prevChapter()` uses `'start'`** as the scroll target. `'end'` is reserved for automatic chapter transitions triggered by scrolling past the chapter boundary (so the reader lands at the end of the previous chapter, matching scroll direction). Explicit chapter button navigation always starts at the beginning.
+- **Chapter-end blank page** — `buildSrcdoc()` injects `padding-left:100vw` into the iframe `html` element. In `writing-mode:vertical-rl`, this adds one viewport-width of blank space at the physical left (= reading end) of the document. `buildScrollScript()` accounts for this by using `sw - 2*vw` (not `sw - vw`) as the real content range for edge detection, `applyInit`, and `reportPos`. `doScroll` fires `EPUB_EDGE` when `cur <= minSReal - 2` (Chrome-neg) / `cur >= maxSReal + 2` (pos), meaning the scroll is already 2+ px into the blank zone. On the prior scroll (which crosses `minSReal`), the viewport shows last content on the right and blank on the left — the intended UX. `epub_viewer_ios.html` uses the same "one step of blank" pattern via CSS-transform: `tx > 0` is the blank zone; `setTx(Math.min(tx + step, step))` caps blank travel at one step; `EPUB_EDGE` fires when `tx >= 2`.
 - **`_renderSeq` (render sequence counter)** guards against race conditions when `renderPage` is called rapidly. Each call captures the current sequence number; after each `await`, the function checks if a newer call has started and returns early if so. This ensures only the last-requested chapter is rendered.
 - **`zip.file()` null checks** — `state.epub.file(absPath)` can return null if the ePub ZIP is missing a declared file. `renderPage` shows a toast and aborts; `loadEpub` skips TOC parsing (the book still opens without a table of contents).
 
