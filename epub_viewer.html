@@ -18,7 +18,10 @@
   body { font-family:"游明朝","YuMincho",serif; background:var(--bg); color:var(--text); height:100vh; height:100dvh; overflow:hidden; display:flex; flex-direction:column; user-select:none; padding-bottom:env(safe-area-inset-bottom,0); }
 
   #toolbar { min-height:48px; background:var(--ui-bg); border-bottom:1px solid var(--ui-border); display:flex; align-items:center; padding:0 8px; gap:6px; flex-shrink:0; box-shadow:0 2px 8px var(--shadow); overflow-x:auto; -webkit-overflow-scrolling:touch; }
-  #toolbar::-webkit-scrollbar { height:3px; }
+  #toolbar::-webkit-scrollbar { height:5px; }
+  #toolbar::-webkit-scrollbar-track { background:transparent; }
+  #toolbar::-webkit-scrollbar-thumb { background:rgba(255,255,255,.2); border-radius:3px; }
+  #toolbar::-webkit-scrollbar-thumb:hover { background:rgba(255,255,255,.4); }
   #toolbar button { background:transparent; border:1px solid var(--ui-border); color:var(--ui-text); padding:4px 10px; border-radius:4px; cursor:pointer; font-size:13px; font-family:inherit; transition:background .15s,border-color .15s; white-space:nowrap; }
   #toolbar button:hover { background:rgba(255,255,255,.1); border-color:var(--accent); }
   #toolbar button.active { background:var(--accent); border-color:var(--accent); }
@@ -90,6 +93,7 @@
   #modal-box { background:var(--ui-bg); border:1px solid var(--ui-border); border-radius:8px; padding:24px; min-width:340px; max-width:480px; color:var(--ui-text); box-shadow:0 8px 40px rgba(0,0,0,.5); }
   #modal-box h3 { font-size:16px; margin-bottom:16px; color:var(--accent); }
   #modal-box p { font-size:13px; line-height:1.8; opacity:.85; }
+  #modal-body { max-height:calc(80vh - 120px); overflow-y:auto; }
   #modal-close { margin-top:20px; background:var(--accent); border:none; color:#fff; padding:8px 24px; border-radius:4px; cursor:pointer; font-size:13px; float:right; }
   #file-input { display:none; }
   #toast { position:fixed; top:60px; left:50%; transform:translateX(-50%); background:var(--ui-bg); border:1px solid var(--accent); color:var(--ui-text); padding:8px 20px; border-radius:20px; font-size:13px; z-index:300; opacity:0; transition:opacity .3s; pointer-events:none; white-space:nowrap; box-shadow:0 2px 12px var(--shadow); }
@@ -248,6 +252,7 @@ const state = {
   epub:null, opfPath:'', opfDir:'',
   spine:[], manifest:{}, toc:[],
   currentSpineIdx:0,
+  bookTitle:'', bookCreator:'',
   fontMode:'publisher', fontSize:100, lineHeight:2.0, theme:'', margin:'full',
   writingMode:'vertical',  // 'vertical' | 'horizontal' | 'publisher'
   sidebarOpen:true,
@@ -355,6 +360,9 @@ async function loadEpub(file) {
     // UI
     const titleEl = opfDoc.querySelector('metadata > *|title, metadata > title');
     const titleText = titleEl ? titleEl.textContent : file.name;
+    state.bookTitle = titleText;
+    state.bookCreator = [...opfDoc.querySelectorAll('metadata > *|creator, metadata > creator')]
+      .map(el => el.textContent.trim()).filter(Boolean).join('・');
     document.getElementById('book-title').textContent = titleText;
     state.bookKey = 'epub_pos_' + titleText + '_' + state.spine.length;
     document.getElementById('welcome').style.display = 'none';
@@ -1101,9 +1109,21 @@ function showToast(msg) {
 // ══════════════════════════════════════════
 //  Help / Modal
 // ══════════════════════════════════════════
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
 function showHelp() {
-  document.getElementById('modal-title').textContent = '操作ガイド';
-  document.getElementById('modal-body').innerHTML = [
+  document.getElementById('modal-title').textContent = 'ヘルプ';
+  const bookInfo = state.epub ? [
+    '<div style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:6px;padding:12px 16px;margin-bottom:16px;">',
+    '<p style="font-size:11px;opacity:.55;margin-bottom:6px;">📚 現在の書籍</p>',
+    '<p style="font-size:14px;font-weight:bold;line-height:1.6;opacity:1;margin-bottom:4px;">' + esc(state.bookTitle) + '</p>',
+    state.bookCreator ? '<p>著者：' + esc(state.bookCreator) + '</p>' : '',
+    '<p>チャプター数：' + state.spine.length + '</p>',
+    state.toc.length ? '<p>目次項目数：' + state.toc.length + '</p>' : '',
+    '</div>',
+  ].join('') : '';
+  document.getElementById('modal-body').innerHTML = bookInfo + [
     '<p><strong>📜 ページスクロール（主操作）</strong></p>',
     '<p>　スペースキー：1画面分 前進スクロール</p>',
     '<p>　Shift+スペース：1画面分 後退スクロール</p>',
@@ -1131,6 +1151,13 @@ function closeModal() {
 document.getElementById('modal-overlay').addEventListener('click', e => {
   if (e.target === document.getElementById('modal-overlay')) closeModal();
 });
+
+// Toolbar horizontal scroll via mouse wheel
+document.getElementById('toolbar').addEventListener('wheel', e => {
+  if (e.deltaY === 0) return;
+  e.preventDefault();
+  e.currentTarget.scrollLeft += e.deltaY;
+}, { passive: false });
 
 // Init
 document.getElementById('toc-btn').classList.add('active');
