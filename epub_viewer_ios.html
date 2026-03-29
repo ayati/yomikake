@@ -140,6 +140,13 @@
     <option value="2.8">最広</option>
   </select>
   <div class="tb-sep"></div>
+  <span class="tb-label">組方向:</span>
+  <select id="writing-mode-select" onchange="changeWritingMode(this.value)">
+    <option value="vertical">縦書き</option>
+    <option value="horizontal">横書き</option>
+    <option value="publisher">ePub指定</option>
+  </select>
+  <div class="tb-sep"></div>
   <span class="tb-label">テーマ:</span>
   <select id="theme-select" onchange="changeTheme(this.value)">
     <option value="">標準</option>
@@ -242,6 +249,7 @@ const state = {
   spine:[], manifest:{}, toc:[],
   currentSpineIdx:0,
   fontMode:'publisher', fontSize:100, lineHeight:2.0, theme:'', margin:'full',
+  writingMode:'vertical',  // 'vertical' | 'horizontal' | 'publisher'
   sidebarOpen:true,
   bookKey:'',
 };
@@ -499,16 +507,27 @@ async function buildSrcdoc(xhtmlText, xhtmlAbsPath, scrollTarget) {
   const paper  = colors.paper;
   const text   = colors.text;
   const fontRule = font ? 'body,body *{font-family:' + font + '!important;}' : '';
+  const wm = state.writingMode;
+  const bodyWmCss = wm === 'vertical'
+    ? 'position:fixed!important;top:0!important;bottom:0!important;left:0!important;' +
+      'width:max-content!important;min-width:100vw!important;max-width:none!important;' +
+      'overflow:visible!important;' +
+      'writing-mode:vertical-rl!important;-webkit-writing-mode:vertical-rl!important;'
+    : wm === 'horizontal'
+      ? 'position:fixed!important;top:0!important;left:0!important;right:0!important;' +
+        'height:max-content!important;min-height:100vh!important;max-height:none!important;' +
+        'overflow:visible!important;' +
+        'writing-mode:horizontal-tb!important;-webkit-writing-mode:horizontal-tb!important;'
+      : /* publisher */
+        'position:fixed!important;top:0!important;left:0!important;' +
+        'overflow:visible!important;max-width:none!important;max-height:none!important;';
   const overrideStyle = doc.createElement('style');
   overrideStyle.id = 'epub-viewer-inject';
   overrideStyle.textContent = [
     'html{height:100%!important;overflow:hidden!important;',
         'margin:0!important;padding:0!important;',
         'background:' + paper + '!important;}',
-    'body{position:fixed!important;top:0!important;bottom:0!important;left:0!important;',
-        'width:max-content!important;min-width:100vw!important;max-width:none!important;',
-        'overflow:visible!important;',
-        'writing-mode:vertical-rl!important;-webkit-writing-mode:vertical-rl!important;',
+    'body{' + bodyWmCss,
         'margin:0!important;padding:0!important;',
         'background:' + paper + '!important;',
         'color:' + text + '!important;',
@@ -521,7 +540,7 @@ async function buildSrcdoc(xhtmlText, xhtmlAbsPath, scrollTarget) {
   doc.head.appendChild(overrideStyle);
 
   const scrollScript = doc.createElement('script');
-  scrollScript.textContent = buildScrollScript(scrollTarget);
+  scrollScript.textContent = buildScrollScript(scrollTarget, state.writingMode);
   doc.body.appendChild(scrollScript);
 
   return '<!DOCTYPE html>\n' + doc.documentElement.outerHTML;
@@ -530,22 +549,244 @@ async function buildSrcdoc(xhtmlText, xhtmlAbsPath, scrollTarget) {
 // ══════════════════════════════════════════
 //  Scroll Script（iOS Safari 専用設計 - CSS transform 方式）
 // ══════════════════════════════════════════
-function buildScrollScript(scrollTarget) {
+function buildScrollScript(scrollTarget, writingMode) {
   // iOS Safari の scroll API を完全に回避し、CSS transform で列をスライドする。
   //
-  // body { position:fixed; writing-mode:vertical-rl; width:max-content }
-  //   → 縦書き列が body の右端（column 1）から左へ並ぶ
-  //   → body.offsetWidth = 全列幅の合計
-  //   → viewport 幅 = window.innerWidth
-  //   → maxS = body.offsetWidth - window.innerWidth
-  //
-  // transform 規則:
+  // 縦書き（vertical）: translateX
   //   tx = -maxS : body 右端 = viewport 右端 = column 1 = コンテンツ先頭
   //   tx = 0     : body 左端 = viewport 左端 = 最終列 = コンテンツ末尾
+  //   前進: tx 増加（-maxS → 0 → blank zone）
   //
-  // 前進（右→左）: tx を増加（-maxS → 0）
-  // 後退（左→右）: tx を減少（0 → -maxS）
+  // 横書き（horizontal）: translateY
+  //   ty = 0     : body 上端 = viewport 上端 = コンテンツ先頭
+  //   ty = maxS  : body 下端 = viewport 下端 = コンテンツ末尾
+  //   前進: ty 増加（0 → maxS → blank zone）
+  //
+  // ePub指定（publisher）: 描画後に writing-mode を検出して軸を切り替え
   const t = JSON.stringify(scrollTarget);
+
+  const CLICK_HANDLER = `
+  document.addEventListener('click', function(ev){
+    var a = ev.target.closest('a');
+    if(!a) return;
+    var href = a.getAttribute('href') || '';
+    if(!href) return;
+    ev.preventDefault();
+    if(href.startsWith('http://')||href.startsWith('https://')||href.startsWith('//')){
+      window.open(href,'_blank','noopener,noreferrer'); return;
+    }
+    if(href.startsWith('#')) return;
+    window.parent.postMessage({type:'EPUB_LINK',href:href},'*');
+  });`;
+
+  const INIT_FN = `
+  function init(){
+    function run(){
+      requestAnimationFrame(function(){
+        requestAnimationFrame(applyInit);
+      });
+    }
+    if(document.readyState === 'complete') run();
+    else window.addEventListener('load', run, {once:true});
+  }
+  init();`;
+
+  if (writingMode === 'horizontal') {
+    return `(function(){
+  var STEP = 0.92;
+  var initTarget = ${t};
+  var body = document.body;
+  var ty = 0;
+  var posTimer = null;
+
+  function vh(){ return window.innerHeight; }
+  function maxS(){ return Math.max(0, body.offsetHeight - vh()); }
+
+  function postEdge(d){ window.parent.postMessage({type:'EPUB_EDGE',direction:d},'*'); }
+  function postPos(r){  window.parent.postMessage({type:'EPUB_POS', ratio:r},  '*'); }
+
+  function setTy(y){
+    ty = y;
+    body.style.setProperty('transform','translateY(-'+y+'px)','important');
+    clearTimeout(posTimer);
+    posTimer = setTimeout(reportPos, 500);
+  }
+
+  function reportPos(){
+    var ms = maxS();
+    if(ms <= 0){ postPos(0); return; }
+    postPos(Math.max(0, Math.min(1, ty / ms)));
+  }
+
+  function applyInit(){
+    var ms = maxS();
+    if(initTarget === 'end'){
+      setTy(ms);
+    } else if(typeof initTarget === 'number'){
+      setTy(initTarget * ms);
+    } else {
+      setTy(0);
+    }
+    body.style.setProperty('opacity','1','important');
+  }
+
+  function doScroll(dir){
+    var ms = maxS();
+    if(ms <= 0){ postEdge(dir); return; }
+    var step = vh() * STEP;
+    if(dir === 1){ // 前進: ty 増加（body が上に移動）→ blank zone (ty > ms)
+      if(ty >= ms + 2){ postEdge(1); return; }
+      setTy(Math.min(ty + step, ms + step));
+    } else { // 後退: ty 減少
+      if(ty <= 2){ postEdge(-1); return; }
+      setTy(Math.max(ty - step, 0));
+    }
+  }
+
+  window.addEventListener('message', function(ev){
+    if(!ev.data || ev.data.type !== 'EPUB_SCROLL') return;
+    doScroll(ev.data.direction);
+  });
+
+  var touchStartY = 0;
+  document.addEventListener('touchstart', function(e){
+    touchStartY = e.touches[0].clientY;
+  }, {passive:true});
+  document.addEventListener('touchend', function(e){
+    var dy = e.changedTouches[0].clientY - touchStartY;
+    if(Math.abs(dy) > 50) doScroll(dy < 0 ? 1 : -1);
+  }, {passive:true});
+${CLICK_HANDLER}
+${INIT_FN}
+})();`;
+  }
+
+  if (writingMode === 'publisher') {
+    return `(function(){
+  var STEP = 0.92;
+  var initTarget = ${t};
+  var body = document.body;
+  var _axis = null; // 'h' = vertical-rl (translateX), 'v' = horizontal-tb (translateY)
+  var tx = 0, ty = 0;
+  var posTimer = null;
+
+  function vw(){ return window.innerWidth; }
+  function vh(){ return window.innerHeight; }
+
+  function detectAxis(){
+    if(_axis) return _axis;
+    var wm = getComputedStyle(body).writingMode || '';
+    _axis = wm.indexOf('vertical') >= 0 ? 'h' : 'v';
+    if(_axis === 'h'){
+      body.style.setProperty('bottom','0','important');
+      body.style.setProperty('width','max-content','important');
+      body.style.setProperty('min-width','100vw','important');
+    } else {
+      body.style.setProperty('right','0','important');
+      body.style.setProperty('height','max-content','important');
+      body.style.setProperty('min-height','100vh','important');
+    }
+    return _axis;
+  }
+
+  function postEdge(d){ window.parent.postMessage({type:'EPUB_EDGE',direction:d},'*'); }
+  function postPos(r){  window.parent.postMessage({type:'EPUB_POS', ratio:r},  '*'); }
+
+  function setTx(x){
+    tx = x;
+    body.style.setProperty('transform','translateX('+x+'px)','important');
+    clearTimeout(posTimer);
+    posTimer = setTimeout(reportPos, 500);
+  }
+  function setTy(y){
+    ty = y;
+    body.style.setProperty('transform','translateY(-'+y+'px)','important');
+    clearTimeout(posTimer);
+    posTimer = setTimeout(reportPos, 500);
+  }
+
+  function reportPos(){
+    var ax = detectAxis(), ms;
+    if(ax === 'h'){
+      ms = Math.max(0, body.offsetWidth - vw());
+      if(ms <= 0){ postPos(0); return; }
+      postPos(Math.max(0, Math.min(1, (tx + ms) / ms)));
+    } else {
+      ms = Math.max(0, body.offsetHeight - vh());
+      if(ms <= 0){ postPos(0); return; }
+      postPos(Math.max(0, Math.min(1, ty / ms)));
+    }
+  }
+
+  function applyInit(){
+    var ax = detectAxis(), ms;
+    if(ax === 'h'){
+      ms = Math.max(0, body.offsetWidth - vw());
+      if(initTarget === 'end'){ setTx(0); }
+      else if(typeof initTarget === 'number'){ setTx(-(1 - initTarget) * ms); }
+      else { setTx(-ms); }
+    } else {
+      ms = Math.max(0, body.offsetHeight - vh());
+      if(initTarget === 'end'){ setTy(ms); }
+      else if(typeof initTarget === 'number'){ setTy(initTarget * ms); }
+      else { setTy(0); }
+    }
+    body.style.setProperty('opacity','1','important');
+  }
+
+  function doScroll(dir){
+    var ax = detectAxis(), ms, step;
+    if(ax === 'h'){
+      ms = Math.max(0, body.offsetWidth - vw());
+      if(ms <= 0){ postEdge(dir); return; }
+      step = vw() * STEP;
+      if(dir === 1){
+        if(tx >= -2){ postEdge(1); return; }
+        setTx(Math.min(tx + step, 0));
+      } else {
+        if(tx <= -(ms - 2)){ postEdge(-1); return; }
+        setTx(Math.max(tx - step, -ms));
+      }
+    } else {
+      ms = Math.max(0, body.offsetHeight - vh());
+      if(ms <= 0){ postEdge(dir); return; }
+      step = vh() * STEP;
+      if(dir === 1){
+        if(ty >= ms - 2){ postEdge(1); return; }
+        setTy(Math.min(ty + step, ms));
+      } else {
+        if(ty <= 2){ postEdge(-1); return; }
+        setTy(Math.max(ty - step, 0));
+      }
+    }
+  }
+
+  window.addEventListener('message', function(ev){
+    if(!ev.data || ev.data.type !== 'EPUB_SCROLL') return;
+    doScroll(ev.data.direction);
+  });
+
+  var touchStartX = 0, touchStartY = 0;
+  document.addEventListener('touchstart', function(e){
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+  }, {passive:true});
+  document.addEventListener('touchend', function(e){
+    var dx = e.changedTouches[0].clientX - touchStartX;
+    var dy = e.changedTouches[0].clientY - touchStartY;
+    var ax = detectAxis();
+    if(ax === 'h'){
+      if(Math.abs(dx) > 50) doScroll(dx < 0 ? 1 : -1);
+    } else {
+      if(Math.abs(dy) > 50) doScroll(dy < 0 ? 1 : -1);
+    }
+  }, {passive:true});
+${CLICK_HANDLER}
+${INIT_FN}
+})();`;
+  }
+
+  // Default: 縦書き（vertical）- translateX
   return `(function(){
   var STEP = 0.92;
   var initTarget = ${t};
@@ -554,8 +795,7 @@ function buildScrollScript(scrollTarget) {
   var posTimer = null;
 
   function vw(){ return window.innerWidth; }
-  function cw(){ return body.offsetWidth; }
-  function maxS(){ return Math.max(0, cw() - vw()); }
+  function maxS(){ return Math.max(0, body.offsetWidth - vw()); }
 
   function postEdge(d){ window.parent.postMessage({type:'EPUB_EDGE',direction:d},'*'); }
   function postPos(r){  window.parent.postMessage({type:'EPUB_POS', ratio:r},  '*'); }
@@ -615,33 +855,8 @@ function buildScrollScript(scrollTarget) {
     var dx = e.changedTouches[0].clientX - touchStartX;
     if(Math.abs(dx) > 50) doScroll(dx < 0 ? 1 : -1);
   }, {passive:true});
-
-  document.addEventListener('click', function(ev){
-    var a = ev.target.closest('a');
-    if(!a) return;
-    var href = a.getAttribute('href') || '';
-    if(!href) return;
-    ev.preventDefault();
-    if(href.startsWith('http://')||href.startsWith('https://')||href.startsWith('//')){
-      window.open(href,'_blank','noopener,noreferrer'); return;
-    }
-    if(href.startsWith('#')) return;
-    window.parent.postMessage({type:'EPUB_LINK',href:href},'*');
-  });
-
-  function init(){
-    // body.offsetWidth は layout 完了後でないと正確に取れないため
-    // load イベント後に applyInit を実行
-    function run(){
-      // 1 frame 遅延して layout 確定を待つ
-      requestAnimationFrame(function(){
-        requestAnimationFrame(applyInit);
-      });
-    }
-    if(document.readyState === 'complete') run();
-    else window.addEventListener('load', run, {once:true});
-  }
-  init();
+${CLICK_HANDLER}
+${INIT_FN}
 })();`;
 }
 
@@ -777,11 +992,12 @@ const SETTINGS_KEY = 'epub_settings';
 function saveSettings() {
   try {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify({
-      fontMode:   state.fontMode,
-      fontSize:   state.fontSize,
-      lineHeight: state.lineHeight,
-      theme:      state.theme,
-      margin:     state.margin,
+      fontMode:    state.fontMode,
+      fontSize:    state.fontSize,
+      lineHeight:  state.lineHeight,
+      theme:       state.theme,
+      margin:      state.margin,
+      writingMode: state.writingMode,
     }));
   } catch(e) {
     notifyStorageError();
@@ -797,6 +1013,7 @@ function loadSettings() {
     if (s.lineHeight)           { state.lineHeight = s.lineHeight;     document.getElementById('lineh-select').value = String(s.lineHeight); }
     if (s.theme !== undefined)  { state.theme = s.theme;               document.body.className = s.theme ? 'theme-' + s.theme : ''; document.getElementById('theme-select').value = s.theme; }
     if (s.margin)               { state.margin = s.margin;             document.getElementById('margin-select').value = s.margin; applyMargin(s.margin); }
+    if (s.writingMode)          { state.writingMode = s.writingMode;   document.getElementById('writing-mode-select').value = s.writingMode; }
   } catch(e) {}
 }
 
@@ -843,6 +1060,11 @@ function changeMargin(v) {
   state.margin = v;
   applyMargin(v);
   saveSettings();
+}
+function changeWritingMode(v) {
+  state.writingMode = v;
+  saveSettings();
+  if (state.spine.length) renderPage(state.currentSpineIdx);
 }
 
 // ══════════════════════════════════════════
