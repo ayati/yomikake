@@ -33,18 +33,24 @@ There are no automated tests. Manual testing requires a `.epub` or `.kepub` file
 
 ## Architecture
 
-Each viewer is a single self-contained HTML file (`epub_viewer.html` ~1140 lines, `epub_viewer_ios.html` ~1220 lines). Both follow a modular functional style with a single central state object. The architecture below describes `epub_viewer.html`; `epub_viewer_ios.html` is identical except for the scroll mechanism (see iOS Viewer section below).
+Each viewer is a single self-contained HTML file (`epub_viewer.html` ~1300 lines, `epub_viewer_ios.html` ~1245 lines). Both follow a modular functional style with a single central state object. The architecture below describes `epub_viewer.html`; `epub_viewer_ios.html` is identical except for the scroll mechanism (see iOS Viewer section below).
 
 ### State
 
 ```js
 const state = {
-  epub,        // JSZip instance
-  spine[],     // chapter items in reading order
-  manifest{},  // ePub manifest (id → resource path)
-  toc[],       // table of contents entries
-  writingMode, // 'vertical' | 'horizontal' | 'publisher'
-  // UI preferences: font, fontSize, theme, sidebar open/closed, etc.
+  epub,             // JSZip instance
+  opfPath,          // path to OPF file inside ZIP
+  opfDir,           // directory prefix for opfPath
+  spine[],          // chapter items in reading order
+  manifest{},       // ePub manifest (id → resource path)
+  toc[],            // table of contents entries
+  currentSpineIdx,  // current chapter index
+  bookTitle,        // from OPF dc:title
+  bookCreator,      // from OPF dc:creator (multiple joined with ・)
+  bookKey,          // localStorage key prefix: 'epub_pos_{title}_{spineCount}'
+  writingMode,      // 'vertical' | 'horizontal' | 'publisher'
+  // UI preferences: fontMode, fontSize, lineHeight, theme, margin, sidebarOpen
 }
 ```
 
@@ -61,8 +67,9 @@ const state = {
 - **`postMessage`** bridges parent↔iframe scroll edge detection.
 - **Writing mode** (`state.writingMode`) controls CSS injection in `buildSrcdoc()`: `'vertical'` forces `vertical-rl` + `padding-left:100vw`; `'horizontal'` forces `horizontal-tb` + `padding-bottom:100vh`; `'publisher'` injects no override and lets the ePub's own CSS control writing direction. `buildScrollScript()` receives `writingMode` and branches into three separate IIFE implementations (vertical RTL scroll, horizontal vertical scroll, publisher auto-detect).
 - **`.kepub`** (Kobo ePub) is supported by treating it as a standard ZIP/ePub.
+- **Settings popover** — display settings (font, size, line height, theme, margin, writing mode) live in a floating `#settings-popover` panel toggled by `toggleSettings()`, not in inline toolbar controls. `updateThemeBtnUI()` syncs the visual theme button state after loading settings.
 - **`THEME_CONTENT` map** holds iframe content colors separately from CSS variables (which only apply to the outer UI). Theme changes re-render the current chapter.
-- **`buildScrollScript()`** returns a self-contained IIFE string baked into the iframe. Two scroll sign conventions exist: Chrome-negative (`scrollLeft=0` at right edge, goes negative left) and positive (`scrollLeft=max` at right edge, `0` at left). The script detects the convention via a universal probe in `applyInit()`: set `scrollLeft=9999999` (a large positive), then read back. Chrome-neg clamps to 0 (right edge); positive mode clamps to max (right edge). In both cases the content is positioned at the start. Read back determines `_neg`. The `doScroll()` else-branch (positive) moves in the opposite numeric direction from the neg-branch but the same visual direction (forward = decrease toward left edge).
+- **`buildScrollScript()`** returns a self-contained IIFE string baked into the iframe. The **vertical** mode uses `window.scrollX` / `window.scrollTo()` instead of `scrollLeft`, so no browser sign-convention detection (`isNeg`) is needed: `scrollX=0` at reading start (right edge) and increases in the reading direction on both Chrome and Firefox. `doScroll` checks at the **top** whether we are already in the blank zone (from a prior scroll) and fires `EPUB_EDGE` then; otherwise it scrolls one page and, if past `contentMax`, lands on the blank page (without firing `EPUB_EDGE` yet). The horizontal and publisher modes still use `scrollLeft` with `isNeg()` detection.
 - **iOS Safari scroll compatibility** — injected CSS sets `html { height:100%; overflow-y:hidden }`. Two constraints: (1) `height:100%` (not `100vh`) — iOS Safari resolves `100vh` to full screen height including address bar, making columns too tall; (2) `overflow-x` is NOT set — setting `overflow-x:auto` causes iOS to use an LTR CSS scroll container where the initial position is scrollLeft=0 (left edge = RTL content end = blank). Without it, iOS UIScrollView auto-positions at the RTL start (right edge = content beginning).
 - **`window.scrollTo()` instead of `scrollLeft` assignment** — `document.documentElement.scrollLeft = X` is silently ignored inside iOS Safari iframes (confirmed via diagnostics: probe=0 after setting 9999999). `window.scrollTo(x, 0)` works correctly. All scroll operations use `window.scrollTo`; `window.scrollX` is used for reading (falls back to `scrollLeft` for browsers that don't support `scrollX`).
 - **`document.documentElement.scrollWidth`** — the document root correctly reports `scrollWidth` including left-side (RTL/vertical-rl) overflow in all browsers. A wrapper `div` with `overflow-x:auto` does NOT include left-side overflow in its `scrollWidth`, causing `scrollWidth == clientWidth` always, making every scroll immediately trigger `EPUB_EDGE`. Always use `document.documentElement.scrollWidth` for measuring content width.
@@ -99,7 +106,7 @@ iOS Safari silently ignores both `document.documentElement.scrollLeft` assignmen
 | `epub_last_book` | `{title, bookKey}` — for the resume banner |
 | `epub_settings` | `{fontMode, fontSize, lineHeight, theme, margin, writingMode}` |
 
-Bookmark key uses OPF title + spine count (not file path), so moving or renaming the file does not break saved positions. `exportBookmarks()` serialises all `epub_pos_*` and `epub_last_book` keys to a JSON file for cross-device transfer; the import handler writes them back.
+Bookmark key uses OPF title + spine count (not file path), so moving or renaming the file does not break saved positions. `exportBookmarks()` serialises all `epub_pos_*` and `epub_last_book` keys to a JSON file for cross-device transfer; the import handler writes them back. `notifyStorageError()` shows a toast when any `localStorage.setItem` throws (quota exceeded). `resumeBook()` is invoked when the user clicks the welcome-screen resume banner; it calls `loadSavedPos()` then opens a file picker.
 
 ### Help Modal
 
