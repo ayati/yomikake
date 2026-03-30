@@ -6,201 +6,304 @@
 <title>縦書きePub3ビューア（iOS Safari専用）</title>
 <style>
   :root {
-    --bg:#f5f0e8; --paper:#fdf8f0; --text:#1a1008;
-    --accent:#8b3a1a; --ui-bg:#2c2016; --ui-text:#e8dcc8;
-    --ui-border:#5a4020; --shadow:rgba(0,0,0,0.35); --page-shadow:rgba(0,0,0,0.18);
+    --bg:#f8f6f2; --paper:#ffffff; --text:#201a15;
+    --accent:#b55632; --ui-bg:#ffffff; --ui-text:#332922;
+    --ui-border:#e5dfd5; --shadow:rgba(0,0,0,0.08); --page-shadow:rgba(0,0,0,0.05);
+    --hover-bg:rgba(0,0,0,0.04); --backdrop:rgba(255,255,255,0.85); --glass-border:rgba(255,255,255,0.4);
   }
-  .theme-dark  { --bg:#1a1510; --paper:#201810; --text:#d8ccb8; --accent:#c87840; --ui-bg:#100c08; --ui-text:#d8ccb8; --ui-border:#3a2c1a; --shadow:rgba(0,0,0,0.6); --page-shadow:rgba(0,0,0,0.4); }
-  .theme-sepia { --bg:#f0e8d0; --paper:#f8f0d8; --text:#3c2808; --accent:#8b5a1a; --ui-bg:#3c2808; --ui-text:#f0e8d0; --ui-border:#8b5a1a; --shadow:rgba(60,20,0,0.3); --page-shadow:rgba(60,20,0,0.15); }
-  .theme-white { --bg:#e8e8e8; --paper:#ffffff; --text:#111; --accent:#1a5a8b; --ui-bg:#1a1a1a; --ui-text:#f0f0f0; --ui-border:#444; --shadow:rgba(0,0,0,0.25); --page-shadow:rgba(0,0,0,0.12); }
+  .theme-dark  { --bg:#141417; --paper:#1c1c20; --text:#e0dcd5; --accent:#dc6e4c; --ui-bg:#1c1c20; --ui-text:#e0dcd5; --ui-border:#33333b; --shadow:rgba(0,0,0,0.7); --page-shadow:rgba(0,0,0,0.5); --hover-bg:rgba(255,255,255,0.08); --backdrop:rgba(28,28,32,0.85); --glass-border:rgba(255,255,255,0.08); }
+  .theme-sepia { --bg:#f4ecd8; --paper:#fbf6eb; --text:#4a3825; --accent:#9c6142; --ui-bg:#fbf6eb; --ui-text:#4a3825; --ui-border:#d9cbb0; --shadow:rgba(74,56,37,0.1); --page-shadow:rgba(74,56,37,0.06); --hover-bg:rgba(74,56,37,0.06); --backdrop:rgba(251,246,235,0.85); --glass-border:rgba(255,255,255,0.3); }
+  .theme-white { --bg:#ececec; --paper:#ffffff; --text:#181818; --accent:#1e78a0; --ui-bg:#ffffff; --ui-text:#222; --ui-border:#d4d4d4; --shadow:rgba(0,0,0,0.15); --page-shadow:rgba(0,0,0,0.08); --hover-bg:rgba(0,0,0,0.05); --backdrop:rgba(255,255,255,0.9); --glass-border:rgba(255,255,255,0.5); }
 
   * { box-sizing:border-box; margin:0; padding:0; }
-  body { font-family:"游明朝","YuMincho",serif; background:var(--bg); color:var(--text); height:100vh; height:100dvh; overflow:hidden; display:flex; flex-direction:column; user-select:none; padding-bottom:env(safe-area-inset-bottom,0); }
+  body { font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background:var(--bg); color:var(--text); height:100vh; height:100dvh; overflow:hidden; display:flex; flex-direction:column; user-select:none; padding-bottom:env(safe-area-inset-bottom,0); }
 
-  #toolbar { min-height:48px; background:var(--ui-bg); border-bottom:1px solid var(--ui-border); display:flex; align-items:center; padding:0 8px; gap:6px; flex-shrink:0; box-shadow:0 2px 8px var(--shadow); overflow-x:auto; -webkit-overflow-scrolling:touch; }
-  #toolbar::-webkit-scrollbar { height:5px; }
-  #toolbar::-webkit-scrollbar-track { background:transparent; }
-  #toolbar::-webkit-scrollbar-thumb { background:rgba(255,255,255,.2); border-radius:3px; }
-  #toolbar::-webkit-scrollbar-thumb:hover { background:rgba(255,255,255,.4); }
-  #toolbar button { background:transparent; border:1px solid var(--ui-border); color:var(--ui-text); padding:4px 10px; border-radius:4px; cursor:pointer; font-size:13px; font-family:inherit; transition:background .15s,border-color .15s; white-space:nowrap; }
-  #toolbar button:hover { background:rgba(255,255,255,.1); border-color:var(--accent); }
-  #toolbar button.active { background:var(--accent); border-color:var(--accent); }
-  #toolbar select { background:#1a1208; border:1px solid var(--ui-border); color:var(--ui-text); padding:4px 6px; border-radius:4px; font-size:13px; font-family:inherit; cursor:pointer; }
-  .tb-sep { width:1px; height:28px; background:var(--ui-border); margin:0 4px; flex-shrink:0; }
-  .tb-label { color:var(--ui-text); font-size:12px; opacity:.7; white-space:nowrap; }
-  #book-title { color:var(--ui-text); font-size:13px; opacity:.85; flex:1; text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding:0 8px; min-width:0; }
-  #open-btn { background:var(--accent)!important; border-color:var(--accent)!important; font-weight:bold; padding:4px 16px!important; }
-  #font-size-display { color:var(--ui-text); font-size:12px; min-width:36px; text-align:center; opacity:.85; }
+  #toolbar { min-height:40px; background:var(--ui-bg); border-bottom:1px solid var(--ui-border); display:flex; align-items:center; padding:0 8px; gap:4px; flex-shrink:0; box-shadow:0 1px 4px var(--shadow); z-index:100; position:relative; }
+
+  #toolbar button, .icon-btn { background:transparent; border:none; color:var(--ui-text); padding:4px 8px; border-radius:6px; cursor:pointer; font-size:13px; display:flex; align-items:center; gap:4px; transition:all .15s ease; font-weight:500; }
+  #toolbar button:hover, .icon-btn:hover { background:var(--hover-bg); }
+  #toolbar button svg, .icon-btn svg { width:16px; height:16px; opacity:0.8; }
+  #toolbar button.active { background:var(--hover-bg); color:var(--accent); }
+  #toolbar button.active svg { opacity:1; stroke:var(--accent); }
+  #toolbar .tb-sep { width:1px; height:20px; background:var(--ui-border); margin:0 4px; flex-shrink:0; }
+
+  #book-title { font-size:13px; font-weight:600; opacity:.9; flex:1; text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding:0 12px; }
+  #open-btn { background:var(--accent)!important; color:#fff!important; padding:4px 12px!important; box-shadow:0 2px 6px rgba(181,86,50,0.3); }
+  #open-btn:hover { filter:brightness(1.1); }
+  #open-btn svg { stroke:#fff; }
+
+  /* Settings Popover */
+  .popover-overlay { position:fixed; inset:0; z-index:400; display:none; }
+  .popover-overlay.show { display:block; }
+  #settings-popover { position:absolute; top:64px; right:16px; width:340px; background:var(--backdrop); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); border:1px solid var(--glass-border); border-radius:16px; box-shadow:0 12px 32px var(--shadow), 0 2px 8px var(--shadow); z-index:500; opacity:0; visibility:hidden; transform:translateY(-8px); transition:all .2s cubic-bezier(0.16,1,0.3,1); display:flex; flex-direction:column; overflow:hidden; }
+  #settings-popover.show { opacity:1; visibility:visible; transform:translateY(0); }
+  .pop-header { padding:16px 20px; font-weight:600; font-size:15px; border-bottom:1px solid var(--ui-border); color:var(--ui-text); display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.02); }
+  .pop-body { padding:0 12px 12px; max-height:calc(100vh - 100px); overflow-y:auto; }
+
+  .set-group { margin-top:20px; padding-bottom:4px; }
+  .set-group h4 { font-size:12px; font-weight:600; color:var(--ui-text); opacity:0.6; text-transform:uppercase; margin:0 8px 12px; letter-spacing:0.5px; }
+  .set-row { display:flex; align-items:center; justify-content:space-between; padding:8px; border-radius:8px; }
+  .set-row:hover { background:var(--hover-bg); }
+  .set-label { font-size:14px; color:var(--ui-text); }
+
+  select.modern-select { appearance:none; background:var(--ui-bg); border:1px solid var(--ui-border); color:var(--ui-text); padding:8px 32px 8px 12px; border-radius:8px; font-size:13px; cursor:pointer; outline:none; font-family:inherit; background-image:url('data:image/svg+xml;utf8,<svg viewBox="0 0 24 24" fill="none" stroke="%23888" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>'); background-repeat:no-repeat; background-position:right 8px center; background-size:14px; min-width:140px; box-shadow:inset 0 1px 2px rgba(0,0,0,0.02); }
+
+  .btn-group { display:flex; background:var(--ui-bg); border:1px solid var(--ui-border); border-radius:8px; overflow:hidden; }
+  .btn-group button { background:transparent; border:none; padding:8px 16px; color:var(--ui-text); cursor:pointer; font-size:14px; transition:background .15s; }
+  .btn-group button:hover { background:var(--hover-bg); }
+  .btn-group span { display:flex; align-items:center; justify-content:center; padding:0 8px; font-size:13px; font-weight:500; border-left:1px solid var(--ui-border); border-right:1px solid var(--ui-border); min-width:54px; color:var(--ui-text); }
+
+  .theme-options { display:flex; gap:8px; }
+  .theme-btn { width:32px; height:32px; border-radius:50%; border:2px solid var(--ui-border); cursor:pointer; transition:transform .15s; display:flex; align-items:center; justify-content:center; }
+  .theme-btn:hover { transform:scale(1.1); }
+  .theme-btn.active { border-color:var(--accent); }
+  .theme-btn svg { width:14px; height:14px; stroke:var(--accent); stroke-width:3; opacity:0; }
+  .theme-btn.active svg { opacity:1; }
+
+  .tb-std { background:#fff; border-color:#e5dfd5; }
+  .tb-sepia { background:#fbf6eb; border-color:#d9cbb0; }
+  .tb-dark { background:#1c1c20; border-color:#33333b; }
+  .tb-white { background:#ffffff; border-color:#d4d4d4; }
 
   #main { flex:1; display:flex; overflow:hidden; }
 
-  #sidebar { width:280px; background:var(--ui-bg); border-right:1px solid var(--ui-border); display:flex; flex-direction:column; transition:width .25s,opacity .25s; overflow:hidden; flex-shrink:0; }
-  #sidebar.hidden { width:0; opacity:0; }
-  #sidebar-header { padding:12px 16px; font-size:13px; color:var(--ui-text); border-bottom:1px solid var(--ui-border); font-weight:bold; flex-shrink:0; }
+  #sidebar { width:280px; background:var(--ui-bg); border-right:1px solid var(--ui-border); display:flex; flex-direction:column; transition:transform .3s cubic-bezier(0.16,1,0.3,1); overflow:hidden; flex-shrink:0; position:relative; z-index:90; }
+  #sidebar.hidden { transform:translateX(-100%); margin-right:-280px; }
+  #sidebar-header { padding:16px; font-size:15px; color:var(--ui-text); border-bottom:1px solid var(--ui-border); font-weight:bold; flex-shrink:0; display:flex; align-items:center; gap:8px; }
+  #sidebar-header svg { stroke:var(--ui-text); stroke-width:2; }
   #toc-list { flex:1; overflow-y:auto; padding:8px 0; }
-  #toc-list::-webkit-scrollbar { width:4px; }
-  #toc-list::-webkit-scrollbar-thumb { background:var(--ui-border); border-radius:2px; }
-  .toc-item { padding:9px 20px; color:var(--ui-text); cursor:pointer; font-size:13px; transition:background .12s; border-left:3px solid transparent; line-height:1.5; opacity:.8; }
-  .toc-item:hover { background:rgba(255,255,255,.07); opacity:1; }
-  .toc-item.current { border-left-color:var(--accent); background:rgba(255,255,255,.05); opacity:1; color:var(--accent); }
+  #toc-list::-webkit-scrollbar { width:6px; }
+  #toc-list::-webkit-scrollbar-thumb { background:var(--ui-border); border-radius:3px; }
+  .toc-item { padding:12px 20px; color:var(--ui-text); cursor:pointer; font-size:14px; transition:all .15s; border-left:3px solid transparent; line-height:1.5; opacity:.85; }
+  .toc-item:hover { background:var(--hover-bg); opacity:1; }
+  .toc-item.current { border-left-color:var(--accent); background:var(--hover-bg); opacity:1; color:var(--accent); font-weight:500; }
 
-  #reading-area { flex:1; display:flex; align-items:center; justify-content:center; overflow:hidden; position:relative; padding:var(--page-padding,12px); background:var(--bg); }
+  #reading-area { flex:1; display:flex; align-items:center; justify-content:center; overflow:hidden; position:relative; padding:var(--page-padding,16px); background:var(--bg); transition:padding .3s; }
 
-  #welcome { width:100%; height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:24px; color:var(--text); opacity:.7; }
-  #welcome h2 { font-size:22px; font-weight:normal; }
-  #welcome p { font-size:14px; opacity:.7; text-align:center; line-height:2; }
-  #drop-zone { border:2px dashed var(--ui-border); border-radius:12px; padding:32px 48px; text-align:center; cursor:pointer; transition:border-color .2s,background .2s; }
-  #drop-zone:hover { border-color:var(--accent); background:rgba(139,58,26,.05); }
-  #resume-banner { display:none; text-align:center; width:100%; max-width:480px; border:1px solid var(--ui-border); border-radius:8px; padding:14px 24px; line-height:1.8; }
-  #resume-banner .resume-label { font-size:12px; opacity:.6; }
-  #resume-banner .resume-title { display:block; font-size:15px; margin:4px 0 6px; }
-  #resume-banner .resume-hint { font-size:12px; opacity:.55; }
-  .resume-or { font-size:12px; opacity:.45; margin:16px 0 0; }
+  #welcome { width:100%; height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:32px; color:var(--text); opacity:.8; animation:fadeIn .5s ease; }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+
+  #drop-zone { border:2px dashed var(--ui-border); border-radius:24px; padding:48px 64px; text-align:center; cursor:pointer; transition:all .2s; max-width:480px; background:var(--paper); box-shadow:0 4px 16px var(--page-shadow); }
+  #drop-zone:hover { border-color:var(--accent); background:rgba(181,86,50,.03); transform:scale(1.02); }
+  #drop-zone svg { width:64px; height:64px; stroke:var(--accent); opacity:.8; margin-bottom:24px; stroke-width:1.5; }
+  #drop-zone h2 { font-size:24px; font-weight:600; margin-bottom:12px; }
+  #drop-zone p { font-size:14px; opacity:.7; line-height:1.6; }
+
+  #resume-banner { display:none; text-align:left; width:100%; max-width:480px; background:var(--ui-bg); border:1px solid var(--accent); border-radius:16px; padding:20px 24px; line-height:1.6; box-shadow:0 8px 24px var(--shadow), inset 0 0 0 1px rgba(181,86,50,0.2); position:relative; overflow:hidden; cursor:pointer; transition:transform .2s; }
+  #resume-banner:hover { transform:translateY(-2px); }
+  #resume-banner::before { content:''; position:absolute; left:0; top:0; bottom:0; width:4px; background:var(--accent); }
+  #resume-banner .resume-label { font-size:12px; color:var(--accent); font-weight:600; text-transform:uppercase; letter-spacing:0.5px; }
+  #resume-banner .resume-title { display:block; font-size:16px; margin:6px 0 4px; font-family:"游明朝","YuMincho",serif; }
+  #resume-banner .resume-hint { font-size:13px; opacity:.6; }
 
   #page-container { width:100%; height:100%; display:none; align-items:stretch; justify-content:center; position:relative; }
   #page-container.visible { display:flex; }
 
-  #epub-frame { background:var(--paper); box-shadow:0 4px 32px var(--page-shadow),0 1px 4px var(--shadow); border-radius:2px; overflow:hidden; position:relative; display:flex; flex-direction:column; width:100%; max-width:var(--frame-max-width,900px); }
-  #page-overlay { position:absolute; inset:0; background:var(--paper); opacity:0; pointer-events:none; z-index:10; transition:opacity .15s; }
-  #page-overlay.flash { opacity:.6; }
+  #epub-frame { background:var(--paper); box-shadow:0 12px 48px var(--page-shadow),0 2px 12px var(--shadow); border-radius:4px; overflow:hidden; position:relative; display:flex; flex-direction:column; width:100%; max-width:var(--frame-max-width,900px); transition:max-width .3s cubic-bezier(0.16,1,0.3,1); }
+  #page-overlay { position:absolute; inset:0; background:var(--paper); opacity:0; pointer-events:none; z-index:10; transition:opacity .2s cubic-bezier(0.2,0,0,1); }
+  #page-overlay.flash { opacity:.8; }
 
   #content-iframe { width:100%; flex:1; border:none; background:transparent; display:block; }
 
-  .chapter-btn { position:absolute; top:50%; transform:translateY(-50%); width:36px; height:64px; background:transparent; border:none; color:var(--ui-text); cursor:pointer; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; border-radius:4px; transition:background .2s,opacity .2s,border .2s; opacity:.12; z-index:20; font-size:13px; }
-  .chapter-btn:hover { opacity:.85; background:var(--ui-bg); border:1px solid var(--ui-border); }
-  .chapter-btn .cb-arrow { font-size:16px; }
-  .chapter-btn .cb-label { font-size:9px; opacity:.8; writing-mode:vertical-rl; letter-spacing:.05em; }
-  #btn-prev { right:6px; }
-  #btn-next { left:6px; }
+  .chapter-btn { position:absolute; top:50%; transform:translateY(-50%); width:64px; height:140px; background:transparent; border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; border-radius:32px; transition:all .3s ease; opacity:0; z-index:20; -webkit-tap-highlight-color:transparent; outline:none !important; color:transparent; }
+  .chapter-btn:focus, .chapter-btn:active { outline:none !important; background:transparent !important; color:transparent; }
+  .chapter-btn svg { width:28px; height:28px; stroke:transparent; stroke-width:1.5; transition:stroke .3s; }
+  #btn-prev { right:16px; }
+  #btn-next { left:16px; }
 
-  .scroll-btn { position:absolute; left:50%; transform:translateX(-50%); width:120px; height:36px; background:transparent; border:none; color:var(--ui-text); cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px; border-radius:20px; transition:background .2s,opacity .2s,border .2s; opacity:.12; z-index:20; font-size:12px; font-family:inherit; }
-  .scroll-btn:hover { opacity:.9; background:var(--accent); border:1px solid var(--accent); color:#fff; }
-  .scroll-btn:active { transform:translateX(-50%) scale(.96); }
-  #btn-scroll-fwd { bottom:max(8px, env(safe-area-inset-bottom, 8px)); width:360px; height:210px; border:1px solid var(--ui-text); background:rgba(255,255,255,0.04); font-size:20px; opacity:.22; border-radius:24px; }
-  #btn-scroll-back { top:8px; }
-  .chapter-btn.nav-hint { opacity:.85; background:var(--accent); border:1px solid var(--accent); color:#fff; }
-  .scroll-btn.nav-hint { opacity:.9; background:var(--accent); border:1px solid var(--accent); color:#fff; }
-  #btn-scroll-fwd:hover { background:rgba(255,255,255,0.08); border-color:var(--ui-text); color:var(--ui-text); }
+  .scroll-btn { position:absolute; left:50%; transform:translateX(-50%); width:180px; height:56px; background:transparent; border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; border-radius:28px; transition:all .3s ease; opacity:0; z-index:20; -webkit-tap-highlight-color:transparent; outline:none !important; color:transparent; font-family:inherit; font-weight:500; font-size:14px; }
+  .scroll-btn:focus, .scroll-btn:active { outline:none !important; background:transparent !important; color:transparent; }
+  .scroll-btn svg { width:20px; height:20px; stroke:transparent; stroke-width:2; transition:stroke .3s; }
 
-  #statusbar { height:28px; background:var(--ui-bg); border-top:1px solid var(--ui-border); display:flex; align-items:center; padding:0 16px; gap:16px; font-size:12px; color:var(--ui-text); opacity:.8; flex-shrink:0; }
-  #page-info { flex:1; text-align:center; }
-  #progress-bar { width:120px; height:4px; background:var(--ui-border); border-radius:2px; overflow:hidden; }
-  #progress-fill { height:100%; background:var(--accent); border-radius:2px; transition:width .3s; width:0%; }
-  #key-hint { opacity:.5; font-size:11px; }
+  #btn-scroll-fwd { bottom:max(24px, env(safe-area-inset-bottom, 24px)); width:360px; height:180px; border-radius:60px; font-size:18px; }
+  #btn-scroll-fwd svg { width:28px; height:28px; }
+  #btn-scroll-back { top:16px; }
 
-  #modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:200; display:none; align-items:center; justify-content:center; }
-  #modal-overlay.show { display:flex; }
-  #modal-box { background:var(--ui-bg); border:1px solid var(--ui-border); border-radius:8px; padding:24px; min-width:340px; max-width:480px; color:var(--ui-text); box-shadow:0 8px 40px rgba(0,0,0,.5); }
-  #modal-box h3 { font-size:16px; margin-bottom:16px; color:var(--accent); }
-  #modal-box p { font-size:13px; line-height:1.8; opacity:.85; }
+  .nav-hint { opacity:0.8 !important; background:var(--accent) !important; color:#fff !important; box-shadow:0 8px 32px var(--shadow); }
+  .nav-hint svg { stroke:#fff !important; }
+
+  #statusbar { height:36px; background:var(--ui-bg); border-top:1px solid var(--ui-border); display:flex; align-items:center; padding:0 16px; gap:16px; font-size:13px; color:var(--ui-text); flex-shrink:0; position:relative; z-index:30; }
+  #page-info { flex:1; text-align:center; font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace; font-variant-numeric: tabular-nums; letter-spacing: 0.5px; opacity: 0.8; }
+  #progress-bar { width:160px; height:6px; background:var(--ui-border); border-radius:3px; overflow:hidden; }
+  #progress-fill { height:100%; background:var(--accent); border-radius:3px; transition:width .3s ease-out; width:0%; }
+  #key-hint { opacity:.5; font-size:12px; }
+
+  #modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.6); backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px); z-index:200; display:none; align-items:center; justify-content:center; opacity:0; transition:opacity .2s; }
+  #modal-overlay.show { display:flex; opacity:1; }
+  #modal-box { background:var(--ui-bg); border:1px solid var(--ui-border); border-radius:16px; padding:32px; min-width:380px; max-width:480px; color:var(--ui-text); box-shadow:0 16px 48px rgba(0,0,0,.3); transform:translateY(20px) scale(0.95); transition:all .3s cubic-bezier(0.16,1,0.3,1); }
+  #modal-overlay.show #modal-box { transform:translateY(0) scale(1); }
+  #modal-box h3 { font-size:20px; margin-bottom:20px; color:var(--text); font-weight:600; display:flex; align-items:center; gap:8px; }
+  #modal-box p { font-size:14px; line-height:1.8; opacity:.85; }
   #modal-body { max-height:calc(80vh - 120px); overflow-y:auto; }
-  #modal-close { margin-top:20px; background:var(--accent); border:none; color:#fff; padding:8px 24px; border-radius:4px; cursor:pointer; font-size:13px; float:right; }
+  #modal-close { margin-top:24px; background:var(--accent); border:none; color:#fff; padding:10px 24px; border-radius:8px; cursor:pointer; font-size:14px; font-weight:600; float:right; transition:filter .15s; }
+  #modal-close:hover { filter:brightness(1.1); }
   #file-input { display:none; }
-  #toast { position:fixed; top:60px; left:50%; transform:translateX(-50%); background:var(--ui-bg); border:1px solid var(--accent); color:var(--ui-text); padding:8px 20px; border-radius:20px; font-size:13px; z-index:300; opacity:0; transition:opacity .3s; pointer-events:none; white-space:nowrap; box-shadow:0 2px 12px var(--shadow); }
-  #toast.show { opacity:1; }
-  ::-webkit-scrollbar { width:6px; height:6px; }
-  ::-webkit-scrollbar-thumb { background:var(--ui-border); border-radius:3px; }
+  #toast { position:fixed; top:72px; left:50%; transform:translateX(-50%) translateY(-10px); background:var(--text); color:var(--bg); padding:10px 24px; border-radius:24px; font-size:13px; font-weight:500; z-index:300; opacity:0; visibility:hidden; transition:all .3s cubic-bezier(0.16,1,0.3,1); pointer-events:none; white-space:nowrap; box-shadow:0 8px 24px rgba(0,0,0,0.15); }
+  #toast.show { opacity:1; visibility:visible; transform:translateX(-50%) translateY(0); }
+
+  ::-webkit-scrollbar { width:8px; height:8px; }
+  ::-webkit-scrollbar-track { background:transparent; }
+  ::-webkit-scrollbar-thumb { background:var(--ui-border); border-radius:4px; border:2px solid var(--ui-bg); }
+  ::-webkit-scrollbar-thumb:hover { background:var(--text); opacity:0.3; }
 
   /* ── スマホ向け ── */
   @media (max-width: 640px) {
     #statusbar { display:none; }
-    #reading-area { padding:var(--page-padding,4px); }
-    .chapter-btn { width:28px; height:52px; opacity:.12; }
-    .scroll-btn { width:96px; height:40px; font-size:13px; opacity:.12; }
-    #btn-scroll-fwd { bottom:max(10px, env(safe-area-inset-bottom, 10px)); width:280px; height:210px; font-size:16px; opacity:.22; border:1px solid var(--ui-text); background:rgba(255,255,255,0.04); border-radius:20px; }
-    #btn-scroll-back { top:10px; }
-    #sidebar { width:240px; }
+    #reading-area { padding:var(--page-padding,8px); }
+    .chapter-btn { width:36px; height:60px; opacity:.3; border-radius:12px; }
+    .scroll-btn { width:120px; height:40px; opacity:0; }
+    #btn-scroll-fwd { bottom:max(16px, env(safe-area-inset-bottom, 16px)); opacity:.22; height:180px; width:360px; border-radius:24px; }
+    #btn-scroll-back { top:16px; }
+    #sidebar { width:240px; position:absolute; left:0; top:56px; bottom:0; z-index:95; border-right:1px solid var(--glass-border); background:var(--backdrop); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); }
+    #sidebar.hidden { transform:translateX(-100%); margin-right:0; }
+    #toolbar { padding:0 8px; }
+    #book-title { display:none; }
+    #settings-popover { right:8px; width:calc(100vw - 16px); }
+  }
+
+  /* ── タッチデバイス：ボタンをわずかに表示 ── */
+  @media (hover: none) {
+    .chapter-btn { opacity:.3; }
+    .chapter-btn svg { stroke:var(--ui-text); }
+    #btn-scroll-fwd { opacity:.22; }
   }
 </style>
 </head>
 <body>
 
 <div id="toolbar">
-  <button id="open-btn" onclick="openFilePicker()">📂 ePubを開く</button>
+  <button id="open-btn" onclick="openFilePicker()" title="ePubファイルを開く">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 22h14a2 2 0 0 0 2-2V7.5L14.5 2H6a2 2 0 0 0-2 2v4"/><polyline points="14 2 14 8 20 8"/><path d="M4 15h12"/><path d="M4 19h12"/></svg>
+    開く
+  </button>
   <input type="file" id="file-input" accept=".epub,.kepub">
+
   <div class="tb-sep"></div>
-  <button id="toc-btn" onclick="toggleSidebar()">☰ 目次</button>
-  <div class="tb-sep"></div>
-  <span class="tb-label">フォント:</span>
-  <select id="font-select" onchange="changeFont(this.value)">
-    <option value="publisher">パブリッシャー</option>
-    <option value="mincho">明朝体（游明朝）</option>
-    <option value="gothic">ゴシック体（游ゴシック）</option>
-    <option value="meiryo">メイリオ</option>
-    <option value="serif">汎用セリフ</option>
-    <option value="sans">汎用サンセリフ</option>
-  </select>
-  <div class="tb-sep"></div>
-  <span class="tb-label">文字:</span>
-  <button onclick="changeFontSize(-1)" style="padding:4px 12px;font-size:15px;" title="文字を小さく">A－</button>
-  <span id="font-size-display">100%</span>
-  <button onclick="changeFontSize(1)" style="padding:4px 12px;font-size:15px;" title="文字を大きく">A＋</button>
-  <div class="tb-sep"></div>
-  <span class="tb-label">行間:</span>
-  <select id="lineh-select" onchange="changeLineHeight(this.value)">
-    <option value="1.6">狭い</option>
-    <option value="2.0" selected>標準</option>
-    <option value="2.4">広い</option>
-    <option value="2.8">最広</option>
-  </select>
-  <div class="tb-sep"></div>
-  <span class="tb-label">組方向:</span>
-  <select id="writing-mode-select" onchange="changeWritingMode(this.value)">
-    <option value="vertical">縦書き</option>
-    <option value="horizontal">横書き</option>
-    <option value="publisher">ePub指定</option>
-  </select>
-  <div class="tb-sep"></div>
-  <span class="tb-label">テーマ:</span>
-  <select id="theme-select" onchange="changeTheme(this.value)">
-    <option value="">標準</option>
-    <option value="sepia">セピア</option>
-    <option value="white">白紙</option>
-    <option value="dark">ダーク</option>
-  </select>
-  <div id="book-title">ePub3縦書きビューア</div>
-  <div class="tb-sep"></div>
-  <span class="tb-label">余白:</span>
-  <select id="margin-select" onchange="changeMargin(this.value)">
-    <option value="full">標準</option>
-    <option value="medium">中</option>
-    <option value="narrow">狭</option>
-    <option value="none">なし</option>
-  </select>
-  <div class="tb-sep"></div>
-  <button onclick="exportBookmarks()" title="しおりをJSONファイルとして書き出す">🔖 書き出し</button>
-  <button onclick="document.getElementById('bookmark-input').click()" title="しおりJSONファイルを読み込む">📥 読み込み</button>
+
+  <button id="toc-btn" onclick="toggleSidebar()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+    目次
+  </button>
+
+  <div id="book-title">ePub3ビューア</div>
+
+  <button class="icon-btn" onclick="document.getElementById('bookmark-input').click()" title="しおり読込">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+  </button>
+  <button class="icon-btn" onclick="exportBookmarks()" title="しおり書出">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+  </button>
   <input type="file" id="bookmark-input" accept=".json" style="display:none">
-  <button onclick="showHelp()">？ ヘルプ</button>
+
+  <div class="tb-sep"></div>
+
+  <button class="icon-btn" id="settings-btn" onclick="toggleSettings()" title="表示設定">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+  </button>
+
+  <button class="icon-btn" onclick="flashNavButtons()" title="操作と配置を確認">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+  </button>
+
+  <button class="icon-btn" onclick="showHelp()" title="ヘルプ">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+  </button>
+</div>
+
+<div class="popover-overlay" id="settings-overlay" onclick="toggleSettings()"></div>
+<div id="settings-popover">
+  <div class="pop-header">
+    表示設定
+    <button class="icon-btn" onclick="toggleSettings()" style="padding:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+  </div>
+  <div class="pop-body">
+    <div class="set-group">
+      <h4>カラー</h4>
+      <div class="set-row">
+        <span class="set-label">テーマ</span>
+        <div class="theme-options">
+          <div class="theme-btn tb-std" onclick="changeTheme('')" title="標準"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
+          <div class="theme-btn tb-sepia" onclick="changeTheme('sepia')" title="セピア"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
+          <div class="theme-btn tb-white" onclick="changeTheme('white')" title="白紙"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
+          <div class="theme-btn tb-dark" onclick="changeTheme('dark')" title="ダーク"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="set-group">
+      <h4>タイポグラフィ</h4>
+      <div class="set-row">
+        <span class="set-label">フォント</span>
+        <select class="modern-select" id="font-select" onchange="changeFont(this.value)">
+          <option value="publisher">指定なし</option>
+          <option value="mincho">明朝体</option>
+          <option value="gothic">ゴシック体</option>
+          <option value="meiryo">メイリオ</option>
+        </select>
+      </div>
+      <div class="set-row">
+        <span class="set-label">文字サイズ</span>
+        <div class="btn-group">
+          <button onclick="changeFontSize(-1)">A-</button>
+          <span id="font-size-display">100%</span>
+          <button onclick="changeFontSize(1)">A+</button>
+        </div>
+      </div>
+      <div class="set-row">
+        <span class="set-label">行間</span>
+        <select class="modern-select" id="lineh-select" onchange="changeLineHeight(this.value)">
+          <option value="1.6">狭い</option>
+          <option value="2.0" selected>標準</option>
+          <option value="2.4">広い</option>
+          <option value="2.8">かなり広い</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="set-group">
+      <h4>レイアウト</h4>
+      <div class="set-row">
+        <span class="set-label">組方向</span>
+        <select class="modern-select" id="writing-mode-select" onchange="changeWritingMode(this.value)">
+          <option value="vertical">縦書き</option>
+          <option value="horizontal">横書き</option>
+          <option value="publisher">ePub指定</option>
+        </select>
+      </div>
+      <div class="set-row">
+        <span class="set-label">ページ余白</span>
+        <select class="modern-select" id="margin-select" onchange="changeMargin(this.value)">
+          <option value="full">標準</option>
+          <option value="medium">中</option>
+          <option value="narrow">狭</option>
+          <option value="none">なし</option>
+        </select>
+      </div>
+    </div>
+  </div>
 </div>
 
 <div id="main">
-  <div id="sidebar">
-    <div id="sidebar-header">📖 目次</div>
+  <div id="sidebar" class="hidden">
+    <div id="sidebar-header">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+      目次
+    </div>
     <div id="toc-list"></div>
   </div>
   <div id="reading-area">
     <div id="welcome">
-      <svg width="80" height="80" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <rect x="10" y="8" width="45" height="60" rx="3" fill="currentColor" opacity="0.15"/>
-        <rect x="16" y="8" width="45" height="60" rx="3" fill="currentColor" opacity="0.25"/>
-        <rect x="22" y="8" width="45" height="60" rx="3" stroke="currentColor" stroke-width="2" fill="none"/>
-        <line x1="34" y1="22" x2="54" y2="22" stroke="currentColor" stroke-width="2" opacity="0.6"/>
-        <line x1="34" y1="32" x2="54" y2="32" stroke="currentColor" stroke-width="1.5" opacity="0.4"/>
-        <line x1="34" y1="40" x2="54" y2="40" stroke="currentColor" stroke-width="1.5" opacity="0.4"/>
-        <line x1="34" y1="48" x2="48" y2="48" stroke="currentColor" stroke-width="1.5" opacity="0.4"/>
-      </svg>
-      <div id="resume-banner">
-        <span class="resume-label">📖 前回の続きがあります</span>
+      <div id="resume-banner" onclick="resumeBook()">
+        <span class="resume-label">前回の続きから読みますか？</span>
         <strong class="resume-title" id="resume-title"></strong>
         <span class="resume-hint">同じファイルを開くと続きから再開します</span>
       </div>
       <div id="drop-zone" onclick="openFilePicker()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 22h14a2 2 0 0 0 2-2V7.5L14.5 2H6a2 2 0 0 0-2 2v4"/><polyline points="14 2 14 8 20 8"/><path d="M12 11v6"/><polyline points="9 14 12 17 15 14"/></svg>
         <h2>ePubファイルを開く</h2>
-        <p>「ePubを開く」ボタンをタップ</p>
-        <p style="margin-top:12px;font-size:12px;opacity:.6;">対応形式: .epub / .kepub</p>
+        <p>「開く」ボタンをタップ</p>
       </div>
-      <p style="font-size:12px;opacity:.5;">次へボタン：次へスクロール　‹›ボタン：章切替</p>
+      <p style="font-size:12px;opacity:.5;font-weight:500;">左右スワイプ：前進・後退<br>‹›ボタン：章切替</p>
     </div>
     <div id="page-container">
       <div id="epub-frame">
@@ -208,16 +311,16 @@
         <iframe id="content-iframe" src="about:blank"></iframe>
       </div>
       <button class="chapter-btn" id="btn-prev" onclick="prevChapter()" title="前の章">
-        <span class="cb-arrow">›</span><span class="cb-label">前章</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
       </button>
       <button class="chapter-btn" id="btn-next" onclick="nextChapter()" title="次の章">
-        <span class="cb-arrow">‹</span><span class="cb-label">次章</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
       </button>
       <button class="scroll-btn" id="btn-scroll-back" onclick="scrollPage(-1)" title="前へ">
-        <span>↑</span><span>前へ</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
       </button>
       <button class="scroll-btn" id="btn-scroll-fwd" onclick="scrollPage(1)" title="次へ">
-        <span>次へ</span><span>↓</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
       </button>
     </div>
   </div>
@@ -255,10 +358,11 @@ const state = {
   bookTitle:'', bookCreator:'',
   fontMode:'publisher', fontSize:100, lineHeight:2.0, theme:'', margin:'full',
   writingMode:'vertical',  // 'vertical' | 'horizontal' | 'publisher'
-  sidebarOpen:true,
+  sidebarOpen:false,
   bookKey:'',
 };
 
+// テーマ別 ePub 本文エリアの色（iframe 内に直接注入）
 const THEME_CONTENT = {
   '':      { paper: '#fdf8f0', text: '#1a1008' },
   sepia:   { paper: '#dfc89a', text: '#2e1a06' },
@@ -326,15 +430,14 @@ async function loadEpub(file) {
       const navItem = state.manifest[navEl.getAttribute('id')];
       if (navItem) {
         const navFile = zip.file(navItem.absPath);
-        if (navFile) {
-          const navXml = await navFile.async('text');
-          const navDoc = new DOMParser().parseFromString(navXml, 'text/html');
-          navDoc.querySelectorAll('nav a').forEach(a => {
-            const label = a.textContent.trim();
-            const href  = a.getAttribute('href');
-            if (label && href) state.toc.push({label, href});
-          });
-        }
+        if (!navFile) { console.warn('TOC file missing:', navItem.absPath); }
+        const navXml = navFile ? await navFile.async('text') : '';
+        const navDoc = new DOMParser().parseFromString(navXml, 'text/html');
+        navDoc.querySelectorAll('nav a').forEach(a => {
+          const label = a.textContent.trim();
+          const href  = a.getAttribute('href');
+          if (label && href) state.toc.push({label, href});
+        });
       }
     }
 
@@ -493,23 +596,9 @@ async function buildSrcdoc(xhtmlText, xhtmlAbsPath, scrollTarget) {
   }
 
   // ── iOS Safari 向けスタイル注入 ──
-  // 核心設計（iOS Safari のスクロール API を一切使わない transform 方式）:
-  //
-  //   window.scrollTo / scrollLeft / scrollX は iOS Safari の iframe 内で
-  //   挙動が不安定なため、一切使用しない。
-  //
-  //   代わりに body を position:fixed + writing-mode:vertical-rl にして
-  //   body.style.transform = translateX(tx) でコンテンツを横移動させる。
-  //
-  //   body { position:fixed; top:0; bottom:0; left:0; width:max-content }
-  //     → 高さ = viewport 高, 幅 = 全コンテンツ幅（縦書き列の合計）
-  //     → body.offsetWidth = 全列幅（JS で計測可能）
-  //
-  //   transform 規則:
-  //     tx = -maxS : body の右端 = viewport 右端 = column 1 = コンテンツ先頭
-  //     tx = 0     : body の左端 = viewport 左端 = 最終列 = コンテンツ末尾
-  //     前進（右→左）: tx を増加（-maxS → 0）
-  //     後退: tx を減少（0 → -maxS）
+  // iOS Safari の iframe 内では scroll API が動作しないため、
+  // body を position:fixed + writing-mode:vertical-rl にして
+  // body.style.transform = translateX(tx) でコンテンツを横移動させる。
   const font   = FONTS[state.fontMode];
   const colors = THEME_CONTENT[state.theme] || THEME_CONTENT[''];
   const paper  = colors.paper;
@@ -536,12 +625,13 @@ async function buildSrcdoc(xhtmlText, xhtmlAbsPath, scrollTarget) {
         'margin:0!important;padding:0!important;',
         'background:' + paper + '!important;}',
     'body{' + bodyWmCss,
+        'will-change:transform;',
         'margin:0!important;padding:0!important;',
         'background:' + paper + '!important;',
         'color:' + text + '!important;',
         'font-size:' + state.fontSize + '%!important;',
         'line-height:' + state.lineHeight + '!important;',
-        'opacity:0!important;}', // JS が transform を適用後に表示
+        'opacity:0!important;}',
     'img{max-width:100%!important;max-height:95vh!important;object-fit:contain!important;}',
     fontRule,
   ].join('');
@@ -590,9 +680,12 @@ function buildScrollScript(scrollTarget, writingMode) {
   const INIT_FN = `
   function init(){
     function run(){
+      // double-rAF: iPhoneでは十分。iPadは500msフォールバックで再測定。
       requestAnimationFrame(function(){
         requestAnimationFrame(applyInit);
       });
+      // iPad等で writing-mode レイアウトが遅延する場合のフォールバック再適用
+      setTimeout(applyInit, 500);
     }
     if(document.readyState === 'complete') run();
     else window.addEventListener('load', run, {once:true});
@@ -642,10 +735,10 @@ function buildScrollScript(scrollTarget, writingMode) {
     var ms = maxS();
     if(ms <= 0){ postEdge(dir); return; }
     var step = vh() * STEP;
-    if(dir === 1){ // 前進: ty 増加（body が上に移動）→ blank zone (ty > ms)
+    if(dir === 1){
       if(ty >= ms + 2){ postEdge(1); return; }
       setTy(Math.min(ty + step, ms + step));
-    } else { // 後退: ty 減少
+    } else {
       if(ty <= 2){ postEdge(-1); return; }
       setTy(Math.max(ty - step, 0));
     }
@@ -839,8 +932,6 @@ ${INIT_FN}
     if(ms <= 0){ postEdge(dir); return; }
     var step = vw() * STEP;
     if(dir === 1){ // 前進: tx → 0 → blank zone (tx > 0)
-      // tx > 0 は blank zone（body が右にずれ、左側に空白が見える）。
-      // blank zone に 2px 以上入った次の押下で EPUB_EDGE を発火する。
       if(tx >= 2){ postEdge(1); return; }
       setTx(Math.min(tx + step, step)); // blank zone 上限 = 1 step 分
     } else {       // 後退: tx → -ms
@@ -949,17 +1040,10 @@ function flashOverlay() {
 }
 function flashNavButtons() {
   const btns = document.querySelectorAll('.chapter-btn, .scroll-btn');
-  const fwd = document.getElementById('btn-scroll-fwd');
   btns.forEach(b => b.classList.add('nav-hint'));
-  fwd.style.background = 'var(--accent)';
-  fwd.style.borderColor = 'var(--accent)';
-  fwd.style.opacity = '0.9';
   setTimeout(() => {
     btns.forEach(b => b.classList.remove('nav-hint'));
-    fwd.style.background = '';
-    fwd.style.borderColor = '';
-    fwd.style.opacity = '';
-  }, 5000);
+  }, 3500);
 }
 function updatePageInfo() {
   const total = state.spine.length, cur = state.currentSpineIdx+1;
@@ -1016,13 +1100,50 @@ function loadSettings() {
   try {
     const s = JSON.parse(localStorage.getItem(SETTINGS_KEY));
     if (!s) return;
-    if (s.fontMode)             { state.fontMode = s.fontMode;         document.getElementById('font-select').value  = s.fontMode; }
-    if (s.fontSize)             { state.fontSize = s.fontSize;         document.getElementById('font-size-display').textContent = s.fontSize + '%'; }
-    if (s.lineHeight)           { state.lineHeight = s.lineHeight;     document.getElementById('lineh-select').value = String(s.lineHeight); }
-    if (s.theme !== undefined)  { state.theme = s.theme;               document.body.className = s.theme ? 'theme-' + s.theme : ''; document.getElementById('theme-select').value = s.theme; }
-    if (s.margin)               { state.margin = s.margin;             document.getElementById('margin-select').value = s.margin; applyMargin(s.margin); }
-    if (s.writingMode)          { state.writingMode = s.writingMode;   document.getElementById('writing-mode-select').value = s.writingMode; }
-  } catch(e) {}
+    if (s.fontMode)             { state.fontMode = s.fontMode;         const el = document.getElementById('font-select'); if(el) el.value = s.fontMode; }
+    if (s.fontSize)             { state.fontSize = s.fontSize;         const el = document.getElementById('font-size-display'); if(el) el.textContent = s.fontSize + '%'; }
+    if (s.lineHeight)           { state.lineHeight = s.lineHeight;     const el = document.getElementById('lineh-select'); if(el) el.value = String(s.lineHeight); }
+    if (s.theme !== undefined)  { state.theme = s.theme;               document.body.className = s.theme ? 'theme-' + s.theme : ''; if(typeof updateThemeBtnUI === 'function') updateThemeBtnUI(); }
+    if (s.margin)               { state.margin = s.margin;             const el = document.getElementById('margin-select'); if(el) el.value = s.margin; applyMargin(s.margin); }
+    if (s.writingMode)          { state.writingMode = s.writingMode;   const el = document.getElementById('writing-mode-select'); if(el) el.value = s.writingMode; }
+  } catch(e) { console.warn("Failed to load settings fully:", e); }
+}
+
+function toggleSettings() {
+  const pop = document.getElementById('settings-popover');
+  const overlay = document.getElementById('settings-overlay');
+  if(pop.classList.contains('show')) {
+    pop.classList.remove('show');
+    overlay.classList.remove('show');
+    document.getElementById('settings-btn').classList.remove('active');
+  } else {
+    pop.classList.add('show');
+    overlay.classList.add('show');
+    document.getElementById('settings-btn').classList.add('active');
+    updateThemeBtnUI();
+  }
+}
+
+function updateThemeBtnUI() {
+  const th = state.theme || '';
+  document.querySelectorAll('.theme-btn').forEach(b => b.classList.remove('active'));
+  let btn = document.querySelector('.tb-' + (th || 'std'));
+  if (btn) btn.classList.add('active');
+}
+
+// changeTheme をラップして theme ボタン UI を同期
+const _origChangeTheme = changeTheme;
+changeTheme = function(v) {
+  _origChangeTheme(v);
+  updateThemeBtnUI();
+};
+
+function resumeBook() {
+  const data = JSON.parse(localStorage.getItem('epub_last_book'));
+  if (data && data.title) {
+    showToast('同じファイル「' + data.title + '」を開いてください');
+    openFilePicker();
+  }
 }
 
 function toggleSidebar() {
@@ -1161,6 +1282,7 @@ document.getElementById('bookmark-input').addEventListener('change', e => {
       }
       showToast('📥 ' + count + '冊分のしおりを読み込みました');
       showResumeBanner();
+      updateThemeBtnUI();
     } catch(err) {
       alert('しおりファイルの読み込みに失敗しました:\n' + err.message);
     }
@@ -1199,9 +1321,10 @@ function showHelp() {
     '</div>',
   ].join('') : '';
   document.getElementById('modal-body').innerHTML = bookInfo + [
-    '<p><strong>📜 ページスクロール</strong></p>',
-    '<p>　画面下「次へ↓」ボタン：前進スクロール</p>',
-    '<p>　画面上「↑前へ」ボタン：後退スクロール</p>',
+    '<p><strong>📱 ページスクロール（主操作）</strong></p>',
+    '<p>　左スワイプ：1画面分 前進スクロール</p>',
+    '<p>　右スワイプ：1画面分 後退スクロール</p>',
+    '<p>　画面下「次へ」・上「前へ」ボタン</p>',
     '<p>　※章末尾/先頭で自動的に章移動</p>',
     '<br>',
     '<p><strong>📖 章切り替え</strong></p>',
@@ -1213,7 +1336,7 @@ function showHelp() {
     '<p>　← 次の章　→ 前の章</p>',
     '<br>',
     '<p><strong>フォント／テーマ</strong></p>',
-    '<p>　ツールバーのセレクトボックスで変更</p>',
+    '<p>　設定パネル（歯車アイコン）で変更</p>',
     '<br>',
     '<p><strong>ファイル形式</strong></p>',
     '<p>　.epub / .kepub（Kobo）対応</p>',
@@ -1228,17 +1351,11 @@ document.getElementById('modal-overlay').addEventListener('click', e => {
   if (e.target === document.getElementById('modal-overlay')) closeModal();
 });
 
-// Toolbar horizontal scroll via mouse wheel
-document.getElementById('toolbar').addEventListener('wheel', e => {
-  if (e.deltaY === 0) return;
-  e.preventDefault();
-  e.currentTarget.scrollLeft += e.deltaY;
-}, { passive: false });
-
 // Init
-document.getElementById('toc-btn').classList.add('active');
 loadSettings();
 showResumeBanner();
+updateThemeBtnUI();
+
 </script>
 </body>
 </html>

@@ -15,6 +15,12 @@ Two-file ePub 3 vertical-text viewer for reading Japanese publications. No build
 
 **License:** MIT © 2026 N.Aono — see `LICENSE`.
 
+**Feature differences between files:**
+- Drag-and-drop file open: `epub_viewer.html` only
+- Keyboard shortcuts (Space/arrows/Home/End): both files support Bluetooth keyboard; `epub_viewer_ios.html` also handles touch swipe inside the iframe
+- Toolbar mouse-wheel scroll: `epub_viewer.html` only
+- Release tags follow `vX.Y.Z` convention (`git tag vX.Y.Z && git push --tags`)
+
 ## Development
 
 No build step. To open the viewer:
@@ -33,7 +39,7 @@ There are no automated tests. Manual testing requires a `.epub` or `.kepub` file
 
 ## Architecture
 
-Each viewer is a single self-contained HTML file (`epub_viewer.html` ~1300 lines, `epub_viewer_ios.html` ~1245 lines). Both follow a modular functional style with a single central state object. The architecture below describes `epub_viewer.html`; `epub_viewer_ios.html` is identical except for the scroll mechanism (see iOS Viewer section below).
+Each viewer is a single self-contained HTML file (`epub_viewer.html` ~1308 lines, `epub_viewer_ios.html` ~1361 lines). Both follow a modular functional style with a single central state object. The architecture below describes `epub_viewer.html`; `epub_viewer_ios.html` is identical except for the scroll mechanism (see iOS Viewer section below).
 
 ### State
 
@@ -73,7 +79,7 @@ const state = {
 - **iOS Safari scroll compatibility** — injected CSS sets `html { height:100%; overflow-y:hidden }`. Two constraints: (1) `height:100%` (not `100vh`) — iOS Safari resolves `100vh` to full screen height including address bar, making columns too tall; (2) `overflow-x` is NOT set — setting `overflow-x:auto` causes iOS to use an LTR CSS scroll container where the initial position is scrollLeft=0 (left edge = RTL content end = blank). Without it, iOS UIScrollView auto-positions at the RTL start (right edge = content beginning).
 - **`window.scrollTo()` instead of `scrollLeft` assignment** — `document.documentElement.scrollLeft = X` is silently ignored inside iOS Safari iframes (confirmed via diagnostics: probe=0 after setting 9999999). `window.scrollTo(x, 0)` works correctly. All scroll operations use `window.scrollTo`; `window.scrollX` is used for reading (falls back to `scrollLeft` for browsers that don't support `scrollX`).
 - **`document.documentElement.scrollWidth`** — the document root correctly reports `scrollWidth` including left-side (RTL/vertical-rl) overflow in all browsers. A wrapper `div` with `overflow-x:auto` does NOT include left-side overflow in its `scrollWidth`, causing `scrollWidth == clientWidth` always, making every scroll immediately trigger `EPUB_EDGE`. Always use `document.documentElement.scrollWidth` for measuring content width.
-- **`flashNavButtons()`** is called (1) after `renderPage` completes on ePub open, and (2) after `closeModal()` closes the help dialog. It flashes all 4 nav buttons with accent color for 5 seconds to help users discover the controls. `#btn-scroll-fwd` is handled via inline styles (not CSS class) because its ID-level `background` and `border` override class-based rules at the same specificity level.
+- **`flashNavButtons()`** is called (1) after `renderPage` completes on ePub open, and (2) after `closeModal()` closes the help dialog. It flashes all 4 nav buttons with accent color for 5 seconds to help users discover the controls. All buttons including `#btn-scroll-fwd` are handled via the `.nav-hint { background:var(--accent) !important }` CSS class — the `!important` overrides the ID-level `background` rule without needing inline styles.
 - **`scrollPage()` calls `blur()`** on any focused nav button before sending the scroll postMessage. Without this, clicking `#btn-scroll-fwd` then pressing a keyboard scroll key leaves the button with a persistent `:focus-visible` border (since `#btn-scroll-fwd` has a always-present `border:1px solid` at the ID level).
 - **`prevChapter()` uses `'start'`** as the scroll target. `'end'` is reserved for automatic chapter transitions triggered by scrolling past the chapter boundary (so the reader lands at the end of the previous chapter, matching scroll direction). Explicit chapter button navigation always starts at the beginning.
 - **Chapter-end blank page** — `buildSrcdoc()` injects a blank end-page via padding: `padding-left:100vw` for vertical mode (blank space at physical left = reading end), `padding-bottom:100vh` for horizontal mode (blank space at bottom). `buildScrollScript()` accounts for this by using `sw - 2*vw` (vertical) or `sh - 2*vh` (horizontal) as the real content range. `doScroll` fires `EPUB_EDGE` when the scroll position is 2+ px into the blank zone, so the prior scroll shows the last content alongside blank — the intended UX. `epub_viewer_ios.html` uses the same "one step of blank" pattern via CSS-transform: `tx > 0` is the blank zone; `setTx(Math.min(tx + step, step))` caps blank travel at one step; `EPUB_EDGE` fires when `tx >= 2`. `'publisher'` mode has no injected padding and no blank end-page.
@@ -84,10 +90,19 @@ const state = {
 
 iOS Safari silently ignores both `document.documentElement.scrollLeft` assignment and `window.scrollTo()` inside iframes, so `epub_viewer_ios.html` uses a completely different scroll mechanism — **CSS `transform`** — inside `buildScrollScript()`:
 
-- `body { position:fixed; writing-mode:vertical-rl; width:max-content }` expands all columns into a single body-width block.
+- `body { position:fixed; writing-mode:vertical-rl; width:max-content; will-change:transform }` expands all columns into a single body-width block. `will-change:transform` forces GPU compositing and prevents partial-render artifacts on iPad (without it, `position:fixed` + CSS `transform` causes incomplete paints during drag scroll).
 - `body.style.transform = 'translateX(px)'` slides the content to simulate page turns.
-- No scroll API is called anywhere; swipe gesture (`touchstart`/`touchend`) replaces keyboard and button scroll in the iframe.
+- No scroll API is called anywhere; swipe gesture (`touchstart`/`touchend`) inside the iframe replaces button/keyboard scroll for content navigation.
 - `EPUB_SCROLL`, `EPUB_EDGE`, `EPUB_POS`, and `EPUB_LINK` postMessage protocol is otherwise identical to the main viewer.
+- **`INIT_FN` timing (iPad fix)** — on iPad, `body.offsetWidth` is read before `writing-mode:vertical-rl` layout completes, causing `maxS()=0` and content positioned off-screen. The fix uses a double-rAF (fast path for iPhone) plus a `setTimeout(applyInit, 500)` fallback (ensures layout is complete on iPad):
+  ```js
+  function run(){
+    requestAnimationFrame(function(){ requestAnimationFrame(applyInit); });
+    setTimeout(applyInit, 500);
+  }
+  ```
+- **Touch device visibility (`@media (hover: none)`)** — chapter nav buttons and `#btn-scroll-fwd` are slightly visible on all touch devices (opacity `.3` / `.22`) so users can find them. This media query applies to both iPhone and iPad regardless of viewport width.
+- **`sidebarOpen: false`** default — both files start with the sidebar hidden. iOS viewer sidebar div has `class="hidden"` in HTML.
 
 ### postMessage Protocol
 
