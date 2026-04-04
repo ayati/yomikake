@@ -65,6 +65,9 @@
   .tb-dark { background:#1c1c20; border-color:#33333b; }
   .tb-white { background:#ffffff; border-color:#d4d4d4; }
 
+  .lang-select { appearance:none; background:var(--ui-bg); border:1px solid var(--ui-border); color:var(--ui-text); padding:4px 20px 4px 8px; border-radius:6px; font-size:12px; cursor:pointer; font-family:inherit; font-weight:500; background-image:url('data:image/svg+xml;utf8,<svg viewBox="0 0 24 24" fill="none" stroke="%23888" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>'); background-repeat:no-repeat; background-position:right 4px center; background-size:12px; outline:none; }
+  .lang-select:hover { background-color:var(--hover-bg); }
+
   #main { flex:1; display:flex; overflow:hidden; }
 
   #sidebar { width:280px; background:var(--ui-bg); border-right:1px solid var(--ui-border); display:flex; flex-direction:column; transition:transform .3s cubic-bezier(0.16,1,0.3,1); overflow:hidden; flex-shrink:0; position:relative; z-index:90; }
@@ -168,77 +171,97 @@
 <body>
 
 <div id="toolbar">
-  <button id="open-btn" onclick="openFilePicker()" title="ePubファイルを開く">
+  <button id="open-btn" onclick="openFilePicker()" data-i18n-title="btn.open.title">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 22h14a2 2 0 0 0 2-2V7.5L14.5 2H6a2 2 0 0 0-2 2v4"/><polyline points="14 2 14 8 20 8"/><path d="M4 15h12"/><path d="M4 19h12"/></svg>
-    開く
+    <span data-i18n="btn.open">開く</span>
   </button>
   <input type="file" id="file-input" accept=".epub,.kepub">
-  
+
   <div class="tb-sep"></div>
-  
+
   <button id="toc-btn" onclick="toggleSidebar()">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
-    目次
+    <span data-i18n="btn.toc">目次</span>
   </button>
-  
+
   <div id="book-title">ePub3ビューア</div>
-  
-  <button class="icon-btn" onclick="document.getElementById('bookmark-input').click()" title="しおり読込">
+
+  <button class="icon-btn" onclick="document.getElementById('bookmark-input').click()" data-i18n-title="btn.bookmark.import">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
   </button>
-  <button class="icon-btn" onclick="exportBookmarks()" title="しおり書出">
+  <button class="icon-btn" onclick="exportBookmarks()" data-i18n-title="btn.bookmark.export">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
   </button>
   <input type="file" id="bookmark-input" accept=".json" style="display:none">
-  
+
   <div class="tb-sep"></div>
-  
-  <button class="icon-btn" id="settings-btn" onclick="toggleSettings()" title="表示設定">
+
+  <button class="icon-btn" id="settings-btn" onclick="toggleSettings()" data-i18n-title="btn.settings">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
   </button>
-  
-  <button class="icon-btn" onclick="flashNavButtons()" title="操作と配置を確認">
+
+  <button class="icon-btn" onclick="flashNavButtons()" data-i18n-title="btn.flash">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
   </button>
-  
-  <button class="icon-btn" onclick="showHelp()" title="ヘルプ">
+
+  <button class="icon-btn" onclick="showHelp()" data-i18n-title="btn.help">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
   </button>
+
+  <div class="tb-sep"></div>
+  <select class="lang-select" onchange="setLang(this.value)" title="Language / 言語">
+    <option value="ja">日本語</option>
+    <option value="en">English</option>
+    <option value="zh-TW">繁體中文</option>
+    <option value="zh-CN">简体中文</option>
+  </select>
 </div>
 
 <div class="popover-overlay" id="settings-overlay" onclick="toggleSettings()"></div>
 <div id="settings-popover">
   <div class="pop-header">
-    表示設定
+    <span data-i18n="settings.title">表示設定</span>
     <button class="icon-btn" onclick="toggleSettings()" style="padding:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
   </div>
   <div class="pop-body">
     <div class="set-group">
-      <h4>カラー</h4>
+      <h4 data-i18n="settings.language">言語</h4>
       <div class="set-row">
-        <span class="set-label">テーマ</span>
+        <select class="modern-select lang-select" onchange="setLang(this.value)" title="Language / 言語">
+          <option value="ja">日本語</option>
+          <option value="en">English</option>
+          <option value="zh-TW">繁體中文</option>
+          <option value="zh-CN">简体中文</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="set-group">
+      <h4 data-i18n="settings.color">カラー</h4>
+      <div class="set-row">
+        <span class="set-label" data-i18n="settings.theme">テーマ</span>
         <div class="theme-options">
-          <div class="theme-btn tb-std" onclick="changeTheme('')" title="標準"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
-          <div class="theme-btn tb-sepia" onclick="changeTheme('sepia')" title="セピア"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
-          <div class="theme-btn tb-white" onclick="changeTheme('white')" title="白紙"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
-          <div class="theme-btn tb-dark" onclick="changeTheme('dark')" title="ダーク"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
+          <div class="theme-btn tb-std" onclick="changeTheme('')" data-i18n-title="theme.std"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
+          <div class="theme-btn tb-sepia" onclick="changeTheme('sepia')" data-i18n-title="theme.sepia"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
+          <div class="theme-btn tb-white" onclick="changeTheme('white')" data-i18n-title="theme.white"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
+          <div class="theme-btn tb-dark" onclick="changeTheme('dark')" data-i18n-title="theme.dark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
         </div>
       </div>
     </div>
-    
+
     <div class="set-group">
-      <h4>タイポグラフィ</h4>
+      <h4 data-i18n="settings.typography">タイポグラフィ</h4>
       <div class="set-row">
-        <span class="set-label">フォント</span>
+        <span class="set-label" data-i18n="settings.font">フォント</span>
         <select class="modern-select" id="font-select" onchange="changeFont(this.value)">
-          <option value="publisher">指定なし</option>
-          <option value="mincho">明朝体</option>
-          <option value="gothic">ゴシック体</option>
-          <option value="meiryo">メイリオ</option>
+          <option value="publisher" data-i18n="font.publisher">指定なし</option>
+          <option value="mincho" data-i18n="font.mincho">明朝体</option>
+          <option value="gothic" data-i18n="font.gothic">ゴシック体</option>
+          <option value="meiryo" data-i18n="font.meiryo">メイリオ</option>
         </select>
       </div>
       <div class="set-row">
-        <span class="set-label">文字サイズ</span>
+        <span class="set-label" data-i18n="settings.fontSize">文字サイズ</span>
         <div class="btn-group">
           <button onclick="changeFontSize(-1)">A-</button>
           <span id="font-size-display">100%</span>
@@ -246,33 +269,33 @@
         </div>
       </div>
       <div class="set-row">
-        <span class="set-label">行間</span>
+        <span class="set-label" data-i18n="settings.lineHeight">行間</span>
         <select class="modern-select" id="lineh-select" onchange="changeLineHeight(this.value)">
-          <option value="1.6">狭い</option>
-          <option value="2.0" selected>標準</option>
-          <option value="2.4">広い</option>
-          <option value="2.8">かなり広い</option>
+          <option value="1.6" data-i18n="lh.narrow">狭い</option>
+          <option value="2.0" selected data-i18n="lh.normal">標準</option>
+          <option value="2.4" data-i18n="lh.wide">広い</option>
+          <option value="2.8" data-i18n="lh.veryWide">かなり広い</option>
         </select>
       </div>
     </div>
-    
+
     <div class="set-group">
-      <h4>レイアウト</h4>
+      <h4 data-i18n="settings.layout">レイアウト</h4>
       <div class="set-row">
-        <span class="set-label">組方向</span>
+        <span class="set-label" data-i18n="settings.writingMode">組方向</span>
         <select class="modern-select" id="writing-mode-select" onchange="changeWritingMode(this.value)">
-          <option value="vertical">縦書き</option>
-          <option value="horizontal">横書き</option>
-          <option value="publisher">ePub指定</option>
+          <option value="vertical" data-i18n="wm.vertical">縦書き</option>
+          <option value="horizontal" data-i18n="wm.horizontal">横書き</option>
+          <option value="publisher" data-i18n="wm.publisher">ePub指定</option>
         </select>
       </div>
       <div class="set-row">
-        <span class="set-label">ページ余白</span>
+        <span class="set-label" data-i18n="settings.margin">ページ余白</span>
         <select class="modern-select" id="margin-select" onchange="changeMargin(this.value)">
-          <option value="full">標準</option>
-          <option value="medium">中</option>
-          <option value="narrow">狭</option>
-          <option value="none">なし</option>
+          <option value="full" data-i18n="margin.full">標準</option>
+          <option value="medium" data-i18n="margin.medium">中</option>
+          <option value="narrow" data-i18n="margin.narrow">狭</option>
+          <option value="none" data-i18n="margin.none">なし</option>
         </select>
       </div>
     </div>
@@ -283,39 +306,39 @@
   <div id="sidebar" class="hidden">
     <div id="sidebar-header">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
-      目次
+      <span data-i18n="sidebar.toc">目次</span>
     </div>
     <div id="toc-list"></div>
   </div>
   <div id="reading-area">
     <div id="welcome">
       <div id="resume-banner" onclick="resumeBook()">
-        <span class="resume-label">前回の続きから読みますか？</span>
+        <span class="resume-label" data-i18n="resume.label">前回の続きから読みますか？</span>
         <strong class="resume-title" id="resume-title"></strong>
-        <span class="resume-hint">クリックして再開（または同じファイルを開いてください）</span>
+        <span class="resume-hint" data-i18n="resume.hint">クリックして再開（または同じファイルを開いてください）</span>
       </div>
       <div id="drop-zone" onclick="openFilePicker()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 22h14a2 2 0 0 0 2-2V7.5L14.5 2H6a2 2 0 0 0-2 2v4"/><polyline points="14 2 14 8 20 8"/><path d="M12 11v6"/><polyline points="9 14 12 17 15 14"/></svg>
-        <h2>ePubファイルを開く</h2>
-        <p>「開く」ボタンをクリック<br>またはここにファイルをドラッグ＆ドロップ</p>
+        <h2 data-i18n="welcome.open.title">ePubファイルを開く</h2>
+        <p data-i18n="welcome.dropZone.desc" data-i18n-html>「開く」ボタンをクリック<br>またはここにファイルをドラッグ＆ドロップ</p>
       </div>
-      <p style="font-size:12px;opacity:.5;font-weight:500;">スペースキー：次へ・↑↓：前進<br>←→：章切替</p>
+      <p style="font-size:12px;opacity:.5;font-weight:500;" data-i18n="welcome.keyHint" data-i18n-html>スペースキー：次へ・↑↓：前進<br>←→：章切替</p>
     </div>
     <div id="page-container">
       <div id="epub-frame">
         <div id="page-overlay"></div>
         <iframe id="content-iframe" src="about:blank"></iframe>
       </div>
-      <button class="chapter-btn" id="btn-prev" onclick="prevChapter()" title="前の章（→）">
+      <button class="chapter-btn" id="btn-prev" onclick="prevChapter()" data-i18n-title="btn.prev">
         <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
       </button>
-      <button class="chapter-btn" id="btn-next" onclick="nextChapter()" title="次の章（←）">
+      <button class="chapter-btn" id="btn-next" onclick="nextChapter()" data-i18n-title="btn.next">
         <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
       </button>
-      <button class="scroll-btn" id="btn-scroll-back" onclick="scrollPage(-1)" title="前へ（↑/Shift+Space）">
+      <button class="scroll-btn" id="btn-scroll-back" onclick="scrollPage(-1)" data-i18n-title="btn.scrollBack">
         <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
       </button>
-      <button class="scroll-btn" id="btn-scroll-fwd" onclick="scrollPage(1)" title="次へ（Space/↓）">
+      <button class="scroll-btn" id="btn-scroll-fwd" onclick="scrollPage(1)" data-i18n-title="btn.scrollFwd">
         <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
       </button>
     </div>
@@ -323,7 +346,7 @@
 </div>
 
 <div id="statusbar">
-  <span id="key-hint">スペース/↓：次へスクロール　←→：章切替</span>
+  <span id="key-hint" data-i18n="statusbar.keyHint">スペース/↓：次へスクロール　←→：章切替</span>
   <span id="page-info">—</span>
   <div id="progress-bar"><div id="progress-fill"></div></div>
 </div>
@@ -334,7 +357,7 @@
   <div id="modal-box">
     <h3 id="modal-title">操作ガイド</h3>
     <div id="modal-body"></div>
-    <button id="modal-close" onclick="closeModal()">閉じる</button>
+    <button id="modal-close" onclick="closeModal()" data-i18n="modal.close">閉じる</button>
   </div>
 </div>
 
@@ -343,6 +366,351 @@
         crossorigin="anonymous"></script>
 <script>
 'use strict';
+
+// ══════════════════════════════════════════
+//  i18n — 国際化
+// ══════════════════════════════════════════
+let _lang = 'ja';
+
+const I18N = {
+  ja: {
+    'btn.open':             '開く',
+    'btn.open.title':       'ePubファイルを開く',
+    'btn.toc':              '目次',
+    'btn.bookmark.import':  'しおり読込',
+    'btn.bookmark.export':  'しおり書出',
+    'btn.settings':         '表示設定',
+    'btn.flash':            '操作と配置を確認',
+    'btn.help':             'ヘルプ',
+    'btn.prev':             '前の章（→）',
+    'btn.next':             '次の章（←）',
+    'btn.scrollBack':       '前へ（↑/Shift+Space）',
+    'btn.scrollFwd':        '次へ（Space/↓）',
+    'app.title':            'ePub3ビューア',
+    'settings.title':       '表示設定',
+    'settings.language':    '言語',
+    'settings.color':       'カラー',
+    'settings.theme':       'テーマ',
+    'theme.std':            '標準',
+    'theme.sepia':          'セピア',
+    'theme.white':          '白紙',
+    'theme.dark':           'ダーク',
+    'settings.typography':  'タイポグラフィ',
+    'settings.font':        'フォント',
+    'font.publisher':       '指定なし',
+    'font.mincho':          '明朝体',
+    'font.gothic':          'ゴシック体',
+    'font.meiryo':          'メイリオ',
+    'settings.fontSize':    '文字サイズ',
+    'settings.lineHeight':  '行間',
+    'lh.narrow':            '狭い',
+    'lh.normal':            '標準',
+    'lh.wide':              '広い',
+    'lh.veryWide':          'かなり広い',
+    'settings.layout':      'レイアウト',
+    'settings.writingMode': '組方向',
+    'wm.vertical':          '縦書き',
+    'wm.horizontal':        '横書き',
+    'wm.publisher':         'ePub指定',
+    'settings.margin':      'ページ余白',
+    'margin.full':          '標準',
+    'margin.medium':        '中',
+    'margin.narrow':        '狭',
+    'margin.none':          'なし',
+    'sidebar.toc':          '目次',
+    'resume.label':         '前回の続きから読みますか？',
+    'resume.hint':          'クリックして再開（または同じファイルを開いてください）',
+    'welcome.open.title':   'ePubファイルを開く',
+    'welcome.dropZone.desc':'「開く」ボタンをクリック<br>またはここにファイルをドラッグ＆ドロップ',
+    'welcome.keyHint':      'スペースキー：次へ・↑↓：前進<br>←→：章切替',
+    'statusbar.keyHint':    'スペース/↓：次へスクロール　←→：章切替',
+    'modal.close':          '閉じる',
+    'modal.title.help':     'ヘルプ',
+    'help.currentBook':     '📚 現在の書籍',
+    'help.author':          '著者：{creator}',
+    'help.chapters':        'チャプター数：{n}',
+    'help.tocItems':        '目次項目数：{n}',
+    'help.body':            '<p><strong>📜 ページスクロール（主操作）</strong></p><p>　スペースキー：1画面分 前進スクロール</p><p>　Shift+スペース：1画面分 後退スクロール</p><p>　↓ / PageDown：前進スクロール</p><p>　↑ / PageUp：後退スクロール</p><p>　画面下「次へ↓」・上「↑前へ」ボタン</p><p>　※章末尾/先頭で自動的に章移動</p><br><p><strong>📖 章切り替え</strong></p><p>　← キー：次の章　　→ キー：前の章</p><p>　Home：最初の章　　End：最後の章</p><br><p><strong>フォント／テーマ</strong></p><p>　設定パネル（⚙アイコン）で変更</p><br><p><strong>ファイル形式</strong></p><p>　.epub / .kepub（Kobo）対応</p>',
+    'toast.resume':         '📖 前回の続きから再開（{n} / {total}章）',
+    'toast.fileMissing':    '⚠️ ファイルが見つかりません: {path}',
+    'toast.noBookmarks':    '書き出せるしおりがありません',
+    'toast.exported':       '📤 {count}冊分のしおりを書き出しました',
+    'toast.imported':       '📥 {count}冊分のしおりを読み込みました',
+    'toast.storageError':   '⚠️ しおり・設定の保存に失敗しました（ストレージ容量不足の可能性）',
+    'toast.resumeHint':     '同じファイル「{title}」を開いてください',
+    'err.noContainerXml':   'META-INF/container.xml が見つかりません。有効な ePub ファイルではない可能性があります。',
+    'err.noRootfile':       'container.xml に rootfile 要素がありません。ePub の構造が不正です。',
+    'err.noFullPath':       'rootfile の full-path 属性がありません。',
+    'err.noOpf':            'OPF ファイルが見つかりません: {path}',
+    'err.loadFailed':       'ePubの読み込みに失敗しました:\n{msg}',
+    'err.invalidFormat':    '形式が不正です',
+    'err.importFailed':     'しおりファイルの読み込みに失敗しました:\n{msg}',
+  },
+  en: {
+    'btn.open':             'Open',
+    'btn.open.title':       'Open ePub file',
+    'btn.toc':              'Contents',
+    'btn.bookmark.import':  'Import bookmarks',
+    'btn.bookmark.export':  'Export bookmarks',
+    'btn.settings':         'Display settings',
+    'btn.flash':            'Show controls',
+    'btn.help':             'Help',
+    'btn.prev':             'Prev chapter (→)',
+    'btn.next':             'Next chapter (←)',
+    'btn.scrollBack':       'Back (↑/Shift+Space)',
+    'btn.scrollFwd':        'Forward (Space/↓)',
+    'app.title':            'ePub3 Viewer',
+    'settings.title':       'Display Settings',
+    'settings.language':    'Language',
+    'settings.color':       'Color',
+    'settings.theme':       'Theme',
+    'theme.std':            'Standard',
+    'theme.sepia':          'Sepia',
+    'theme.white':          'White',
+    'theme.dark':           'Dark',
+    'settings.typography':  'Typography',
+    'settings.font':        'Font',
+    'font.publisher':       'Default',
+    'font.mincho':          'Mincho',
+    'font.gothic':          'Gothic',
+    'font.meiryo':          'Meiryo',
+    'settings.fontSize':    'Font size',
+    'settings.lineHeight':  'Line height',
+    'lh.narrow':            'Narrow',
+    'lh.normal':            'Normal',
+    'lh.wide':              'Wide',
+    'lh.veryWide':          'Extra wide',
+    'settings.layout':      'Layout',
+    'settings.writingMode': 'Writing mode',
+    'wm.vertical':          'Vertical',
+    'wm.horizontal':        'Horizontal',
+    'wm.publisher':         'ePub default',
+    'settings.margin':      'Page margin',
+    'margin.full':          'Normal',
+    'margin.medium':        'Medium',
+    'margin.narrow':        'Narrow',
+    'margin.none':          'None',
+    'sidebar.toc':          'Contents',
+    'resume.label':         'Continue reading?',
+    'resume.hint':          'Click to resume (or open the same file)',
+    'welcome.open.title':   'Open ePub file',
+    'welcome.dropZone.desc':'Click the "Open" button<br>or drag &amp; drop a file here',
+    'welcome.keyHint':      'Space: next · ↑↓: scroll<br>←→: change chapter',
+    'statusbar.keyHint':    'Space/↓: scroll · ←→: chapter',
+    'modal.close':          'Close',
+    'modal.title.help':     'Help',
+    'help.currentBook':     '📚 Current book',
+    'help.author':          'Author: {creator}',
+    'help.chapters':        'Chapters: {n}',
+    'help.tocItems':        'TOC items: {n}',
+    'help.body':            '<p><strong>📜 Page scroll (main operation)</strong></p><p>&nbsp;Space: scroll forward one page</p><p>&nbsp;Shift+Space: scroll back one page</p><p>&nbsp;↓ / PageDown: scroll forward</p><p>&nbsp;↑ / PageUp: scroll back</p><p>&nbsp;"Next ↓" button (bottom) / "↑ Prev" button (top)</p><p>&nbsp;※ Automatically advances chapter at boundaries</p><br><p><strong>📖 Chapter navigation</strong></p><p>&nbsp;← key: next chapter　　→ key: previous chapter</p><p>&nbsp;Home: first chapter　　End: last chapter</p><br><p><strong>Font / Theme</strong></p><p>&nbsp;Change via the settings panel (⚙ icon)</p><br><p><strong>File formats</strong></p><p>&nbsp;.epub / .kepub (Kobo) supported</p>',
+    'toast.resume':         '📖 Resumed from chapter {n} of {total}',
+    'toast.fileMissing':    '⚠️ File not found: {path}',
+    'toast.noBookmarks':    'No bookmarks to export',
+    'toast.exported':       '📤 Exported {count} bookmark(s)',
+    'toast.imported':       '📥 Imported {count} bookmark(s)',
+    'toast.storageError':   '⚠️ Failed to save (storage may be full)',
+    'toast.resumeHint':     'Please open "{title}"',
+    'err.noContainerXml':   'META-INF/container.xml not found. This may not be a valid ePub file.',
+    'err.noRootfile':       'No rootfile element in container.xml. The ePub structure is invalid.',
+    'err.noFullPath':       'Missing full-path attribute in rootfile.',
+    'err.noOpf':            'OPF file not found: {path}',
+    'err.loadFailed':       'Failed to load ePub:\n{msg}',
+    'err.invalidFormat':    'Invalid format',
+    'err.importFailed':     'Failed to import bookmarks:\n{msg}',
+  },
+  'zh-TW': {
+    'btn.open':             '開啟',
+    'btn.open.title':       '開啟 ePub 檔案',
+    'btn.toc':              '目錄',
+    'btn.bookmark.import':  '匯入書籤',
+    'btn.bookmark.export':  '匯出書籤',
+    'btn.settings':         '顯示設定',
+    'btn.flash':            '顯示控制項',
+    'btn.help':             '說明',
+    'btn.prev':             '上一章（→）',
+    'btn.next':             '下一章（←）',
+    'btn.scrollBack':       '後退（↑/Shift+空白）',
+    'btn.scrollFwd':        '前進（空白/↓）',
+    'app.title':            'ePub3 閱讀器',
+    'settings.title':       '顯示設定',
+    'settings.language':    '語言',
+    'settings.color':       '顏色',
+    'settings.theme':       '主題',
+    'theme.std':            '標準',
+    'theme.sepia':          '棕褐',
+    'theme.white':          '白紙',
+    'theme.dark':           '暗色',
+    'settings.typography':  '排版',
+    'settings.font':        '字型',
+    'font.publisher':       '預設',
+    'font.mincho':          '明朝體',
+    'font.gothic':          '黑體',
+    'font.meiryo':          'Meiryo',
+    'settings.fontSize':    '字型大小',
+    'settings.lineHeight':  '行距',
+    'lh.narrow':            '緊縮',
+    'lh.normal':            '標準',
+    'lh.wide':              '寬鬆',
+    'lh.veryWide':          '非常寬鬆',
+    'settings.layout':      '版面',
+    'settings.writingMode': '書寫方向',
+    'wm.vertical':          '直排',
+    'wm.horizontal':        '橫排',
+    'wm.publisher':         'ePub 預設',
+    'settings.margin':      '頁面邊距',
+    'margin.full':          '標準',
+    'margin.medium':        '中等',
+    'margin.narrow':        '窄',
+    'margin.none':          '無',
+    'sidebar.toc':          '目錄',
+    'resume.label':         '繼續上次閱讀？',
+    'resume.hint':          '點擊繼續（或開啟相同檔案）',
+    'welcome.open.title':   '開啟 ePub 檔案',
+    'welcome.dropZone.desc':'點擊「開啟」按鈕<br>或將檔案拖放至此',
+    'welcome.keyHint':      '空白鍵：前進・↑↓：捲動<br>←→：切換章節',
+    'statusbar.keyHint':    '空白/↓：捲動・←→：章節',
+    'modal.close':          '關閉',
+    'modal.title.help':     '說明',
+    'help.currentBook':     '📚 目前書籍',
+    'help.author':          '作者：{creator}',
+    'help.chapters':        '章節數：{n}',
+    'help.tocItems':        '目錄項目數：{n}',
+    'help.body':            '<p><strong>📜 頁面捲動（主要操作）</strong></p><p>　空白鍵：前進一頁</p><p>　Shift+空白：後退一頁</p><p>　↓ / PageDown：前進捲動</p><p>　↑ / PageUp：後退捲動</p><p>　畫面下方「下一頁↓」・上方「↑上一頁」按鈕</p><p>　※章節末尾/開頭時自動切換章節</p><br><p><strong>📖 章節切換</strong></p><p>　← 鍵：下一章　　→ 鍵：上一章</p><p>　Home：第一章　　End：最後一章</p><br><p><strong>字型／主題</strong></p><p>　於設定面板（⚙圖示）中變更</p><br><p><strong>支援格式</strong></p><p>　.epub / .kepub（Kobo）</p>',
+    'toast.resume':         '📖 從第 {n} 章（共 {total} 章）繼續閱讀',
+    'toast.fileMissing':    '⚠️ 找不到檔案：{path}',
+    'toast.noBookmarks':    '沒有可匯出的書籤',
+    'toast.exported':       '📤 已匯出 {count} 本書的書籤',
+    'toast.imported':       '📥 已匯入 {count} 本書的書籤',
+    'toast.storageError':   '⚠️ 儲存失敗（可能儲存空間不足）',
+    'toast.resumeHint':     '請開啟「{title}」',
+    'err.noContainerXml':   '找不到 META-INF/container.xml，可能不是有效的 ePub 檔案。',
+    'err.noRootfile':       'container.xml 中找不到 rootfile 元素，ePub 結構無效。',
+    'err.noFullPath':       'rootfile 缺少 full-path 屬性。',
+    'err.noOpf':            '找不到 OPF 檔案：{path}',
+    'err.loadFailed':       '載入 ePub 失敗：\n{msg}',
+    'err.invalidFormat':    '格式無效',
+    'err.importFailed':     '匯入書籤失敗：\n{msg}',
+  },
+  'zh-CN': {
+    'btn.open':             '打开',
+    'btn.open.title':       '打开 ePub 文件',
+    'btn.toc':              '目录',
+    'btn.bookmark.import':  '导入书签',
+    'btn.bookmark.export':  '导出书签',
+    'btn.settings':         '显示设置',
+    'btn.flash':            '显示控件',
+    'btn.help':             '帮助',
+    'btn.prev':             '上一章（→）',
+    'btn.next':             '下一章（←）',
+    'btn.scrollBack':       '后退（↑/Shift+空格）',
+    'btn.scrollFwd':        '前进（空格/↓）',
+    'app.title':            'ePub3 阅读器',
+    'settings.title':       '显示设置',
+    'settings.language':    '语言',
+    'settings.color':       '颜色',
+    'settings.theme':       '主题',
+    'theme.std':            '标准',
+    'theme.sepia':          '棕褐',
+    'theme.white':          '白纸',
+    'theme.dark':           '深色',
+    'settings.typography':  '排版',
+    'settings.font':        '字体',
+    'font.publisher':       '默认',
+    'font.mincho':          '明朝体',
+    'font.gothic':          '黑体',
+    'font.meiryo':          'Meiryo',
+    'settings.fontSize':    '字体大小',
+    'settings.lineHeight':  '行距',
+    'lh.narrow':            '紧缩',
+    'lh.normal':            '标准',
+    'lh.wide':              '宽松',
+    'lh.veryWide':          '非常宽松',
+    'settings.layout':      '版面',
+    'settings.writingMode': '书写方向',
+    'wm.vertical':          '竖排',
+    'wm.horizontal':        '横排',
+    'wm.publisher':         'ePub 默认',
+    'settings.margin':      '页面边距',
+    'margin.full':          '标准',
+    'margin.medium':        '中等',
+    'margin.narrow':        '窄',
+    'margin.none':          '无',
+    'sidebar.toc':          '目录',
+    'resume.label':         '继续上次阅读？',
+    'resume.hint':          '点击继续（或打开相同文件）',
+    'welcome.open.title':   '打开 ePub 文件',
+    'welcome.dropZone.desc':'点击「打开」按钮<br>或将文件拖放至此',
+    'welcome.keyHint':      '空格键：前进・↑↓：滚动<br>←→：切换章节',
+    'statusbar.keyHint':    '空格/↓：滚动・←→：章节',
+    'modal.close':          '关闭',
+    'modal.title.help':     '帮助',
+    'help.currentBook':     '📚 当前书籍',
+    'help.author':          '作者：{creator}',
+    'help.chapters':        '章节数：{n}',
+    'help.tocItems':        '目录项目数：{n}',
+    'help.body':            '<p><strong>📜 页面滚动（主要操作）</strong></p><p>　空格键：前进一页</p><p>　Shift+空格：后退一页</p><p>　↓ / PageDown：向前滚动</p><p>　↑ / PageUp：向后滚动</p><p>　画面下方「前进↓」・上方「↑后退」按钮</p><p>　※章节末尾/开头时自动切换章节</p><br><p><strong>📖 章节切换</strong></p><p>　← 键：下一章　　→ 键：上一章</p><p>　Home：第一章　　End：最后一章</p><br><p><strong>字体／主题</strong></p><p>　在设置面板（⚙图标）中更改</p><br><p><strong>支持格式</strong></p><p>　.epub / .kepub（Kobo）</p>',
+    'toast.resume':         '📖 从第 {n} 章（共 {total} 章）继续阅读',
+    'toast.fileMissing':    '⚠️ 找不到文件：{path}',
+    'toast.noBookmarks':    '没有可导出的书签',
+    'toast.exported':       '📤 已导出 {count} 本书的书签',
+    'toast.imported':       '📥 已导入 {count} 本书的书签',
+    'toast.storageError':   '⚠️ 保存失败（可能存储空间不足）',
+    'toast.resumeHint':     '请打开「{title}」',
+    'err.noContainerXml':   '找不到 META-INF/container.xml，可能不是有效的 ePub 文件。',
+    'err.noRootfile':       'container.xml 中找不到 rootfile 元素，ePub 结构无效。',
+    'err.noFullPath':       'rootfile 缺少 full-path 属性。',
+    'err.noOpf':            '找不到 OPF 文件：{path}',
+    'err.loadFailed':       '加载 ePub 失败：\n{msg}',
+    'err.invalidFormat':    '格式无效',
+    'err.importFailed':     '导入书签失败：\n{msg}',
+  },
+};
+
+function t(key, vars) {
+  const dict = I18N[_lang] || I18N['ja'];
+  let str = key in dict ? dict[key] : (I18N['ja'][key] || key);
+  if (vars) {
+    for (const [k, v] of Object.entries(vars))
+      str = str.replaceAll('{' + k + '}', String(v));
+  }
+  return str;
+}
+
+function initLang() {
+  const stored = localStorage.getItem('epub_lang');
+  if (stored && stored in I18N) { _lang = stored; return; }
+  const nav = navigator.language || 'ja';
+  if      (nav.startsWith('zh-TW') || nav.startsWith('zh-Hant')) _lang = 'zh-TW';
+  else if (nav.startsWith('zh'))                                   _lang = 'zh-CN';
+  else if (nav.startsWith('en'))                                   _lang = 'en';
+  else                                                             _lang = 'ja';
+}
+
+function setLang(lang) {
+  if (!(lang in I18N)) return;
+  _lang = lang;
+  try { localStorage.setItem('epub_lang', lang); } catch(e) {}
+  applyI18n();
+  if (document.getElementById('modal-overlay').classList.contains('show')) {
+    updateHelpContent();
+  }
+}
+
+function applyI18n() {
+  document.documentElement.lang = _lang;
+  document.title = t('app.title');
+  if (!state.epub) document.getElementById('book-title').textContent = t('app.title');
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    'i18nHtml' in el.dataset
+      ? (el.innerHTML = t(el.dataset.i18n))
+      : (el.textContent = t(el.dataset.i18n));
+  });
+  document.querySelectorAll('[data-i18n-title]').forEach(el => {
+    el.title = t(el.dataset.i18nTitle);
+  });
+  document.querySelectorAll('.lang-select').forEach(s => { s.value = _lang; });
+}
 
 // ══════════════════════════════════════════
 //  State
@@ -403,18 +771,18 @@ async function loadEpub(file) {
 
     // container.xml → OPF path
     const containerEntry = zip.file('META-INF/container.xml');
-    if (!containerEntry) throw new Error('META-INF/container.xml が見つかりません。有効な ePub ファイルではない可能性があります。');
+    if (!containerEntry) throw new Error(t('err.noContainerXml'));
     const cXml = await containerEntry.async('text');
     const cDoc = new DOMParser().parseFromString(cXml, 'application/xml');
     const rootfileEl = cDoc.querySelector('rootfile');
-    if (!rootfileEl) throw new Error('container.xml に rootfile 要素がありません。ePub の構造が不正です。');
+    if (!rootfileEl) throw new Error(t('err.noRootfile'));
     state.opfPath = rootfileEl.getAttribute('full-path');
-    if (!state.opfPath) throw new Error('rootfile の full-path 属性がありません。');
+    if (!state.opfPath) throw new Error(t('err.noFullPath'));
     state.opfDir  = state.opfPath.includes('/') ? state.opfPath.slice(0, state.opfPath.lastIndexOf('/')+1) : '';
 
     // OPF
     const opfEntry = zip.file(state.opfPath);
-    if (!opfEntry) throw new Error(`OPF ファイルが見つかりません: ${state.opfPath}`);
+    if (!opfEntry) throw new Error(t('err.noOpf', {path: state.opfPath}));
     const opfXml = await opfEntry.async('text');
     const opfDoc = new DOMParser().parseFromString(opfXml, 'application/xml');
 
@@ -473,7 +841,7 @@ async function loadEpub(file) {
     if (saved && saved.spineIdx > 0 && saved.spineIdx < state.spine.length) {
       if (state.sidebarOpen) toggleSidebar();
       await renderPage(saved.spineIdx, typeof saved.ratio === 'number' ? saved.ratio : 'start');
-      showToast('📖 前回の続きから再開（' + (saved.spineIdx + 1) + ' / ' + state.spine.length + '章）');
+      showToast(t('toast.resume', {n: saved.spineIdx + 1, total: state.spine.length}));
       flashNavButtons();
     } else {
       await renderPage(0);
@@ -481,7 +849,7 @@ async function loadEpub(file) {
     }
 
   } catch(err) {
-    alert('ePubの読み込みに失敗しました:\n' + err.message);
+    alert(t('err.loadFailed', {msg: err.message}));
     console.error(err);
   }
 }
@@ -832,7 +1200,7 @@ function buildScrollScript(scrollTarget, writingMode) {
     '  function isNeg(){',
     '    if(_neg !== null) return _neg;',
     '    var e = root();',
-    '    if(e.scrollWidth <= e.clientWidth){ _neg = false; return false; }',
+    '    if(e.scrollWidth <= e.clientWidth){ return false; }',
     '    _neg = (e.scrollLeft <= 0); return _neg;',
     '  }',
     '  function getX(e){',
@@ -913,7 +1281,7 @@ async function renderPage(idx, scrollTarget) {
 
   const spineItem = state.spine[idx];
   const spineFile = state.epub.file(spineItem.absPath);
-  if (!spineFile) { showToast('⚠️ ファイルが見つかりません: ' + spineItem.absPath); return; }
+  if (!spineFile) { showToast(t('toast.fileMissing', {path: spineItem.absPath})); return; }
   const xhtmlText = await spineFile.async('text');
   if (seq !== _renderSeq) return;
   const srcdoc = await buildSrcdoc(xhtmlText, spineItem.absPath, scrollTarget);
@@ -1081,7 +1449,7 @@ changeTheme = function(v) {
 function resumeBook() {
   const data = JSON.parse(localStorage.getItem('epub_last_book'));
   if (data && data.title) {
-     showToast('同じファイル「' + data.title + '」を開いてください');
+     showToast(t('toast.resumeHint', {title: data.title}));
      openFilePicker();
   }
 }
@@ -1188,7 +1556,7 @@ function exportBookmarks() {
     }
   }
   const count = Object.keys(data).filter(k => k.startsWith('epub_pos_')).length;
-  if (count === 0) { showToast('書き出せるしおりがありません'); return; }
+  if (count === 0) { showToast(t('toast.noBookmarks')); return; }
   const blob = new Blob(
     [JSON.stringify({ version: 1, exportedAt: new Date().toISOString(), bookmarks: data }, null, 2)],
     { type: 'application/json' }
@@ -1200,7 +1568,7 @@ function exportBookmarks() {
   a.download = 'epub_bookmarks_' + date + '.json';
   a.click();
   URL.revokeObjectURL(url);
-  showToast('📤 ' + count + '冊分のしおりを書き出しました');
+  showToast(t('toast.exported', {count}));
 }
 
 document.getElementById('bookmark-input').addEventListener('change', e => {
@@ -1211,7 +1579,7 @@ document.getElementById('bookmark-input').addEventListener('change', e => {
   reader.onload = ev => {
     try {
       const json = JSON.parse(ev.target.result);
-      if (!json.bookmarks || typeof json.bookmarks !== 'object') throw new Error('形式が不正です');
+      if (!json.bookmarks || typeof json.bookmarks !== 'object') throw new Error(t('err.invalidFormat'));
       let count = 0;
       for (const [key, val] of Object.entries(json.bookmarks)) {
         if (!key.startsWith('epub_pos_') && key !== 'epub_last_book') continue;
@@ -1220,12 +1588,12 @@ document.getElementById('bookmark-input').addEventListener('change', e => {
           if (key.startsWith('epub_pos_')) count++;
         } catch(e) { notifyStorageError(); break; }
       }
-      showToast('📥 ' + count + '冊分のしおりを読み込みました');
+      showToast(t('toast.imported', {count}));
       showResumeBanner();
-updateThemeBtnUI();
+      updateThemeBtnUI();
 
     } catch(err) {
-      alert('しおりファイルの読み込みに失敗しました:\n' + err.message);
+      alert(t('err.importFailed', {msg: err.message}));
     }
   };
   reader.readAsText(file);
@@ -1234,7 +1602,7 @@ updateThemeBtnUI();
 function notifyStorageError() {
   if (window._storageWarnShown) return;
   window._storageWarnShown = true;
-  showToast('⚠️ しおり・設定の保存に失敗しました（ストレージ容量不足の可能性）');
+  showToast(t('toast.storageError'));
 }
 function showToast(msg) {
   const t = document.getElementById('toast');
@@ -1250,36 +1618,21 @@ function showToast(msg) {
 function esc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
-function showHelp() {
-  document.getElementById('modal-title').textContent = 'ヘルプ';
+function updateHelpContent() {
+  document.getElementById('modal-title').textContent = t('modal.title.help');
   const bookInfo = state.epub ? [
     '<div style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:6px;padding:12px 16px;margin-bottom:16px;">',
-    '<p style="font-size:11px;opacity:.55;margin-bottom:6px;">📚 現在の書籍</p>',
+    '<p style="font-size:11px;opacity:.55;margin-bottom:6px;">' + esc(t('help.currentBook')) + '</p>',
     '<p style="font-size:14px;font-weight:bold;line-height:1.6;opacity:1;margin-bottom:4px;">' + esc(state.bookTitle) + '</p>',
-    state.bookCreator ? '<p>著者：' + esc(state.bookCreator) + '</p>' : '',
-    '<p>チャプター数：' + state.spine.length + '</p>',
-    state.toc.length ? '<p>目次項目数：' + state.toc.length + '</p>' : '',
+    state.bookCreator ? '<p>' + esc(t('help.author', {creator: state.bookCreator})) + '</p>' : '',
+    '<p>' + esc(t('help.chapters', {n: state.spine.length})) + '</p>',
+    state.toc.length ? '<p>' + esc(t('help.tocItems', {n: state.toc.length})) + '</p>' : '',
     '</div>',
   ].join('') : '';
-  document.getElementById('modal-body').innerHTML = bookInfo + [
-    '<p><strong>📜 ページスクロール（主操作）</strong></p>',
-    '<p>　スペースキー：1画面分 前進スクロール</p>',
-    '<p>　Shift+スペース：1画面分 後退スクロール</p>',
-    '<p>　↓ / PageDown：前進スクロール</p>',
-    '<p>　↑ / PageUp：後退スクロール</p>',
-    '<p>　画面下「次へ↓」・上「↑前へ」ボタン</p>',
-    '<p>　※章末尾/先頭で自動的に章移動</p>',
-    '<br>',
-    '<p><strong>📖 章切り替え</strong></p>',
-    '<p>　← キー：次の章　　→ キー：前の章</p>',
-    '<p>　Home：最初の章　　End：最後の章</p>',
-    '<br>',
-    '<p><strong>フォント／テーマ</strong></p>',
-    '<p>　ツールバーのセレクトボックスで変更</p>',
-    '<br>',
-    '<p><strong>ファイル形式</strong></p>',
-    '<p>　.epub / .kepub（Kobo）対応</p>',
-  ].join('');
+  document.getElementById('modal-body').innerHTML = bookInfo + t('help.body');
+}
+function showHelp() {
+  updateHelpContent();
   document.getElementById('modal-overlay').classList.add('show');
 }
 function closeModal() {
@@ -1298,6 +1651,8 @@ document.getElementById('toolbar').addEventListener('wheel', e => {
 }, { passive: false });
 
 // Init
+initLang();
+applyI18n();
 document.getElementById('toc-btn').classList.add('active');
 loadSettings();
 showResumeBanner();
