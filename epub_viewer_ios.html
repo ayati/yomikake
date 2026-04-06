@@ -196,6 +196,12 @@
   <button class="icon-btn" onclick="exportBookmarks()" data-i18n-title="btn.bookmark.export">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
   </button>
+  <button class="icon-btn" id="drive-download-btn" onclick="driveDownload()" data-i18n-title="btn.drive.download">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" stroke-dasharray="3 2"/><polyline points="8 12 12 16 16 12"/><line x1="12" y1="8" x2="12" y2="16"/></svg>
+  </button>
+  <button class="icon-btn" id="drive-upload-btn" onclick="driveUpload()" data-i18n-title="btn.drive.upload">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" stroke-dasharray="3 2"/><polyline points="16 12 12 8 8 12"/><line x1="12" y1="16" x2="12" y2="8"/></svg>
+  </button>
   <input type="file" id="bookmark-input" accept=".json" style="display:none">
 
   <div class="tb-sep"></div>
@@ -368,8 +374,23 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"
         integrity="sha512-XMVd28F1oH/O71fzwBnV7HucLxVwtxf26XV8P4wPk26EDxuGZ91N8bsOttmnomcCD3CS5ZMRL50H0GgOHvegtg=="
         crossorigin="anonymous"></script>
+<!-- Google Identity Services — Google Drive しおり同期に使用。SRI非対応のためintegrity属性なし -->
+<script src="https://accounts.google.com/gsi/client" async></script>
 <script>
 'use strict';
+
+// ══════════════════════════════════════════
+//  Google Drive しおり同期
+//  セットアップ:
+//  1. Google Cloud Console でプロジェクト作成 → Drive API 有効化
+//  2. 「OAuth クライアントID」作成（種類: ウェブ アプリケーション）
+//  3. 承認済みの JavaScript 生成元に使用するオリジン（例: https://example.com）を追加
+//  4. 発行された Client ID を下記定数に貼り付ける
+//  ※ file:// オリジンは Google OAuth 非対応のため HTTP/HTTPS サーバー必須
+// ══════════════════════════════════════════
+const GOOGLE_CLIENT_ID = '';  // ← ここに Client ID を貼り付ける
+
+let _driveToken = null;  // OAuth アクセストークン（メモリのみ、XSS対策でlocalStorage非使用）
 
 // ══════════════════════════════════════════
 //  i18n — 国際化
@@ -434,7 +455,7 @@ const I18N = {
     'help.author':          '著者：{creator}',
     'help.chapters':        'チャプター数：{n}',
     'help.tocItems':        '目次項目数：{n}',
-    'help.body':            '<p><strong>📱 ページスクロール（主操作）</strong></p><p>　左スワイプ：1画面分 前進スクロール</p><p>　右スワイプ：1画面分 後退スクロール</p><p>　画面下「次へ」・上「前へ」ボタン</p><p>　※章末尾/先頭で自動的に章移動</p><br><p><strong>📖 章切り替え</strong></p><p>　右「›」ボタン：前の章</p><p>　左「‹」ボタン：次の章</p><br><p><strong>🔵 Bluetoothキーボード</strong></p><p>　スペース：次へ　Shift+スペース：前へ</p><p>　← 次の章　→ 前の章</p><br><p><strong>フォント／テーマ</strong></p><p>　設定パネル（歯車アイコン）で変更</p><br><p><strong>ファイル形式</strong></p><p>　.epub / .kepub（Kobo）対応</p>',
+    'help.body':            '<p><strong>📱 ページスクロール（主操作）</strong></p><p>　左スワイプ：1画面分 前進スクロール</p><p>　右スワイプ：1画面分 後退スクロール</p><p>　画面下「次へ」・上「前へ」ボタン</p><p>　※章末尾/先頭で自動的に章移動</p><br><p><strong>📖 章切り替え</strong></p><p>　右「›」ボタン：前の章</p><p>　左「‹」ボタン：次の章</p><br><p><strong>🔵 Bluetoothキーボード</strong></p><p>　スペース：次へ　Shift+スペース：前へ</p><p>　← 次の章　→ 前の章</p><br><p><strong>フォント／テーマ</strong></p><p>　設定パネル（歯車アイコン）で変更</p><br><p><strong>ファイル形式</strong></p><p>　.epub / .kepub（Kobo）対応</p><br><p><strong>🔖 しおり</strong></p><p>　読み位置は自動記録されます。ツールバーの4つのアイコンでバックアップ・同期が可能です。</p><p>　📥 ローカル読込：保存済み .json ファイルからしおりを読み込む</p><p>　📤 ローカル書出：しおりを .json ファイルとして書き出す</p><p>　☁↓ Drive読込：Google Driveからしおりを読み込む（ローカルを上書き）</p><p>　☁↑ Drive保存：しおりをGoogle Driveに保存する（複数デバイス間で共有可能）</p><p style="font-size:12px;opacity:.6;">　※ Drive機能はHTTP/HTTPSサーバー経由の起動とGoogle Client IDの設定が必要です</p>',
     'toast.resume':         '📖 前回の続きから再開（{n} / {total}章）',
     'toast.fileMissing':    '⚠️ ファイルが見つかりません: {path}',
     'toast.noBookmarks':    '書き出せるしおりがありません',
@@ -442,6 +463,13 @@ const I18N = {
     'toast.imported':       '📥 {count}冊分のしおりを読み込みました',
     'toast.storageError':   '⚠️ しおり・設定の保存に失敗しました（ストレージ容量不足の可能性）',
     'toast.resumeHint':     '同じファイル「{title}」を開いてください',
+    'toast.driveUploaded':  '☁️ Driveにしおりを保存しました（{count}冊分）',
+    'toast.driveDownloaded':'☁️ Driveからしおりを読み込みました（{count}冊分）',
+    'toast.driveNoFile':    'Drive上にしおりファイルが見つかりません',
+    'toast.driveNoClientId':'Google Client IDが設定されていません',
+    'confirm.driveOverwrite':'ローカルのしおりをDriveの内容で上書きします。よろしいですか？',
+    'btn.drive.download':   'Driveからしおりを読み込む',
+    'btn.drive.upload':     'しおりをDriveに保存する',
     'err.noContainerXml':   'META-INF/container.xml が見つかりません。有効な ePub ファイルではない可能性があります。',
     'err.noRootfile':       'container.xml に rootfile 要素がありません。ePub の構造が不正です。',
     'err.noFullPath':       'rootfile の full-path 属性がありません。',
@@ -449,6 +477,7 @@ const I18N = {
     'err.loadFailed':       'ePubの読み込みに失敗しました:\n{msg}',
     'err.invalidFormat':    '形式が不正です',
     'err.importFailed':     'しおりファイルの読み込みに失敗しました:\n{msg}',
+    'err.driveFailed':      'Drive操作に失敗しました:\n{msg}',
   },
   en: {
     'btn.open':             'Open',
@@ -507,7 +536,7 @@ const I18N = {
     'help.author':          'Author: {creator}',
     'help.chapters':        'Chapters: {n}',
     'help.tocItems':        'TOC items: {n}',
-    'help.body':            '<p><strong>📱 Page scroll (main operation)</strong></p><p>&nbsp;Swipe left: scroll forward one page</p><p>&nbsp;Swipe right: scroll back one page</p><p>&nbsp;"Next" button (bottom) / "Prev" button (top)</p><p>&nbsp;※ Automatically advances chapter at boundaries</p><br><p><strong>📖 Chapter navigation</strong></p><p>&nbsp;"›" button (right): previous chapter</p><p>&nbsp;"‹" button (left): next chapter</p><br><p><strong>🔵 Bluetooth keyboard</strong></p><p>&nbsp;Space: forward　Shift+Space: back</p><p>&nbsp;← next chapter　→ previous chapter</p><br><p><strong>Font / Theme</strong></p><p>&nbsp;Change via the settings panel (⚙ icon)</p><br><p><strong>File formats</strong></p><p>&nbsp;.epub / .kepub (Kobo) supported</p>',
+    'help.body':            '<p><strong>📱 Page scroll (main operation)</strong></p><p>&nbsp;Swipe left: scroll forward one page</p><p>&nbsp;Swipe right: scroll back one page</p><p>&nbsp;"Next" button (bottom) / "Prev" button (top)</p><p>&nbsp;※ Automatically advances chapter at boundaries</p><br><p><strong>📖 Chapter navigation</strong></p><p>&nbsp;"›" button (right): previous chapter</p><p>&nbsp;"‹" button (left): next chapter</p><br><p><strong>🔵 Bluetooth keyboard</strong></p><p>&nbsp;Space: forward　Shift+Space: back</p><p>&nbsp;← next chapter　→ previous chapter</p><br><p><strong>Font / Theme</strong></p><p>&nbsp;Change via the settings panel (⚙ icon)</p><br><p><strong>File formats</strong></p><p>&nbsp;.epub / .kepub (Kobo) supported</p><br><p><strong>🔖 Bookmarks</strong></p><p>&nbsp;Reading position is saved automatically. Use the 4 toolbar icons to back up and sync.</p><p>&nbsp;📥 Local import: Load bookmarks from a saved .json file</p><p>&nbsp;📤 Local export: Download bookmarks as a .json file</p><p>&nbsp;☁↓ Drive load: Load bookmarks from Google Drive (overwrites local data)</p><p>&nbsp;☁↑ Drive save: Save bookmarks to Google Drive (share across devices)</p><p style="font-size:12px;opacity:.6;">&nbsp;※ Drive features require HTTP/HTTPS server and Google Client ID configuration</p>',
     'toast.resume':         '📖 Resumed from chapter {n} of {total}',
     'toast.fileMissing':    '⚠️ File not found: {path}',
     'toast.noBookmarks':    'No bookmarks to export',
@@ -515,6 +544,13 @@ const I18N = {
     'toast.imported':       '📥 Imported {count} bookmark(s)',
     'toast.storageError':   '⚠️ Failed to save (storage may be full)',
     'toast.resumeHint':     'Please open "{title}"',
+    'toast.driveUploaded':  '☁️ Bookmarks saved to Drive ({count} book(s))',
+    'toast.driveDownloaded':'☁️ Bookmarks loaded from Drive ({count} book(s))',
+    'toast.driveNoFile':    'No bookmark file found on Drive',
+    'toast.driveNoClientId':'Google Client ID is not configured',
+    'confirm.driveOverwrite':'Overwrite local bookmarks with Drive data?',
+    'btn.drive.download':   'Load bookmarks from Drive',
+    'btn.drive.upload':     'Save bookmarks to Drive',
     'err.noContainerXml':   'META-INF/container.xml not found. This may not be a valid ePub file.',
     'err.noRootfile':       'No rootfile element in container.xml. The ePub structure is invalid.',
     'err.noFullPath':       'Missing full-path attribute in rootfile.',
@@ -522,6 +558,7 @@ const I18N = {
     'err.loadFailed':       'Failed to load ePub:\n{msg}',
     'err.invalidFormat':    'Invalid format',
     'err.importFailed':     'Failed to import bookmarks:\n{msg}',
+    'err.driveFailed':      'Drive operation failed:\n{msg}',
   },
   'zh-TW': {
     'btn.open':             '開啟',
@@ -580,7 +617,7 @@ const I18N = {
     'help.author':          '作者：{creator}',
     'help.chapters':        '章節數：{n}',
     'help.tocItems':        '目錄項目數：{n}',
-    'help.body':            '<p><strong>📱 頁面捲動（主要操作）</strong></p><p>　向左滑動：前進一頁</p><p>　向右滑動：後退一頁</p><p>　畫面下方「下一頁」・上方「上一頁」按鈕</p><p>　※章節末尾/開頭時自動切換章節</p><br><p><strong>📖 章節切換</strong></p><p>　右側「›」按鈕：上一章</p><p>　左側「‹」按鈕：下一章</p><br><p><strong>🔵 藍牙鍵盤</strong></p><p>　空白鍵：前進　Shift+空白：後退</p><p>　← 下一章　→ 上一章</p><br><p><strong>字型／主題</strong></p><p>　於設定面板（⚙圖示）中變更</p><br><p><strong>支援格式</strong></p><p>　.epub / .kepub（Kobo）</p>',
+    'help.body':            '<p><strong>📱 頁面捲動（主要操作）</strong></p><p>　向左滑動：前進一頁</p><p>　向右滑動：後退一頁</p><p>　畫面下方「下一頁」・上方「上一頁」按鈕</p><p>　※章節末尾/開頭時自動切換章節</p><br><p><strong>📖 章節切換</strong></p><p>　右側「›」按鈕：上一章</p><p>　左側「‹」按鈕：下一章</p><br><p><strong>🔵 藍牙鍵盤</strong></p><p>　空白鍵：前進　Shift+空白：後退</p><p>　← 下一章　→ 上一章</p><br><p><strong>字型／主題</strong></p><p>　於設定面板（⚙圖示）中變更</p><br><p><strong>支援格式</strong></p><p>　.epub / .kepub（Kobo）</p><br><p><strong>🔖 書籤</strong></p><p>　閱讀位置會自動記錄。工具列的 4 個圖示可用於備份與同步。</p><p>　📥 本機匯入：從已儲存的 .json 檔案載入書籤</p><p>　📤 本機匯出：將書籤下載為 .json 檔案</p><p>　☁↓ 從 Drive 載入：從 Google Drive 載入書籤（覆蓋本機資料）</p><p>　☁↑ 儲存至 Drive：將書籤儲存至 Google Drive（可跨裝置共用）</p><p style="font-size:12px;opacity:.6;">　※ Drive 功能需透過 HTTP/HTTPS 伺服器啟動並設定 Google Client ID</p>',
     'toast.resume':         '📖 從第 {n} 章（共 {total} 章）繼續閱讀',
     'toast.fileMissing':    '⚠️ 找不到檔案：{path}',
     'toast.noBookmarks':    '沒有可匯出的書籤',
@@ -588,6 +625,13 @@ const I18N = {
     'toast.imported':       '📥 已匯入 {count} 本書的書籤',
     'toast.storageError':   '⚠️ 儲存失敗（可能儲存空間不足）',
     'toast.resumeHint':     '請開啟「{title}」',
+    'toast.driveUploaded':  '☁️ 書籤已儲存至 Drive（{count} 本書）',
+    'toast.driveDownloaded':'☁️ 已從 Drive 載入書籤（{count} 本書）',
+    'toast.driveNoFile':    'Drive 上找不到書籤檔案',
+    'toast.driveNoClientId':'未設定 Google Client ID',
+    'confirm.driveOverwrite':'將以 Drive 的內容覆蓋本機書籤，確定嗎？',
+    'btn.drive.download':   '從 Drive 載入書籤',
+    'btn.drive.upload':     '儲存書籤至 Drive',
     'err.noContainerXml':   '找不到 META-INF/container.xml，可能不是有效的 ePub 檔案。',
     'err.noRootfile':       'container.xml 中找不到 rootfile 元素，ePub 結構無效。',
     'err.noFullPath':       'rootfile 缺少 full-path 屬性。',
@@ -595,6 +639,7 @@ const I18N = {
     'err.loadFailed':       '載入 ePub 失敗：\n{msg}',
     'err.invalidFormat':    '格式無效',
     'err.importFailed':     '匯入書籤失敗：\n{msg}',
+    'err.driveFailed':      'Drive 操作失敗：\n{msg}',
   },
   'zh-CN': {
     'btn.open':             '打开',
@@ -653,7 +698,7 @@ const I18N = {
     'help.author':          '作者：{creator}',
     'help.chapters':        '章节数：{n}',
     'help.tocItems':        '目录项目数：{n}',
-    'help.body':            '<p><strong>📱 页面滚动（主要操作）</strong></p><p>　向左滑动：前进一页</p><p>　向右滑动：后退一页</p><p>　画面下方「下一页」・上方「上一页」按钮</p><p>　※章节末尾/开头时自动切换章节</p><br><p><strong>📖 章节切换</strong></p><p>　右侧「›」按钮：上一章</p><p>　左侧「‹」按钮：下一章</p><br><p><strong>🔵 蓝牙键盘</strong></p><p>　空格键：前进　Shift+空格：后退</p><p>　← 下一章　→ 上一章</p><br><p><strong>字体／主题</strong></p><p>　在设置面板（⚙图标）中更改</p><br><p><strong>支持格式</strong></p><p>　.epub / .kepub（Kobo）</p>',
+    'help.body':            '<p><strong>📱 页面滚动（主要操作）</strong></p><p>　向左滑动：前进一页</p><p>　向右滑动：后退一页</p><p>　画面下方「下一页」・上方「上一页」按钮</p><p>　※章节末尾/开头时自动切换章节</p><br><p><strong>📖 章节切换</strong></p><p>　右侧「›」按钮：上一章</p><p>　左侧「‹」按钮：下一章</p><br><p><strong>🔵 蓝牙键盘</strong></p><p>　空格键：前进　Shift+空格：后退</p><p>　← 下一章　→ 上一章</p><br><p><strong>字体／主题</strong></p><p>　在设置面板（⚙图标）中更改</p><br><p><strong>支持格式</strong></p><p>　.epub / .kepub（Kobo）</p><br><p><strong>🔖 书签</strong></p><p>　阅读位置会自动记录。工具栏的 4 个图标可用于备份与同步。</p><p>　📥 本地导入：从已保存的 .json 文件加载书签</p><p>　📤 本地导出：将书签下载为 .json 文件</p><p>　☁↓ 从 Drive 加载：从 Google Drive 加载书签（覆盖本地数据）</p><p>　☁↑ 保存至 Drive：将书签保存至 Google Drive（可跨设备共用）</p><p style="font-size:12px;opacity:.6;">　※ Drive 功能需通过 HTTP/HTTPS 服务器启动并配置 Google Client ID</p>',
     'toast.resume':         '📖 从第 {n} 章（共 {total} 章）继续阅读',
     'toast.fileMissing':    '⚠️ 找不到文件：{path}',
     'toast.noBookmarks':    '没有可导出的书签',
@@ -661,6 +706,13 @@ const I18N = {
     'toast.imported':       '📥 已导入 {count} 本书的书签',
     'toast.storageError':   '⚠️ 保存失败（可能存储空间不足）',
     'toast.resumeHint':     '请打开「{title}」',
+    'toast.driveUploaded':  '☁️ 书签已保存至 Drive（{count} 本书）',
+    'toast.driveDownloaded':'☁️ 已从 Drive 加载书签（{count} 本书）',
+    'toast.driveNoFile':    'Drive 上找不到书签文件',
+    'toast.driveNoClientId':'未设置 Google Client ID',
+    'confirm.driveOverwrite':'将以 Drive 的内容覆盖本地书签，确定吗？',
+    'btn.drive.download':   '从 Drive 加载书签',
+    'btn.drive.upload':     '保存书签至 Drive',
     'err.noContainerXml':   '找不到 META-INF/container.xml，可能不是有效的 ePub 文件。',
     'err.noRootfile':       'container.xml 中找不到 rootfile 元素，ePub 结构无效。',
     'err.noFullPath':       'rootfile 缺少 full-path 属性。',
@@ -668,6 +720,7 @@ const I18N = {
     'err.loadFailed':       '加载 ePub 失败：\n{msg}',
     'err.invalidFormat':    '格式无效',
     'err.importFailed':     '导入书签失败：\n{msg}',
+    'err.driveFailed':      'Drive 操作失败：\n{msg}',
   },
 };
 
@@ -728,6 +781,7 @@ const state = {
   writingMode:'vertical',  // 'vertical' | 'horizontal' | 'publisher'
   sidebarOpen:false,
   bookKey:'',
+  driveFileId:null,  // epub_bookmarks.json の Drive ファイルID（ページ滞在中キャッシュ）
 };
 
 // テーマ別 ePub 本文エリアの色（iframe 内に直接注入）
@@ -1658,6 +1712,149 @@ document.getElementById('bookmark-input').addEventListener('change', e => {
   reader.readAsText(file);
 });
 
+// ══════════════════════════════════════════
+//  Google Drive しおり同期
+// ══════════════════════════════════════════
+
+function driveAuth() {
+  return new Promise((resolve, reject) => {
+    if (_driveToken) { resolve(_driveToken); return; }
+    if (!GOOGLE_CLIENT_ID) { showToast(t('toast.driveNoClientId')); reject(new Error('no_client_id')); return; }
+    if (typeof google === 'undefined' || !google.accounts) {
+      reject(new Error('Google Identity Services が読み込まれていません。HTTP/HTTPS サーバー経由で開いてください。'));
+      return;
+    }
+    google.accounts.oauth2.initTokenClient({
+      client_id: GOOGLE_CLIENT_ID,
+      scope: 'https://www.googleapis.com/auth/drive.appdata',
+      callback: r => {
+        if (r.error) { reject(new Error(r.error)); return; }
+        _driveToken = r.access_token;
+        resolve(_driveToken);
+      },
+    }).requestAccessToken();
+  });
+}
+
+async function driveFindFile(token) {
+  if (state.driveFileId) return state.driveFileId;
+  const res = await fetch(
+    'https://www.googleapis.com/drive/v3/files' +
+    '?spaces=appDataFolder&q=' + encodeURIComponent("name='epub_bookmarks.json'") + '&fields=files(id)',
+    { headers: { Authorization: 'Bearer ' + token } }
+  );
+  if (res.status === 401) { _driveToken = null; state.driveFileId = null; throw new Error('401 Unauthorized — 再度ボタンをクリックしてください'); }
+  if (!res.ok) throw new Error(res.status + ' ' + res.statusText);
+  const json = await res.json();
+  state.driveFileId = (json.files && json.files[0]) ? json.files[0].id : null;
+  return state.driveFileId;
+}
+
+function collectBookmarks() {
+  const data = {};
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key.startsWith('epub_pos_') || key === 'epub_last_book') {
+      try { data[key] = JSON.parse(localStorage.getItem(key)); } catch(e) { data[key] = localStorage.getItem(key); }
+    }
+  }
+  return { version: 1, exportedAt: new Date().toISOString(), bookmarks: data };
+}
+
+async function driveUpload() {
+  if (!GOOGLE_CLIENT_ID) { showToast(t('toast.driveNoClientId')); return; }
+  const btn = document.getElementById('drive-upload-btn');
+  btn.disabled = true;
+  try {
+    const token = await driveAuth();
+    const payload = collectBookmarks();
+    const count = Object.keys(payload.bookmarks).filter(k => k.startsWith('epub_pos_')).length;
+    const body = JSON.stringify(payload, null, 2);
+    const fileId = await driveFindFile(token);
+
+    if (fileId) {
+      const res = await fetch(
+        'https://www.googleapis.com/upload/drive/v3/files/' + fileId + '?uploadType=media',
+        {
+          method: 'PATCH',
+          headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+          body,
+        }
+      );
+      if (res.status === 401) { _driveToken = null; state.driveFileId = null; throw new Error('401 Unauthorized — 再度ボタンをクリックしてください'); }
+      if (!res.ok) throw new Error(res.status + ' ' + res.statusText);
+    } else {
+      const boundary = 'epub_bm_boundary';
+      const meta = JSON.stringify({ name: 'epub_bookmarks.json', parents: ['appDataFolder'] });
+      const multipart =
+        '--' + boundary + '\r\n' +
+        'Content-Type: application/json; charset=UTF-8\r\n\r\n' + meta + '\r\n' +
+        '--' + boundary + '\r\n' +
+        'Content-Type: application/json\r\n\r\n' + body + '\r\n' +
+        '--' + boundary + '--';
+      const res = await fetch(
+        'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
+        {
+          method: 'POST',
+          headers: {
+            Authorization: 'Bearer ' + token,
+            'Content-Type': 'multipart/related; boundary=' + boundary,
+          },
+          body: multipart,
+        }
+      );
+      if (res.status === 401) { _driveToken = null; state.driveFileId = null; throw new Error('401 Unauthorized — 再度ボタンをクリックしてください'); }
+      if (!res.ok) throw new Error(res.status + ' ' + res.statusText);
+      const created = await res.json();
+      state.driveFileId = created.id;
+    }
+    showToast(t('toast.driveUploaded', {count}));
+  } catch(err) {
+    if (err.message !== 'no_client_id') alert(t('err.driveFailed', {msg: err.message}));
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function driveDownload() {
+  if (!GOOGLE_CLIENT_ID) { showToast(t('toast.driveNoClientId')); return; }
+  const btn = document.getElementById('drive-download-btn');
+  btn.disabled = true;
+  try {
+    const token = await driveAuth();
+    const fileId = await driveFindFile(token);
+    if (!fileId) { showToast(t('toast.driveNoFile')); return; }
+
+    const res = await fetch(
+      'https://www.googleapis.com/drive/v3/files/' + fileId + '?alt=media',
+      { headers: { Authorization: 'Bearer ' + token } }
+    );
+    if (res.status === 401) { _driveToken = null; state.driveFileId = null; throw new Error('401 Unauthorized — 再度ボタンをクリックしてください'); }
+    if (!res.ok) throw new Error(res.status + ' ' + res.statusText);
+    const json = await res.json();
+    if (!json.bookmarks || typeof json.bookmarks !== 'object') throw new Error(t('err.invalidFormat'));
+
+    const hasLocal = Array.from({ length: localStorage.length }, (_, i) => localStorage.key(i))
+      .some(k => k.startsWith('epub_pos_'));
+    if (hasLocal && !confirm(t('confirm.driveOverwrite'))) return;
+
+    let count = 0;
+    for (const [key, val] of Object.entries(json.bookmarks)) {
+      if (!key.startsWith('epub_pos_') && key !== 'epub_last_book') continue;
+      try {
+        localStorage.setItem(key, typeof val === 'string' ? val : JSON.stringify(val));
+        if (key.startsWith('epub_pos_')) count++;
+      } catch(e) { notifyStorageError(); break; }
+    }
+    showToast(t('toast.driveDownloaded', {count}));
+    showResumeBanner();
+  } catch(err) {
+    if (err.message !== 'no_client_id') alert(t('err.driveFailed', {msg: err.message}));
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 function notifyStorageError() {
   if (window._storageWarnShown) return;
   window._storageWarnShown = true;
@@ -1708,6 +1905,12 @@ applyI18n();
 loadSettings();
 showResumeBanner();
 updateThemeBtnUI();
+
+// file:// で開いた場合は Drive ボタンを非表示（Google OAuth は file:// 非対応）
+if (location.protocol !== 'http:' && location.protocol !== 'https:') {
+  document.getElementById('drive-download-btn').style.display = 'none';
+  document.getElementById('drive-upload-btn').style.display = 'none';
+}
 
 </script>
 </body>
