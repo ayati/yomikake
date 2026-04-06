@@ -319,6 +319,15 @@
         </select>
       </div>
     </div>
+
+    <div class="set-group" id="drive-auto-group">
+      <h4 data-i18n="settings.driveGroup">Google Drive</h4>
+      <div class="set-row">
+        <span class="set-label" data-i18n="settings.driveAutoSave">しおり自動保存</span>
+        <button id="drive-auto-toggle" onclick="toggleDriveAutoSave()"
+                style="border:1px solid var(--ui-border);border-radius:8px;padding:6px 16px;min-width:60px;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;">OFF</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -401,6 +410,10 @@
 const GOOGLE_CLIENT_ID = '491729394813-3dm1apv1do4pmcsv1mpgdq26ji2iavdr.apps.googleusercontent.com';  // ← ここに Client ID を貼り付ける
 
 let _driveToken = null;  // OAuth アクセストークン（メモリのみ、XSS対策でlocalStorage非使用）
+let _autoSaveTimer  = null;   // Drive自動保存の pending setTimeout ID
+let _lastAutoSaveAt = 0;      // 最後の自動保存成功タイムスタンプ (ms)
+let _autoSaveBusy   = false;  // 同時アップロード防止フラグ
+const AUTO_SAVE_INTERVAL = 60000; // 自動保存の最小間隔: 1分 (ms)
 
 // ══════════════════════════════════════════
 //  i18n — 国際化
@@ -477,13 +490,17 @@ const I18N = {
     'toast.imported':       '📥 {count}冊分のしおりを読み込みました',
     'toast.storageError':   '⚠️ しおり・設定の保存に失敗しました（ストレージ容量不足の可能性）',
     'toast.resumeHint':     '同じファイル「{title}」を開いてください',
-    'toast.driveUploaded':  '☁️ Driveにしおりを保存しました（{count}冊分）',
-    'toast.driveDownloaded':'☁️ Driveからしおりを読み込みました（{count}冊分）',
-    'toast.driveNoFile':    'Drive上にしおりファイルが見つかりません',
-    'toast.driveNoClientId':'Google Client IDが設定されていません',
-    'confirm.driveOverwrite':'ローカルのしおりをDriveの内容で上書きします。よろしいですか？',
-    'btn.drive.download':   'Driveからしおりを読み込む',
-    'btn.drive.upload':     'しおりをDriveに保存する',
+    'toast.driveUploaded':       '☁️ Driveにしおりを保存しました（{count}冊分）',
+    'toast.driveDownloaded':     '☁️ Driveからしおりを読み込みました（{count}冊分）',
+    'toast.driveNoFile':         'Drive上にしおりファイルが見つかりません',
+    'toast.driveNoClientId':     'Google Client IDが設定されていません',
+    'toast.driveAutoSaveOn':     '☁️ Drive自動保存が有効になりました',
+    'toast.driveAutoSaveExpired':'Drive接続が切れました。自動保存を再度オンにしてください',
+    'confirm.driveOverwrite':    'ローカルのしおりをDriveの内容で上書きします。よろしいですか？',
+    'btn.drive.download':        'Driveからしおりを読み込む',
+    'btn.drive.upload':          'しおりをDriveに保存する',
+    'settings.driveGroup':       'Google Drive',
+    'settings.driveAutoSave':    'しおり自動保存',
     'err.noContainerXml':   'META-INF/container.xml が見つかりません。有効な ePub ファイルではない可能性があります。',
     'err.noRootfile':       'container.xml に rootfile 要素がありません。ePub の構造が不正です。',
     'err.noFullPath':       'rootfile の full-path 属性がありません。',
@@ -562,13 +579,17 @@ const I18N = {
     'toast.imported':       '📥 Imported {count} bookmark(s)',
     'toast.storageError':   '⚠️ Failed to save (storage may be full)',
     'toast.resumeHint':     'Please open "{title}"',
-    'toast.driveUploaded':  '☁️ Bookmarks saved to Drive ({count} book(s))',
-    'toast.driveDownloaded':'☁️ Bookmarks loaded from Drive ({count} book(s))',
-    'toast.driveNoFile':    'No bookmark file found on Drive',
-    'toast.driveNoClientId':'Google Client ID is not configured',
-    'confirm.driveOverwrite':'Overwrite local bookmarks with Drive data?',
-    'btn.drive.download':   'Load bookmarks from Drive',
-    'btn.drive.upload':     'Save bookmarks to Drive',
+    'toast.driveUploaded':       '☁️ Bookmarks saved to Drive ({count} book(s))',
+    'toast.driveDownloaded':     '☁️ Bookmarks loaded from Drive ({count} book(s))',
+    'toast.driveNoFile':         'No bookmark file found on Drive',
+    'toast.driveNoClientId':     'Google Client ID is not configured',
+    'toast.driveAutoSaveOn':     '☁️ Drive auto-save enabled',
+    'toast.driveAutoSaveExpired':'Drive session expired. Please re-enable auto-save.',
+    'confirm.driveOverwrite':    'Overwrite local bookmarks with Drive data?',
+    'btn.drive.download':        'Load bookmarks from Drive',
+    'btn.drive.upload':          'Save bookmarks to Drive',
+    'settings.driveGroup':       'Google Drive',
+    'settings.driveAutoSave':    'Auto-save bookmarks',
     'err.noContainerXml':   'META-INF/container.xml not found. This may not be a valid ePub file.',
     'err.noRootfile':       'No rootfile element in container.xml. The ePub structure is invalid.',
     'err.noFullPath':       'Missing full-path attribute in rootfile.',
@@ -647,13 +668,17 @@ const I18N = {
     'toast.imported':       '📥 已匯入 {count} 本書的書籤',
     'toast.storageError':   '⚠️ 儲存失敗（可能儲存空間不足）',
     'toast.resumeHint':     '請開啟「{title}」',
-    'toast.driveUploaded':  '☁️ 書籤已儲存至 Drive（{count} 本書）',
-    'toast.driveDownloaded':'☁️ 已從 Drive 載入書籤（{count} 本書）',
-    'toast.driveNoFile':    'Drive 上找不到書籤檔案',
-    'toast.driveNoClientId':'未設定 Google Client ID',
-    'confirm.driveOverwrite':'將以 Drive 的內容覆蓋本機書籤，確定嗎？',
-    'btn.drive.download':   '從 Drive 載入書籤',
-    'btn.drive.upload':     '儲存書籤至 Drive',
+    'toast.driveUploaded':       '☁️ 書籤已儲存至 Drive（{count} 本書）',
+    'toast.driveDownloaded':     '☁️ 已從 Drive 載入書籤（{count} 本書）',
+    'toast.driveNoFile':         'Drive 上找不到書籤檔案',
+    'toast.driveNoClientId':     '未設定 Google Client ID',
+    'toast.driveAutoSaveOn':     '☁️ 已啟用 Drive 自動儲存',
+    'toast.driveAutoSaveExpired':'Drive 連線已中斷，請重新開啟自動儲存',
+    'confirm.driveOverwrite':    '將以 Drive 的內容覆蓋本機書籤，確定嗎？',
+    'btn.drive.download':        '從 Drive 載入書籤',
+    'btn.drive.upload':          '儲存書籤至 Drive',
+    'settings.driveGroup':       'Google Drive',
+    'settings.driveAutoSave':    '自動儲存書籤',
     'err.noContainerXml':   '找不到 META-INF/container.xml，可能不是有效的 ePub 檔案。',
     'err.noRootfile':       'container.xml 中找不到 rootfile 元素，ePub 結構無效。',
     'err.noFullPath':       'rootfile 缺少 full-path 屬性。',
@@ -732,13 +757,17 @@ const I18N = {
     'toast.imported':       '📥 已导入 {count} 本书的书签',
     'toast.storageError':   '⚠️ 保存失败（可能存储空间不足）',
     'toast.resumeHint':     '请打开「{title}」',
-    'toast.driveUploaded':  '☁️ 书签已保存至 Drive（{count} 本书）',
-    'toast.driveDownloaded':'☁️ 已从 Drive 加载书签（{count} 本书）',
-    'toast.driveNoFile':    'Drive 上找不到书签文件',
-    'toast.driveNoClientId':'未设置 Google Client ID',
-    'confirm.driveOverwrite':'将以 Drive 的内容覆盖本地书签，确定吗？',
-    'btn.drive.download':   '从 Drive 加载书签',
-    'btn.drive.upload':     '保存书签至 Drive',
+    'toast.driveUploaded':       '☁️ 书签已保存至 Drive（{count} 本书）',
+    'toast.driveDownloaded':     '☁️ 已从 Drive 加载书签（{count} 本书）',
+    'toast.driveNoFile':         'Drive 上找不到书签文件',
+    'toast.driveNoClientId':     '未设置 Google Client ID',
+    'toast.driveAutoSaveOn':     '☁️ 已启用 Drive 自动保存',
+    'toast.driveAutoSaveExpired':'Drive 连接已断开，请重新开启自动保存',
+    'confirm.driveOverwrite':    '将以 Drive 的内容覆盖本地书签，确定吗？',
+    'btn.drive.download':        '从 Drive 加载书签',
+    'btn.drive.upload':          '保存书签至 Drive',
+    'settings.driveGroup':       'Google Drive',
+    'settings.driveAutoSave':    '自动保存书签',
     'err.noContainerXml':   '找不到 META-INF/container.xml，可能不是有效的 ePub 文件。',
     'err.noRootfile':       'container.xml 中找不到 rootfile 元素，ePub 结构无效。',
     'err.noFullPath':       'rootfile 缺少 full-path 属性。',
@@ -808,7 +837,8 @@ const state = {
   fwdBtnSize:'small',      // 'small' | 'medium' | 'large'
   sidebarOpen:false,
   bookKey:'',
-  driveFileId:null,  // epub_bookmarks.json の Drive ファイルID（ページ滞在中キャッシュ）
+  driveFileId:null,      // epub_bookmarks.json の Drive ファイルID（ページ滞在中キャッシュ）
+  driveAutoSave:false,   // Drive自動保存が有効かどうか
 };
 
 // テーマ別 ePub 本文エリアの色（iframe 内に直接注入）
@@ -1533,13 +1563,14 @@ const SETTINGS_KEY = 'epub_settings';
 function saveSettings() {
   try {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify({
-      fontMode:    state.fontMode,
-      fontSize:    state.fontSize,
-      lineHeight:  state.lineHeight,
-      theme:       state.theme,
-      margin:      state.margin,
-      writingMode: state.writingMode,
-      fwdBtnSize:  state.fwdBtnSize,
+      fontMode:      state.fontMode,
+      fontSize:      state.fontSize,
+      lineHeight:    state.lineHeight,
+      theme:         state.theme,
+      margin:        state.margin,
+      writingMode:   state.writingMode,
+      fwdBtnSize:    state.fwdBtnSize,
+      driveAutoSave: state.driveAutoSave,
     }));
   } catch(e) {
     notifyStorageError();
@@ -1550,13 +1581,14 @@ function loadSettings() {
   try {
     const s = JSON.parse(localStorage.getItem(SETTINGS_KEY));
     if (!s) return;
-    if (s.fontMode)             { state.fontMode = s.fontMode;         const el = document.getElementById('font-select'); if(el) el.value = s.fontMode; }
-    if (s.fontSize)             { state.fontSize = s.fontSize;         const el = document.getElementById('font-size-display'); if(el) el.textContent = s.fontSize + '%'; }
-    if (s.lineHeight)           { state.lineHeight = s.lineHeight;     const el = document.getElementById('lineh-select'); if(el) el.value = String(s.lineHeight); }
-    if (s.theme !== undefined)  { state.theme = s.theme;               document.body.className = s.theme ? 'theme-' + s.theme : ''; if(typeof updateThemeBtnUI === 'function') updateThemeBtnUI(); }
-    if (s.margin)               { state.margin = s.margin;             const el = document.getElementById('margin-select'); if(el) el.value = s.margin; applyMargin(s.margin); }
-    if (s.writingMode)          { state.writingMode = s.writingMode;   const el = document.getElementById('writing-mode-select'); if(el) el.value = s.writingMode; }
-    if (s.fwdBtnSize)           { state.fwdBtnSize = s.fwdBtnSize;     const el = document.getElementById('fwd-btn-size-select'); if(el) el.value = s.fwdBtnSize; applyFwdBtnSize(s.fwdBtnSize); }
+    if (s.fontMode)              { state.fontMode = s.fontMode;         const el = document.getElementById('font-select'); if(el) el.value = s.fontMode; }
+    if (s.fontSize)              { state.fontSize = s.fontSize;         const el = document.getElementById('font-size-display'); if(el) el.textContent = s.fontSize + '%'; }
+    if (s.lineHeight)            { state.lineHeight = s.lineHeight;     const el = document.getElementById('lineh-select'); if(el) el.value = String(s.lineHeight); }
+    if (s.theme !== undefined)   { state.theme = s.theme;               document.body.className = s.theme ? 'theme-' + s.theme : ''; if(typeof updateThemeBtnUI === 'function') updateThemeBtnUI(); }
+    if (s.margin)                { state.margin = s.margin;             const el = document.getElementById('margin-select'); if(el) el.value = s.margin; applyMargin(s.margin); }
+    if (s.writingMode)           { state.writingMode = s.writingMode;   const el = document.getElementById('writing-mode-select'); if(el) el.value = s.writingMode; }
+    if (s.fwdBtnSize)            { state.fwdBtnSize = s.fwdBtnSize;     const el = document.getElementById('fwd-btn-size-select'); if(el) el.value = s.fwdBtnSize; applyFwdBtnSize(s.fwdBtnSize); }
+    if (s.driveAutoSave !== undefined) { state.driveAutoSave = !!s.driveAutoSave; updateAutoSaveToggleUI(); }
   } catch(e) { console.warn("Failed to load settings fully:", e); }
 }
 
@@ -1703,6 +1735,7 @@ function savePos(ratio) {
   } catch(e) {
     notifyStorageError();
   }
+  scheduleAutoSave();
 }
 
 // ══════════════════════════════════════════
@@ -1810,59 +1843,124 @@ function collectBookmarks() {
   return { version: 1, exportedAt: new Date().toISOString(), bookmarks: data };
 }
 
+// 手動・自動保存共通のアップロードコア（UIに触れない、エラーはそのまま throw）
+async function driveUploadCore(token) {
+  const payload = collectBookmarks();
+  const count = Object.keys(payload.bookmarks).filter(k => k.startsWith('epub_pos_')).length;
+  const body = JSON.stringify(payload, null, 2);
+  const fileId = await driveFindFile(token);
+
+  if (fileId) {
+    // 既存ファイルを上書き更新
+    const res = await fetch(
+      'https://www.googleapis.com/upload/drive/v3/files/' + fileId + '?uploadType=media',
+      { method: 'PATCH', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }, body }
+    );
+    if (res.status === 401) { _driveToken = null; state.driveFileId = null; throw new Error('401 Unauthorized — 再度ボタンをクリックしてください'); }
+    if (!res.ok) throw new Error(res.status + ' ' + res.statusText);
+  } else {
+    // 新規作成（multipart: メタデータ＋本文を一度に送信）
+    const boundary = 'epub_bm_boundary';
+    const meta = JSON.stringify({ name: 'epub_bookmarks.json', parents: ['appDataFolder'] });
+    const multipart =
+      '--' + boundary + '\r\n' +
+      'Content-Type: application/json; charset=UTF-8\r\n\r\n' + meta + '\r\n' +
+      '--' + boundary + '\r\n' +
+      'Content-Type: application/json\r\n\r\n' + body + '\r\n' +
+      '--' + boundary + '--';
+    const res = await fetch(
+      'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
+      { method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'multipart/related; boundary=' + boundary }, body: multipart }
+    );
+    if (res.status === 401) { _driveToken = null; state.driveFileId = null; throw new Error('401 Unauthorized — 再度ボタンをクリックしてください'); }
+    if (!res.ok) throw new Error(res.status + ' ' + res.statusText);
+    const created = await res.json();
+    state.driveFileId = created.id;
+  }
+  return count;
+}
+
 async function driveUpload() {
   if (!GOOGLE_CLIENT_ID) { showToast(t('toast.driveNoClientId')); return; }
   const btn = document.getElementById('drive-upload-btn');
   btn.disabled = true;
   try {
     const token = await driveAuth();
-    const payload = collectBookmarks();
-    const count = Object.keys(payload.bookmarks).filter(k => k.startsWith('epub_pos_')).length;
-    const body = JSON.stringify(payload, null, 2);
-    const fileId = await driveFindFile(token);
-
-    if (fileId) {
-      const res = await fetch(
-        'https://www.googleapis.com/upload/drive/v3/files/' + fileId + '?uploadType=media',
-        {
-          method: 'PATCH',
-          headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
-          body,
-        }
-      );
-      if (res.status === 401) { _driveToken = null; state.driveFileId = null; throw new Error('401 Unauthorized — 再度ボタンをクリックしてください'); }
-      if (!res.ok) throw new Error(res.status + ' ' + res.statusText);
-    } else {
-      const boundary = 'epub_bm_boundary';
-      const meta = JSON.stringify({ name: 'epub_bookmarks.json', parents: ['appDataFolder'] });
-      const multipart =
-        '--' + boundary + '\r\n' +
-        'Content-Type: application/json; charset=UTF-8\r\n\r\n' + meta + '\r\n' +
-        '--' + boundary + '\r\n' +
-        'Content-Type: application/json\r\n\r\n' + body + '\r\n' +
-        '--' + boundary + '--';
-      const res = await fetch(
-        'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
-        {
-          method: 'POST',
-          headers: {
-            Authorization: 'Bearer ' + token,
-            'Content-Type': 'multipart/related; boundary=' + boundary,
-          },
-          body: multipart,
-        }
-      );
-      if (res.status === 401) { _driveToken = null; state.driveFileId = null; throw new Error('401 Unauthorized — 再度ボタンをクリックしてください'); }
-      if (!res.ok) throw new Error(res.status + ' ' + res.statusText);
-      const created = await res.json();
-      state.driveFileId = created.id;
-    }
+    const count = await driveUploadCore(token);
     showToast(t('toast.driveUploaded', {count}));
   } catch(err) {
     if (err.message !== 'no_client_id') alert(t('err.driveFailed', {msg: err.message}));
   } finally {
     btn.disabled = false;
   }
+}
+
+// ──────────────────────────────────────────
+//  Drive 自動保存
+// ──────────────────────────────────────────
+function scheduleAutoSave() {
+  if (!state.driveAutoSave || !GOOGLE_CLIENT_ID) return;
+  if (_autoSaveBusy) return;
+  clearTimeout(_autoSaveTimer);
+  const elapsed = Date.now() - _lastAutoSaveAt;
+  const delay = Math.max(0, AUTO_SAVE_INTERVAL - elapsed);
+  _autoSaveTimer = setTimeout(runAutoSave, delay);
+}
+
+async function runAutoSave() {
+  if (!state.driveAutoSave || _autoSaveBusy) return;
+  _autoSaveBusy = true;
+  try {
+    const token = await driveAuth();
+    await driveUploadCore(token);
+    _lastAutoSaveAt = Date.now();
+  } catch(e) {
+    if (e.message && e.message.startsWith('401')) {
+      // トークン期限切れ → 自動保存を無効化してユーザーに通知
+      state.driveAutoSave = false;
+      saveSettings();
+      updateAutoSaveToggleUI();
+      showToast(t('toast.driveAutoSaveExpired'));
+    }
+    // その他のエラー（ネットワーク断など）は silent
+  } finally {
+    _autoSaveBusy = false;
+  }
+}
+
+async function toggleDriveAutoSave() {
+  if (state.driveAutoSave) {
+    // OFF にする
+    state.driveAutoSave = false;
+    clearTimeout(_autoSaveTimer);
+    saveSettings();
+    updateAutoSaveToggleUI();
+    return;
+  }
+  // ON にする: Drive接続を確認してから有効化
+  const btn = document.getElementById('drive-auto-toggle');
+  btn.disabled = true;
+  try {
+    const token = await driveAuth();
+    await driveFindFile(token);  // fileIDキャッシュのウォームアップ兼接続確認
+    state.driveAutoSave = true;
+    saveSettings();
+    showToast(t('toast.driveAutoSaveOn'));
+  } catch(e) {
+    if (e.message !== 'no_client_id') showToast(t('err.driveFailed', {msg: e.message}));
+  } finally {
+    btn.disabled = false;
+    updateAutoSaveToggleUI();
+  }
+}
+
+function updateAutoSaveToggleUI() {
+  const btn = document.getElementById('drive-auto-toggle');
+  if (!btn) return;
+  const on = state.driveAutoSave;
+  btn.textContent = on ? 'ON' : 'OFF';
+  btn.style.background = on ? 'var(--accent)' : '';
+  btn.style.color = on ? '#fff' : '';
 }
 
 async function driveDownload() {
@@ -1955,10 +2053,12 @@ loadSettings();
 showResumeBanner();
 updateThemeBtnUI();
 
-// file:// で開いた場合は Drive ボタンを非表示（Google OAuth は file:// 非対応）
+// file:// で開いた場合は Drive ボタンと自動保存グループを非表示（Google OAuth は file:// 非対応）
 if (location.protocol !== 'http:' && location.protocol !== 'https:') {
   document.getElementById('drive-download-btn').style.display = 'none';
   document.getElementById('drive-upload-btn').style.display = 'none';
+  document.getElementById('drive-auto-group').style.display = 'none';
+  state.driveAutoSave = false;  // file:// 環境では強制 OFF
 }
 
 </script>

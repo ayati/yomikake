@@ -40,7 +40,7 @@ There are no automated tests. Manual testing requires a `.epub` or `.kepub` file
 
 ## Architecture
 
-Each viewer is a single self-contained HTML file (`epub_viewer.html` ~1921 lines, `epub_viewer_ios.html` ~1964 lines). Both follow a modular functional style with a single central state object. The architecture below describes `epub_viewer.html`; `epub_viewer_ios.html` is identical except for the scroll mechanism (see iOS Viewer section below).
+Each viewer is a single self-contained HTML file (`epub_viewer.html` ~1923 lines, `epub_viewer_ios.html` ~1966 lines). Both follow a modular functional style with a single central state object. The architecture below describes `epub_viewer.html`; `epub_viewer_ios.html` is identical except for the scroll mechanism (see iOS Viewer section below).
 
 ### State
 
@@ -59,7 +59,13 @@ const state = {
   writingMode,      // 'vertical' | 'horizontal' | 'publisher'
   fwdBtnSize,       // 'small' | 'medium' | 'large' — size of #btn-scroll-fwd
   driveFileId,      // cached Drive file ID for epub_bookmarks.json (session only)
-  // UI preferences: fontMode, fontSize, lineHeight, theme, margin, sidebarOpen
+  // UI preferences (persisted in epub_settings):
+  fontMode,         // 'publisher' | 'mincho' | 'gothic' | 'meiryo' | 'serif' | 'sans-serif'
+  fontSize,         // 60–400 (percent, default 100)
+  lineHeight,       // 1.6 | 2.0 | 2.4 | 2.8 (default 2.0)
+  theme,            // '' | 'sepia' | 'white' | 'dark' (default '' = warm white)
+  margin,           // 'full' | 'medium' | 'narrow' | 'none' (default 'full')
+  sidebarOpen,      // boolean (default false)
 }
 ```
 
@@ -139,6 +145,7 @@ Both files support **4 languages**: `ja` (Japanese), `en` (English), `zh-TW` (Tr
 | `epub_pos_{title}_{spineCount}` | `{spineIdx, ratio}` — per-book reading position |
 | `epub_last_book` | `{title, bookKey}` — for the resume banner |
 | `epub_settings` | `{fontMode, fontSize, lineHeight, theme, margin, writingMode, fwdBtnSize}` |
+| `epub_lang` | selected UI language (`ja` / `en` / `zh-TW` / `zh-CN`) |
 
 Bookmark key uses OPF title + spine count (not file path), so moving or renaming the file does not break saved positions. `exportBookmarks()` serialises all `epub_pos_*` and `epub_last_book` keys to a JSON file (`{ version, exportedAt, bookmarks: {} }`) for cross-device transfer. Import is handled by a `change` event listener on a hidden `<input type="file" id="bookmark-input">` (no named import function); it validates the JSON shape and writes matching keys back to `localStorage`. `notifyStorageError()` shows a toast when any `localStorage.setItem` throws (quota exceeded). `resumeBook()` is invoked when the user clicks the welcome-screen resume banner; it calls `loadSavedPos()` then opens a file picker.
 
