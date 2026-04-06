@@ -22,6 +22,7 @@
 - **設定ポップオーバー**：ツールバーのボタンから開くフローティングパネルで全設定を一元管理
 - **しおり機能**：前回読んだ章・スクロール位置を自動保存・復元
 - **しおりエクスポート/インポート**：全冊分のしおりをJSONファイルで書き出し・読み込み（デバイス間の引き継ぎに対応）
+- **Google Drive しおり同期**：Google Drive にしおりを保存・読み込みして複数デバイス間で同期（`epub_viewer.html` のみ、HTTPサーバー経由かつ Client ID 設定が必要）
 - **レジュームヒント**：前回読んでいた書名をウェルカム画面に表示
 - 目次（TOC）サイドバー
 - **書誌情報表示**：ヘルプダイアログにタイトル・著者・チャプター数・目次項目数を表示
@@ -76,9 +77,28 @@
 
 ツールバーの **「☰ 目次」** ボタンでサイドバーを開閉できます。目次項目をクリックすると該当章へジャンプします。しおりから続きを再開した場合はサイドバーが自動的に閉じた状態で起動します。
 
-### しおりのエクスポート／インポート
+### しおりのエクスポート／インポート・Drive同期
 
-ツールバーの **「🔖 書き出し」** ボタンで全冊分のしおりを JSON ファイルとしてダウンロードできます。別のデバイスやブラウザで **「📥 読み込み」** から同ファイルを選択すると、しおり情報が復元されます。
+ツールバーに4つのしおり操作アイコンがあります。
+
+| アイコン | 機能 | 用途 |
+|---------|------|------|
+| 📥 ローカル読込 | PCに保存した `.json` ファイルからしおりを読み込む | 手動でのバックアップ復元 |
+| 📤 ローカル書出 | 全冊分のしおりを `.json` ファイルとしてダウンロード | バックアップ・手動での引き継ぎ |
+| ☁↓ Drive読込 | Google Driveからしおりを読み込む（ローカルを上書き） | 複数デバイス間の同期 |
+| ☁↑ Drive保存 | しおりをGoogle Driveに保存する | 複数デバイス間の同期 |
+
+Drive ボタンは `file://` で直接開いた場合は非表示になります（Google OAuth の制約）。
+
+**Drive 機能のセットアップ：**
+
+1. Google Cloud Console でプロジェクトを作成し、Drive API を有効化
+2. OAuth クライアントID を作成（種類: ウェブ アプリケーション）
+3. 承認済みの JavaScript 生成元に `http://localhost:8080` 等を追加
+4. `epub_viewer.html` 冒頭の `GOOGLE_CLIENT_ID` 定数に Client ID を貼り付け
+5. `python3 -m http.server 8080` で起動し `http://localhost:8080/epub_viewer.html` を開く
+
+Drive 上のしおりファイル（`epub_bookmarks.json`）は Google Drive の隠し領域（appDataFolder）に保存されるため、Drive の通常のファイル一覧には表示されません。削除はGoogleアカウント設定の「接続済みアプリ」から行えます。
 
 > **しおりの識別について**：しおりはファイルパスではなく、OPFメタデータのタイトルとチャプター数をキーとして保存されます。ファイルを別フォルダに移動・リネームしても同じしおりが使用されます。
 
@@ -106,7 +126,7 @@
 | `epub_viewer.html` | Chrome・Firefox・Edge（Windows/macOS/Android）、Safari（macOS） |
 | `epub_viewer_ios.html` | Safari（iPhone・iPad）専用 |
 
-外部ライブラリ: **JSZip 3.10.1**（CDNから読み込み、SRI検証済み）
+外部ライブラリ: **JSZip 3.10.1**（CDNから読み込み、SRI検証済み）、**Google Identity Services**（Drive同期時のみ、SRI非対応）
 ビルド不要・インストール不要
 
 ### アーキテクチャ概要
@@ -126,10 +146,11 @@ epub_viewer.html / epub_viewer_ios.html（単一ファイル）
     ├── buildScrollScript() iframe内スクロール制御・位置報告スクリプト生成
     ├── renderPage()      章レンダリング → iframe.srcdoc に設定
     ├── I18N / t() / initLang() / setLang() / applyI18n()  多言語対応
-    ├── saveSettings() / loadSettings()      表示設定の永続化
-    ├── savePos() / loadSavedPos()           しおり位置の永続化
-    ├── exportBookmarks() / (import handler) しおりJSON書き出し・読み込み
-    └── showResumeBanner()                   レジュームヒント表示
+    ├── saveSettings() / loadSettings()                   表示設定の永続化
+    ├── savePos() / loadSavedPos()                        しおり位置の永続化
+    ├── exportBookmarks() / collectBookmarks() / (import handler)  しおりJSON書き出し・読み込み
+    ├── driveAuth() / driveFindFile() / driveUpload() / driveDownload()  Google Drive同期
+    └── showResumeBanner()                                レジュームヒント表示
 ```
 
 ### iOS版の実装上の違い（epub_viewer_ios.html）

@@ -39,7 +39,7 @@ There are no automated tests. Manual testing requires a `.epub` or `.kepub` file
 
 ## Architecture
 
-Each viewer is a single self-contained HTML file (`epub_viewer.html` ~1308 lines, `epub_viewer_ios.html` ~1361 lines). Both follow a modular functional style with a single central state object. The architecture below describes `epub_viewer.html`; `epub_viewer_ios.html` is identical except for the scroll mechanism (see iOS Viewer section below).
+Each viewer is a single self-contained HTML file (`epub_viewer.html` ~1663 lines, `epub_viewer_ios.html` ~1714 lines). Both follow a modular functional style with a single central state object. The architecture below describes `epub_viewer.html`; `epub_viewer_ios.html` is identical except for the scroll mechanism (see iOS Viewer section below).
 
 ### State
 
