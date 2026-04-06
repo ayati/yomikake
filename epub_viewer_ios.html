@@ -388,7 +388,7 @@
 //  4. 発行された Client ID を下記定数に貼り付ける
 //  ※ file:// オリジンは Google OAuth 非対応のため HTTP/HTTPS サーバー必須
 // ══════════════════════════════════════════
-const GOOGLE_CLIENT_ID = '';  // ← ここに Client ID を貼り付ける
+const GOOGLE_CLIENT_ID = '491729394813-3dm1apv1do4pmcsv1mpgdq26ji2iavdr.apps.googleusercontent.com';  // ← ここに Client ID を貼り付ける
 
 let _driveToken = null;  // OAuth アクセストークン（メモリのみ、XSS対策でlocalStorage非使用）
 
@@ -1746,7 +1746,9 @@ async function driveFindFile(token) {
   if (res.status === 401) { _driveToken = null; state.driveFileId = null; throw new Error('401 Unauthorized — 再度ボタンをクリックしてください'); }
   if (!res.ok) throw new Error(res.status + ' ' + res.statusText);
   const json = await res.json();
-  state.driveFileId = (json.files && json.files[0]) ? json.files[0].id : null;
+  const id = (json.files && json.files[0]) ? json.files[0].id : null;
+  if (id && !/^[a-zA-Z0-9_-]+$/.test(id)) throw new Error('Unexpected file ID format');
+  state.driveFileId = id;
   return state.driveFileId;
 }
 

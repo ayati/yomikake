@@ -1690,7 +1690,9 @@ async function driveFindFile(token) {
   if (res.status === 401) { _driveToken = null; state.driveFileId = null; throw new Error('401 Unauthorized — 再度ボタンをクリックしてください'); }
   if (!res.ok) throw new Error(res.status + ' ' + res.statusText);
   const json = await res.json();
-  state.driveFileId = (json.files && json.files[0]) ? json.files[0].id : null;
+  const id = (json.files && json.files[0]) ? json.files[0].id : null;
+  if (id && !/^[a-zA-Z0-9_-]+$/.test(id)) throw new Error('Unexpected file ID format');
+  state.driveFileId = id;
   return state.driveFileId;
 }
 
