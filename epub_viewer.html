@@ -35,10 +35,10 @@
   /* Settings Popover */
   .popover-overlay { position:fixed; inset:0; z-index:400; display:none; }
   .popover-overlay.show { display:block; }
-  #settings-popover { position:absolute; top:64px; right:16px; width:340px; background:var(--backdrop); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); border:1px solid var(--glass-border); border-radius:16px; box-shadow:0 12px 32px var(--shadow), 0 2px 8px var(--shadow); z-index:500; opacity:0; visibility:hidden; transform:translateY(-8px); transition:all .2s cubic-bezier(0.16,1,0.3,1); display:flex; flex-direction:column; overflow:hidden; }
+  #settings-popover { position:absolute; top:64px; right:16px; width:340px; background:var(--backdrop); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); border:1px solid var(--glass-border); border-radius:16px; box-shadow:0 12px 32px var(--shadow), 0 2px 8px var(--shadow); z-index:500; opacity:0; visibility:hidden; transform:translateY(-8px); transition:all .2s cubic-bezier(0.16,1,0.3,1); display:flex; flex-direction:column; overflow:hidden; max-height:calc(100dvh - 72px - env(safe-area-inset-bottom, 0px)); }
   #settings-popover.show { opacity:1; visibility:visible; transform:translateY(0); }
-  .pop-header { padding:16px 20px; font-weight:600; font-size:15px; border-bottom:1px solid var(--ui-border); color:var(--ui-text); display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.02); }
-  .pop-body { padding:0 12px 12px; max-height:calc(100vh - 100px); overflow-y:auto; }
+  .pop-header { padding:16px 20px; font-weight:600; font-size:15px; border-bottom:1px solid var(--ui-border); color:var(--ui-text); display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.02); flex-shrink:0; }
+  .pop-body { padding:0 12px 12px; flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; }
   
   .set-group { margin-top:20px; padding-bottom:4px; }
   .set-group h4 { font-size:12px; font-weight:600; color:var(--ui-text); opacity:0.6; text-transform:uppercase; margin:0 8px 12px; letter-spacing:0.5px; }
@@ -304,6 +304,14 @@
           <option value="none" data-i18n="margin.none">なし</option>
         </select>
       </div>
+      <div class="set-row">
+        <span class="set-label" data-i18n="settings.fwdBtnSize">次へボタン</span>
+        <select class="modern-select" id="fwd-btn-size-select" onchange="changeFwdBtnSize(this.value)">
+          <option value="small" data-i18n="fwdSize.small">小</option>
+          <option value="medium" data-i18n="fwdSize.medium">中</option>
+          <option value="large" data-i18n="fwdSize.large">大</option>
+        </select>
+      </div>
     </div>
   </div>
 </div>
@@ -439,6 +447,10 @@ const I18N = {
     'margin.medium':        '中',
     'margin.narrow':        '狭',
     'margin.none':          'なし',
+    'settings.fwdBtnSize':  '次へボタン',
+    'fwdSize.small':        '小',
+    'fwdSize.medium':       '中',
+    'fwdSize.large':        '大',
     'sidebar.toc':          '目次',
     'resume.label':         '前回の続きから読みますか？',
     'resume.hint':          'クリックして再開（または同じファイルを開いてください）',
@@ -520,6 +532,10 @@ const I18N = {
     'margin.medium':        'Medium',
     'margin.narrow':        'Narrow',
     'margin.none':          'None',
+    'settings.fwdBtnSize':  'Next button',
+    'fwdSize.small':        'Small',
+    'fwdSize.medium':       'Medium',
+    'fwdSize.large':        'Large',
     'sidebar.toc':          'Contents',
     'resume.label':         'Continue reading?',
     'resume.hint':          'Click to resume (or open the same file)',
@@ -601,6 +617,10 @@ const I18N = {
     'margin.medium':        '中等',
     'margin.narrow':        '窄',
     'margin.none':          '無',
+    'settings.fwdBtnSize':  '前進按鈕',
+    'fwdSize.small':        '小',
+    'fwdSize.medium':       '中',
+    'fwdSize.large':        '大',
     'sidebar.toc':          '目錄',
     'resume.label':         '繼續上次閱讀？',
     'resume.hint':          '點擊繼續（或開啟相同檔案）',
@@ -682,6 +702,10 @@ const I18N = {
     'margin.medium':        '中等',
     'margin.narrow':        '窄',
     'margin.none':          '无',
+    'settings.fwdBtnSize':  '前进按钮',
+    'fwdSize.small':        '小',
+    'fwdSize.medium':       '中',
+    'fwdSize.large':        '大',
     'sidebar.toc':          '目录',
     'resume.label':         '继续上次阅读？',
     'resume.hint':          '点击继续（或打开相同文件）',
@@ -776,6 +800,7 @@ const state = {
   bookTitle:'', bookCreator:'',
   fontMode:'publisher', fontSize:100, lineHeight:2.0, theme:'', margin:'full',
   writingMode:'vertical',  // 'vertical' | 'horizontal' | 'publisher'
+  fwdBtnSize:'small',      // 'small' | 'medium' | 'large'
   sidebarOpen:false,
   bookKey:'',
   driveFileId:null,  // epub_bookmarks.json の Drive ファイルID（ページ滞在中キャッシュ）
@@ -1452,6 +1477,7 @@ function saveSettings() {
       theme:       state.theme,
       margin:      state.margin,
       writingMode: state.writingMode,
+      fwdBtnSize:  state.fwdBtnSize,
     }));
   } catch(e) {
     notifyStorageError();
@@ -1468,6 +1494,7 @@ function loadSettings() {
     if (s.theme !== undefined)  { state.theme = s.theme;               document.body.className = s.theme ? 'theme-' + s.theme : ''; if(typeof updateThemeBtnUI === 'function') updateThemeBtnUI(); }
     if (s.margin)               { state.margin = s.margin;             const el = document.getElementById('margin-select'); if(el) el.value = s.margin; applyMargin(s.margin); }
     if (s.writingMode)          { state.writingMode = s.writingMode;   const el = document.getElementById('writing-mode-select'); if(el) el.value = s.writingMode; }
+    if (s.fwdBtnSize)           { state.fwdBtnSize = s.fwdBtnSize;     const el = document.getElementById('fwd-btn-size-select'); if(el) el.value = s.fwdBtnSize; applyFwdBtnSize(s.fwdBtnSize); }
   } catch(e) { console.warn("Failed to load settings fully:", e); }
 }
 
@@ -1558,6 +1585,24 @@ function changeWritingMode(v) {
   state.writingMode = v;
   saveSettings();
   if (state.spine.length) renderPage(state.currentSpineIdx);
+}
+function applyFwdBtnSize(v) {
+  const btn = document.getElementById('btn-scroll-fwd');
+  if (!btn) return;
+  const presets = {
+    small:  { width:'360px',             height:'120px', borderRadius:'60px' },
+    medium: { width:'min(500px,80vw)',   height:'200px', borderRadius:'48px' },
+    large:  { width:'calc(100% - 24px)', height:'42vh',  borderRadius:'24px' },
+  };
+  const p = presets[v] || presets['small'];
+  btn.style.width = p.width;
+  btn.style.height = p.height;
+  btn.style.borderRadius = p.borderRadius;
+}
+function changeFwdBtnSize(v) {
+  state.fwdBtnSize = v;
+  applyFwdBtnSize(v);
+  saveSettings();
 }
 
 // ══════════════════════════════════════════

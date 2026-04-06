@@ -19,6 +19,7 @@ Two-file ePub 3 vertical-text viewer for reading Japanese publications. No build
 - Drag-and-drop file open: `epub_viewer.html` only
 - Keyboard shortcuts (Space/arrows/Home/End): both files support Bluetooth keyboard; `epub_viewer_ios.html` also handles touch swipe inside the iframe
 - Toolbar mouse-wheel scroll: `epub_viewer.html` only
+- Google Drive bookmark sync: both files (requires HTTP server — Google Identity Services does not work on `file://`)
 - Release tags follow `vX.Y.Z` convention (`git tag vX.Y.Z && git push --tags`)
 
 ## Development
@@ -39,7 +40,7 @@ There are no automated tests. Manual testing requires a `.epub` or `.kepub` file
 
 ## Architecture
 
-Each viewer is a single self-contained HTML file (`epub_viewer.html` ~1663 lines, `epub_viewer_ios.html` ~1714 lines). Both follow a modular functional style with a single central state object. The architecture below describes `epub_viewer.html`; `epub_viewer_ios.html` is identical except for the scroll mechanism (see iOS Viewer section below).
+Each viewer is a single self-contained HTML file (`epub_viewer.html` ~1876 lines, `epub_viewer_ios.html` ~1919 lines). Both follow a modular functional style with a single central state object. The architecture below describes `epub_viewer.html`; `epub_viewer_ios.html` is identical except for the scroll mechanism (see iOS Viewer section below).
 
 ### State
 
@@ -56,6 +57,7 @@ const state = {
   bookCreator,      // from OPF dc:creator (multiple joined with ・)
   bookKey,          // localStorage key prefix: 'epub_pos_{title}_{spineCount}'
   writingMode,      // 'vertical' | 'horizontal' | 'publisher'
+  driveFileId,      // cached Drive file ID for epub_bookmarks.json (session only)
   // UI preferences: fontMode, fontSize, lineHeight, theme, margin, sidebarOpen
 }
 ```
@@ -139,6 +141,18 @@ Both files support **4 languages**: `ja` (Japanese), `en` (English), `zh-TW` (Tr
 
 Bookmark key uses OPF title + spine count (not file path), so moving or renaming the file does not break saved positions. `exportBookmarks()` serialises all `epub_pos_*` and `epub_last_book` keys to a JSON file (`{ version, exportedAt, bookmarks: {} }`) for cross-device transfer. Import is handled by a `change` event listener on a hidden `<input type="file" id="bookmark-input">` (no named import function); it validates the JSON shape and writes matching keys back to `localStorage`. `notifyStorageError()` shows a toast when any `localStorage.setItem` throws (quota exceeded). `resumeBook()` is invoked when the user clicks the welcome-screen resume banner; it calls `loadSavedPos()` then opens a file picker.
 
+### Google Drive Bookmark Sync
+
+Both files support syncing `epub_pos_*` / `epub_last_book` keys to/from Google Drive `appDataFolder` as `epub_bookmarks.json`.
+
+- **`GOOGLE_CLIENT_ID`** — hardcoded OAuth 2.0 client ID near the top of `<script>`. If empty, Drive buttons show an error toast and abort.
+- **`_driveToken`** — OAuth access token stored in memory only (not localStorage, for XSS safety). Re-acquired on next button press after expiry.
+- **`driveAuth()`** — calls Google Identity Services `initTokenClient` with scope `drive.appdata`. Requires `https://accounts.google.com/gsi/client` to be loaded (HTTP only; fails on `file://`).
+- **`driveFindFile(token)`** — searches `appDataFolder` for `epub_bookmarks.json` and caches the file ID in `state.driveFileId` for the session. Returns `null` if not found. Validates the returned ID against `/^[a-zA-Z0-9_-]+$/` (security: prevents URL injection via API response).
+- **`driveUpload()`** — serialises all `epub_pos_*` and `epub_last_book` localStorage keys via `collectBookmarks()`, then PATCHes the existing Drive file or POSTs a new multipart upload. Button is disabled during the operation.
+- **`driveDownload()`** — fetches `epub_bookmarks.json` from Drive and writes matching keys back to `localStorage`. Prompts confirmation before overwriting. Token is cleared and `state.driveFileId` reset on 401 so the user can retry.
+- **`google.accounts` guard** — `driveAuth()` checks `typeof google === 'undefined'` and throws a human-readable error when the GIS script has not loaded (e.g., `file://` mode).
+
 ### Help Modal
 
 `showHelp()` builds the modal content dynamically. When a book is open (`state.epub` is non-null), a book-info card is prepended showing `state.bookTitle`, `state.bookCreator` (omitted if empty), spine count, and TOC item count (omitted if 0). `state.bookTitle` and `state.bookCreator` are populated in `loadEpub()` from OPF `dc:title` / `dc:creator` elements; multiple creators are joined with `・`. `esc()` escapes HTML entities before injecting title/creator into `innerHTML`. `#modal-body` has `max-height: calc(80vh - 120px); overflow-y: auto` to handle long content.
@@ -151,3 +165,5 @@ Bookmark key uses OPF title + spine count (not file path), so moving or renaming
 - `postMessage` origin is `"*"` (required for `file://`); receiver validates `e.data.type`.
 - All `<a>` clicks inside the iframe are intercepted: external URLs → `window.open(_blank, noopener)`, internal epub links → `EPUB_LINK` postMessage to parent (prevents X-Frame-Options errors).
 - Inline `on*` event handlers in ePub content are **not** stripped — intentional trade-off (low risk, high removal cost).
+- Drive API file IDs validated against `/^[a-zA-Z0-9_-]+$/` in `driveFindFile()` before use in fetch URLs (prevents URL injection via malicious API responses).
+- `_driveToken` stored in memory only (not localStorage) to limit XSS token theft surface.
