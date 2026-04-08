@@ -1575,11 +1575,13 @@ changeTheme = function(v) {
 };
 
 function resumeBook() {
-  const data = JSON.parse(localStorage.getItem('epub_last_book'));
-  if (data && data.title) {
-     showToast(t('toast.resumeHint', {title: data.title}));
-     openFilePicker();
-  }
+  try {
+    const data = JSON.parse(localStorage.getItem('epub_last_book'));
+    if (data && data.title) {
+      showToast(t('toast.resumeHint', {title: data.title}));
+      openFilePicker();
+    }
+  } catch(e) {}
 }
 
 function toggleSidebar() {
@@ -1976,9 +1978,12 @@ async function driveDownload() {
     const json = await res.json();
     if (!json.bookmarks || typeof json.bookmarks !== 'object') throw new Error(t('err.invalidFormat'));
 
+    // ボタンを一時再有効化してから confirm を表示（disabled のままダイアログを出すと UX が悪い）
+    btn.disabled = false;
     const hasLocal = Array.from({ length: localStorage.length }, (_, i) => localStorage.key(i))
       .some(k => k.startsWith('epub_pos_'));
     if (hasLocal && !confirm(t('confirm.driveOverwrite'))) return;
+    btn.disabled = true;
 
     let count = 0;
     for (const [key, val] of Object.entries(json.bookmarks)) {
