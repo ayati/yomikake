@@ -106,11 +106,13 @@ iOS Safari silently ignores both `document.documentElement.scrollLeft` assignmen
 - No scroll API is called anywhere; swipe gesture (`touchstart`/`touchend`) inside the iframe replaces button/keyboard scroll for content navigation.
 - `EPUB_SCROLL`, `EPUB_EDGE`, `EPUB_POS`, and `EPUB_LINK` postMessage protocol is otherwise identical to the main viewer.
 - **`CLICK_HANDLER` / `INIT_FN` template variables** — at the top of `buildScrollScript()`, two shared template literal strings are defined and interpolated (`${CLICK_HANDLER}`, `${INIT_FN}`) into all three scroll mode IIFEs (vertical, horizontal, publisher). `CLICK_HANDLER` intercepts `<a>` clicks inside the iframe and routes them to `window.open` or `EPUB_LINK`; `INIT_FN` wraps the `applyInit` call with the double-rAF + 500ms fallback pattern. This avoids duplicating these blocks across three separate string literals.
-- **`INIT_FN` timing (iPad fix)** — on iPad, `body.offsetWidth` is read before `writing-mode:vertical-rl` layout completes, causing `maxS()=0` and content positioned off-screen. The fix uses a double-rAF (fast path for iPhone) plus a `setTimeout(applyInit, 500)` fallback (ensures layout is complete on iPad):
+- **`INIT_FN` timing (iPad fix)** — on iPad, `body.offsetWidth` is read before `writing-mode:vertical-rl` layout completes, causing `maxS()=0` and content positioned off-screen. The fix uses a double-rAF (fast path for iPhone) plus a `setTimeout(runApplyInit, 500)` fallback (ensures layout is complete on iPad). A `_initApplied` flag prevents the second call from resetting the reading position if the first already succeeded:
   ```js
+  var _initApplied = false;
+  function runApplyInit(){ if(_initApplied) return; _initApplied = true; applyInit(); }
   function run(){
-    requestAnimationFrame(function(){ requestAnimationFrame(applyInit); });
-    setTimeout(applyInit, 500);
+    requestAnimationFrame(function(){ requestAnimationFrame(runApplyInit); });
+    setTimeout(runApplyInit, 500);
   }
   ```
 - **Touch device visibility (`@media (hover: none)`)** — chapter nav buttons and `#btn-scroll-fwd` are slightly visible on all touch devices (opacity `.3` / `.22`) so users can find them. This media query applies to both iPhone and iPad regardless of viewport width.
@@ -157,9 +159,9 @@ Both files support syncing `epub_pos_*` / `epub_last_book` keys to/from Google D
 - **`GOOGLE_CLIENT_ID`** — hardcoded OAuth 2.0 client ID near the top of `<script>`. If empty, Drive buttons show an error toast and abort.
 - **`_driveToken`** — OAuth access token stored in memory only (not localStorage, for XSS safety). Re-acquired on next button press after expiry.
 - **`driveAuth()`** — calls Google Identity Services `initTokenClient` with scope `drive.appdata`. Requires `https://accounts.google.com/gsi/client` to be loaded (HTTP only; fails on `file://`).
-- **`driveFindFile(token)`** — searches `appDataFolder` for `epub_bookmarks.json` and caches the file ID in `state.driveFileId` for the session. Returns `null` if not found. Validates the returned ID against `/^[a-zA-Z0-9_-]+$/` (security: prevents URL injection via API response).
+- **`driveFindFile(token)`** — searches `appDataFolder` for `epub_bookmarks.json` and caches the file ID in `state.driveFileId` for the session. Returns `null` if not found. Validates the returned ID against `/^[a-zA-Z0-9_-]{10,200}$/` (security: prevents URL injection via API response).
 - **`driveUpload()`** — serialises all `epub_pos_*` and `epub_last_book` localStorage keys via `collectBookmarks()`, then PATCHes the existing Drive file or POSTs a new multipart upload. Button is disabled during the operation.
-- **`driveDownload()`** — fetches `epub_bookmarks.json` from Drive and writes matching keys back to `localStorage`. Prompts confirmation before overwriting. Token is cleared and `state.driveFileId` reset on 401 so the user can retry.
+- **`driveDownload()`** — fetches `epub_bookmarks.json` from Drive and writes matching keys back to `localStorage`. Prompts confirmation before overwriting (button is briefly re-enabled while `confirm()` is shown, then re-disabled if confirmed). Token is cleared and `state.driveFileId` reset on 401 so the user can retry.
 - **`google.accounts` guard** — `driveAuth()` checks `typeof google === 'undefined'` and throws a human-readable error when the GIS script has not loaded (e.g., `file://` mode).
 - **Auto-save** — `const AUTO_SAVE_INTERVAL = 60000` (1 min). When `state.driveAutoSave` is true, each `EPUB_POS` event schedules a debounced `driveUploadCore()` call via `scheduleAutoSave()`. Toggled by a switch in the settings popover; `updateAutoSaveToggleUI()` syncs the UI. Persisted in `epub_settings` as `driveAutoSave`. Forced off on `file://` during init. `_autoSaveBusy` flag prevents concurrent uploads.
 - **Token lifecycle** — `_tokenClient` holds the GIS `TokenClient` instance (created once on first auth, reused thereafter). `_driveTokenExpiry` stores the expiry timestamp from `r.expires_in`. `driveAuth()` returns the cached token if >5 min remain; otherwise calls `requestAccessToken({ prompt: '' })` on the existing client for a silent refresh (no popup). `scheduleTokenRefresh()` arms a timer 5 min before expiry to proactively refresh in the background. `runAutoSave()` retries once with silent refresh on 401; only if that also fails does it disable auto-save and show `toast.driveAutoSaveExpired`.
@@ -173,8 +175,9 @@ Both files support syncing `epub_pos_*` / `epub_last_book` keys to/from Google D
 - ePub `<script>` tags stripped in `buildSrcdoc()` (XSS — iframe has no `sandbox` attribute).
 - ePub `<base>` replaced with `<base href="about:blank">` to prevent `file://` URL leakage.
 - JSZip loaded with SRI (`integrity` + `crossorigin`).
-- `postMessage` origin is `"*"` (required for `file://`); receiver validates `e.data.type`.
-- All `<a>` clicks inside the iframe are intercepted: external URLs → `window.open(_blank, noopener)`, internal epub links → `EPUB_LINK` postMessage to parent (prevents X-Frame-Options errors).
+- `postMessage` origin is `"*"` (required for `file://`); receiver validates `e.source === iframe.contentWindow` to reject messages from other windows/extensions, plus `e.data.type`.
+- All `<a>` clicks inside the iframe are intercepted: external URLs → `window.open(_blank, noopener)`, internal epub links → `EPUB_LINK` postMessage to parent (prevents X-Frame-Options errors). `javascript:` scheme URIs are rejected in `handleIframeLink()`.
 - Inline `on*` event handlers in ePub content are **not** stripped — intentional trade-off (low risk, high removal cost).
-- Drive API file IDs validated against `/^[a-zA-Z0-9_-]+$/` in `driveFindFile()` before use in fetch URLs (prevents URL injection via malicious API responses).
+- Drive API file IDs validated against `/^[a-zA-Z0-9_-]{10,200}$/` in `driveFindFile()` before use in fetch URLs (prevents URL injection via malicious API responses).
+- `resolveCssText()` uses regex with escaped pattern (not `split().join()`) to replace `url()` references, avoiding mismatches with special characters in URL strings.
 - `_driveToken` stored in memory only (not localStorage) to limit XSS token theft surface.
