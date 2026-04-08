@@ -40,7 +40,7 @@ There are no automated tests. Manual testing requires a `.epub` or `.kepub` file
 
 ## Architecture
 
-Each viewer is a single self-contained HTML file (`epub_viewer.html` ~1923 lines, `epub_viewer_ios.html` ~1966 lines). Both follow a modular functional style with a single central state object. The architecture below describes `epub_viewer.html`; `epub_viewer_ios.html` is identical except for the scroll mechanism (see iOS Viewer section below).
+Each viewer is a single self-contained HTML file (`epub_viewer.html` ~2021 lines, `epub_viewer_ios.html` ~2066 lines). Both follow a modular functional style with a single central state object. The architecture below describes `epub_viewer.html`; `epub_viewer_ios.html` is identical except for the scroll mechanism (see iOS Viewer section below).
 
 ### State
 
@@ -65,6 +65,7 @@ const state = {
   lineHeight,       // 1.6 | 2.0 | 2.4 | 2.8 (default 2.0)
   theme,            // '' | 'sepia' | 'white' | 'dark' (default '' = warm white)
   margin,           // 'full' | 'medium' | 'narrow' | 'none' (default 'full')
+  driveAutoSave,    // boolean (default false) — auto-upload bookmarks on EPUB_POS events
   sidebarOpen,      // boolean (default false)
 }
 ```
@@ -144,7 +145,7 @@ Both files support **4 languages**: `ja` (Japanese), `en` (English), `zh-TW` (Tr
 |-----|---------|
 | `epub_pos_{title}_{spineCount}` | `{spineIdx, ratio}` — per-book reading position |
 | `epub_last_book` | `{title, bookKey}` — for the resume banner |
-| `epub_settings` | `{fontMode, fontSize, lineHeight, theme, margin, writingMode, fwdBtnSize}` |
+| `epub_settings` | `{fontMode, fontSize, lineHeight, theme, margin, writingMode, fwdBtnSize, driveAutoSave}` |
 | `epub_lang` | selected UI language (`ja` / `en` / `zh-TW` / `zh-CN`) |
 
 Bookmark key uses OPF title + spine count (not file path), so moving or renaming the file does not break saved positions. `exportBookmarks()` serialises all `epub_pos_*` and `epub_last_book` keys to a JSON file (`{ version, exportedAt, bookmarks: {} }`) for cross-device transfer. Import is handled by a `change` event listener on a hidden `<input type="file" id="bookmark-input">` (no named import function); it validates the JSON shape and writes matching keys back to `localStorage`. `notifyStorageError()` shows a toast when any `localStorage.setItem` throws (quota exceeded). `resumeBook()` is invoked when the user clicks the welcome-screen resume banner; it calls `loadSavedPos()` then opens a file picker.
@@ -160,6 +161,8 @@ Both files support syncing `epub_pos_*` / `epub_last_book` keys to/from Google D
 - **`driveUpload()`** — serialises all `epub_pos_*` and `epub_last_book` localStorage keys via `collectBookmarks()`, then PATCHes the existing Drive file or POSTs a new multipart upload. Button is disabled during the operation.
 - **`driveDownload()`** — fetches `epub_bookmarks.json` from Drive and writes matching keys back to `localStorage`. Prompts confirmation before overwriting. Token is cleared and `state.driveFileId` reset on 401 so the user can retry.
 - **`google.accounts` guard** — `driveAuth()` checks `typeof google === 'undefined'` and throws a human-readable error when the GIS script has not loaded (e.g., `file://` mode).
+- **Auto-save** — `const AUTO_SAVE_INTERVAL = 60000` (1 min). When `state.driveAutoSave` is true, each `EPUB_POS` event schedules a debounced `driveUploadCore()` call via `scheduleAutoSave()`. Toggled by a switch in the settings popover; `updateAutoSaveToggleUI()` syncs the UI. Persisted in `epub_settings` as `driveAutoSave`. Forced off on `file://` during init. `_autoSaveBusy` flag prevents concurrent uploads.
+- **Token lifecycle** — `_tokenClient` holds the GIS `TokenClient` instance (created once on first auth, reused thereafter). `_driveTokenExpiry` stores the expiry timestamp from `r.expires_in`. `driveAuth()` returns the cached token if >5 min remain; otherwise calls `requestAccessToken({ prompt: '' })` on the existing client for a silent refresh (no popup). `scheduleTokenRefresh()` arms a timer 5 min before expiry to proactively refresh in the background. `runAutoSave()` retries once with silent refresh on 401; only if that also fails does it disable auto-save and show `toast.driveAutoSaveExpired`.
 
 ### Help Modal
 

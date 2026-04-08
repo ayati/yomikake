@@ -409,10 +409,13 @@
 // ══════════════════════════════════════════
 const GOOGLE_CLIENT_ID = '491729394813-3dm1apv1do4pmcsv1mpgdq26ji2iavdr.apps.googleusercontent.com';  // ← ここに Client ID を貼り付ける
 
-let _driveToken = null;  // OAuth アクセストークン（メモリのみ、XSS対策でlocalStorage非使用）
-let _autoSaveTimer  = null;   // Drive自動保存の pending setTimeout ID
-let _lastAutoSaveAt = 0;      // 最後の自動保存成功タイムスタンプ (ms)
-let _autoSaveBusy   = false;  // 同時アップロード防止フラグ
+let _driveToken       = null;  // OAuth アクセストークン（メモリのみ、XSS対策でlocalStorage非使用）
+let _driveTokenExpiry = 0;     // トークン有効期限タイムスタンプ (ms)
+let _tokenClient      = null;  // GIS TokenClient インスタンス（再利用・サイレントリフレッシュ用）
+let _refreshTimer     = null;  // トークン事前リフレッシュの setTimeout ID
+let _autoSaveTimer    = null;  // Drive自動保存の pending setTimeout ID
+let _lastAutoSaveAt   = 0;     // 最後の自動保存成功タイムスタンプ (ms)
+let _autoSaveBusy     = false; // 同時アップロード防止フラグ
 const AUTO_SAVE_INTERVAL = 60000; // 自動保存の最小間隔: 1分 (ms)
 
 // ══════════════════════════════════════════
@@ -1798,22 +1801,46 @@ document.getElementById('bookmark-input').addEventListener('change', e => {
 
 function driveAuth() {
   return new Promise((resolve, reject) => {
-    if (_driveToken) { resolve(_driveToken); return; }
+    // 有効期限5分以上残っていればキャッシュ済みトークンをそのまま使用
+    if (_driveToken && Date.now() < _driveTokenExpiry - 300000) { resolve(_driveToken); return; }
     if (!GOOGLE_CLIENT_ID) { showToast(t('toast.driveNoClientId')); reject(new Error('no_client_id')); return; }
     if (typeof google === 'undefined' || !google.accounts) {
       reject(new Error('Google Identity Services が読み込まれていません。HTTP/HTTPS サーバー経由で開いてください。'));
       return;
     }
-    google.accounts.oauth2.initTokenClient({
-      client_id: GOOGLE_CLIENT_ID,
-      scope: 'https://www.googleapis.com/auth/drive.appdata',
-      callback: r => {
-        if (r.error) { reject(new Error(r.error)); return; }
-        _driveToken = r.access_token;
-        resolve(_driveToken);
-      },
-    }).requestAccessToken();
+    const onToken = r => {
+      if (r.error) { _driveToken = null; reject(new Error(r.error)); return; }
+      _driveToken = r.access_token;
+      _driveTokenExpiry = Date.now() + (r.expires_in || 3600) * 1000;
+      scheduleTokenRefresh();
+      resolve(_driveToken);
+    };
+    if (!_tokenClient) {
+      // 初回: ポップアップで認証
+      _tokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: GOOGLE_CLIENT_ID,
+        scope: 'https://www.googleapis.com/auth/drive.appdata',
+        callback: onToken,
+      });
+      _tokenClient.requestAccessToken();
+    } else {
+      // 2回目以降: prompt:'' でユーザー操作なしにサイレントリフレッシュ
+      _tokenClient.callback = onToken;
+      _tokenClient.requestAccessToken({ prompt: '' });
+    }
   });
+}
+
+// トークン有効期限の5分前にサイレントリフレッシュをスケジュール
+function scheduleTokenRefresh() {
+  clearTimeout(_refreshTimer);
+  if (!_tokenClient) return;
+  const delay = _driveTokenExpiry - Date.now() - 300000;
+  if (delay <= 0) return;
+  _refreshTimer = setTimeout(async () => {
+    _driveToken = null;  // 期限切れとみなしてリフレッシュを強制
+    try { await driveAuth(); } catch(e) { /* サイレント失敗: 次回操作時に再取得 */ }
+  }, delay);
 }
 
 async function driveFindFile(token) {
@@ -1916,11 +1943,19 @@ async function runAutoSave() {
     _lastAutoSaveAt = Date.now();
   } catch(e) {
     if (e.message && e.message.startsWith('401')) {
-      // トークン期限切れ → 自動保存を無効化してユーザーに通知
-      state.driveAutoSave = false;
-      saveSettings();
-      updateAutoSaveToggleUI();
-      showToast(t('toast.driveAutoSaveExpired'));
+      // 万一トークンが失効していた場合: サイレントリフレッシュを試みてリトライ
+      _driveToken = null;
+      try {
+        const token2 = await driveAuth();
+        await driveUploadCore(token2);
+        _lastAutoSaveAt = Date.now();
+      } catch(e2) {
+        // Googleセッション切れなど回復不能 → 自動保存を停止してユーザーに通知
+        state.driveAutoSave = false;
+        saveSettings();
+        updateAutoSaveToggleUI();
+        showToast(t('toast.driveAutoSaveExpired'));
+      }
     }
     // その他のエラー（ネットワーク断など）は silent
   } finally {
@@ -1933,6 +1968,7 @@ async function toggleDriveAutoSave() {
     // OFF にする
     state.driveAutoSave = false;
     clearTimeout(_autoSaveTimer);
+    clearTimeout(_refreshTimer);
     saveSettings();
     updateAutoSaveToggleUI();
     return;
