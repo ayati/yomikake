@@ -412,6 +412,7 @@ const GOOGLE_CLIENT_ID = '491729394813-3dm1apv1do4pmcsv1mpgdq26ji2iavdr.apps.goo
 let _driveToken       = null;  // OAuth アクセストークン（メモリのみ、XSS対策でlocalStorage非使用）
 let _driveTokenExpiry = 0;     // トークン有効期限タイムスタンプ (ms)
 let _tokenClient      = null;  // GIS TokenClient インスタンス（再利用・サイレントリフレッシュ用）
+let _authPromise      = null;  // 進行中の driveAuth Promise（同時実行防止用）
 let _refreshTimer     = null;  // トークン事前リフレッシュの setTimeout ID
 let _autoSaveTimer    = null;  // Drive自動保存の pending setTimeout ID
 let _lastAutoSaveAt   = 0;     // 最後の自動保存成功タイムスタンプ (ms)
@@ -1022,7 +1023,11 @@ async function resolveCssText(css, cssDir) {
   for (const {full, src} of hits) {
     if (src.startsWith('data:') || src.startsWith('http') || src.startsWith('blob:')) continue;
     const uri = await toDataUri(resolvePath(cssDir, src));
-    if (uri) css = css.split(full).join("url('" + uri + "')");
+    if (uri) {
+      // full は正規表現マッチ済み文字列。特殊文字をエスケープして全出現箇所を置換
+      const escapedFull = full.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      css = css.replace(new RegExp(escapedFull, 'g'), "url('" + uri + "')");
+    }
   }
   return css;
 }
@@ -1489,6 +1494,9 @@ function scrollPage(direction) {
 }
 
 window.addEventListener('message', e => {
+  // 自分の iframe からのメッセージのみ受け付ける（他のウィンドウ・拡張機能からの不正メッセージを排除）
+  const iframe = document.getElementById('content-iframe');
+  if (!iframe || e.source !== iframe.contentWindow) return;
   if (!e.data) return;
   if (e.data.type === 'EPUB_EDGE') {
     const dir = e.data.direction;
@@ -1506,6 +1514,7 @@ window.addEventListener('message', e => {
 function handleIframeLink(href) {
   const base   = href.split('#')[0];
   if (!base) return;
+  if (/^javascript:/i.test(base)) return; // javascript: スキームは拒否
   const curItem = state.spine[state.currentSpineIdx];
   const curDir  = curItem.absPath.includes('/')
     ? curItem.absPath.slice(0, curItem.absPath.lastIndexOf('/') + 1)
@@ -1799,16 +1808,19 @@ document.getElementById('bookmark-input').addEventListener('change', e => {
 //  Google Drive しおり同期
 // ══════════════════════════════════════════
 
+// OAuth アクセストークンを取得（キャッシュがあれば再利用、同時呼び出しは同一 Promise を共有）
 function driveAuth() {
-  return new Promise((resolve, reject) => {
-    // 有効期限5分以上残っていればキャッシュ済みトークンをそのまま使用
-    if (_driveToken && Date.now() < _driveTokenExpiry - 300000) { resolve(_driveToken); return; }
-    if (!GOOGLE_CLIENT_ID) { showToast(t('toast.driveNoClientId')); reject(new Error('no_client_id')); return; }
-    if (typeof google === 'undefined' || !google.accounts) {
-      reject(new Error('Google Identity Services が読み込まれていません。HTTP/HTTPS サーバー経由で開いてください。'));
-      return;
-    }
+  // 有効期限5分以上残っていればキャッシュ済みトークンをそのまま使用
+  if (_driveToken && Date.now() < _driveTokenExpiry - 300000) return Promise.resolve(_driveToken);
+  // 既に認証フロー進行中なら同じ Promise を返す（_tokenClient.callback 競合を防止）
+  if (_authPromise) return _authPromise;
+  if (!GOOGLE_CLIENT_ID) { showToast(t('toast.driveNoClientId')); return Promise.reject(new Error('no_client_id')); }
+  if (typeof google === 'undefined' || !google.accounts) {
+    return Promise.reject(new Error('Google Identity Services が読み込まれていません。HTTP/HTTPS サーバー経由で開いてください。'));
+  }
+  _authPromise = new Promise((resolve, reject) => {
     const onToken = r => {
+      _authPromise = null;
       if (r.error) { _driveToken = null; reject(new Error(r.error)); return; }
       _driveToken = r.access_token;
       _driveTokenExpiry = Date.now() + (r.expires_in || 3600) * 1000;
@@ -1829,6 +1841,7 @@ function driveAuth() {
       _tokenClient.requestAccessToken({ prompt: '' });
     }
   });
+  return _authPromise;
 }
 
 // トークン有効期限の5分前にサイレントリフレッシュをスケジュール
@@ -1854,7 +1867,7 @@ async function driveFindFile(token) {
   if (!res.ok) throw new Error(res.status + ' ' + res.statusText);
   const json = await res.json();
   const id = (json.files && json.files[0]) ? json.files[0].id : null;
-  if (id && !/^[a-zA-Z0-9_-]+$/.test(id)) throw new Error('Unexpected file ID format');
+  if (id && !/^[a-zA-Z0-9_-]{10,200}$/.test(id)) throw new Error('Unexpected file ID format');
   state.driveFileId = id;
   return state.driveFileId;
 }
