@@ -149,6 +149,13 @@
   ::-webkit-scrollbar-thumb { background:var(--ui-border); border-radius:4px; border:2px solid var(--ui-bg); }
   ::-webkit-scrollbar-thumb:hover { background:var(--text); opacity:0.3; }
 
+  /* ── タッチデバイス：ボタンをわずかに表示 ── */
+  @media (hover: none) and (pointer: coarse) {
+    .chapter-btn { opacity:.3; }
+    .chapter-btn svg { stroke:var(--ui-text); }
+    #btn-scroll-fwd { opacity:.22; }
+  }
+
   /* ── スマホ向け ── */
   @media (max-width: 640px) {
     #statusbar { display:none; }
@@ -157,8 +164,7 @@
     #page-container:hover .chapter-btn { opacity:.8; }
     .scroll-btn { width:120px; height:40px; opacity:.9; }
     #page-container:hover .scroll-btn { opacity:.9; }
-    #btn-scroll-fwd { bottom:max(16px, env(safe-area-inset-bottom, 16px)); background:var(--accent); color:#fff; }
-    #btn-scroll-fwd svg { stroke:#fff; }
+    #btn-scroll-fwd { bottom:max(16px, env(safe-area-inset-bottom, 16px)); }
     #btn-scroll-back { top:16px; }
     #sidebar { width:240px; position:absolute; left:0; top:56px; bottom:0; z-index:95; border-right:1px solid var(--glass-border); background:var(--backdrop); backdrop-filter:blur(16px); }
     #sidebar.hidden { transform:translateX(-100%); margin-right:0; }
