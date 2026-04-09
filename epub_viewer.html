@@ -149,6 +149,30 @@
   ::-webkit-scrollbar-thumb { background:var(--ui-border); border-radius:4px; border:2px solid var(--ui-bg); }
   ::-webkit-scrollbar-thumb:hover { background:var(--text); opacity:0.3; }
 
+  /* ── フルスクリーン ── */
+  #toolbar, #statusbar { transition: opacity .2s ease; }
+  body.fullscreen #toolbar {
+    position:fixed; top:-200px; left:0; right:0; opacity:0; pointer-events:none;
+  }
+  body.fullscreen #statusbar {
+    position:fixed; bottom:-200px; left:0; right:0; opacity:0; pointer-events:none;
+  }
+  #fs-exit-zone {
+    position:fixed; top:0; left:0; right:0; height:16px; z-index:50;
+    background:var(--accent); opacity:.15; cursor:pointer;
+    display:none; transition:opacity .2s;
+  }
+  body.fullscreen #fs-exit-zone { display:block; }
+  #fs-exit-zone:hover { opacity:.35; }
+  #fs-exit-btn {
+    position:fixed; top:0; left:50%; transform:translateX(-50%) translateY(-100%);
+    padding:10px 28px; background:var(--accent); color:#fff; border:none;
+    border-radius:0 0 14px 14px; z-index:51; font-size:14px; font-weight:600;
+    font-family:inherit; cursor:pointer; opacity:0; pointer-events:none;
+    transition:transform .25s ease, opacity .2s;
+  }
+  #fs-exit-btn.show { transform:translateX(-50%) translateY(0); opacity:.95; pointer-events:auto; }
+
   /* ── タッチデバイス：ボタンをわずかに表示 ── */
   @media (hover: none) and (pointer: coarse) {
     .chapter-btn { opacity:.3; }
@@ -220,6 +244,10 @@
 
   <button class="icon-btn" onclick="showHelp()" data-i18n-title="btn.help">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+  </button>
+
+  <button class="icon-btn" id="fs-btn" onclick="toggleFullscreen()" data-i18n-title="btn.fullscreen">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
   </button>
 
   <div class="tb-sep"></div>
@@ -382,6 +410,9 @@
   <div id="progress-bar"><div id="progress-fill"></div></div>
 </div>
 
+<div id="fs-exit-zone" onclick="showFsExitBtn()"></div>
+<button id="fs-exit-btn" onclick="toggleFullscreen()" data-i18n="btn.fullscreen.exit">読書モード終了</button>
+
 <div id="toast"></div>
 
 <div id="modal-overlay">
@@ -506,6 +537,8 @@ const I18N = {
     'confirm.driveOverwrite':    'ローカルのしおりをDriveの内容で上書きします。よろしいですか？',
     'btn.drive.download':        'Driveからしおりを読み込む',
     'btn.drive.upload':          'しおりをDriveに保存する',
+    'btn.fullscreen':            'フルスクリーン',
+    'btn.fullscreen.exit':       '読書モード終了',
     'settings.driveGroup':       'Google Drive',
     'settings.driveAutoSave':    'しおり自動保存',
     'err.noContainerXml':   'META-INF/container.xml が見つかりません。有効な ePub ファイルではない可能性があります。',
@@ -595,6 +628,8 @@ const I18N = {
     'confirm.driveOverwrite':    'Overwrite local bookmarks with Drive data?',
     'btn.drive.download':        'Load bookmarks from Drive',
     'btn.drive.upload':          'Save bookmarks to Drive',
+    'btn.fullscreen':            'Fullscreen',
+    'btn.fullscreen.exit':       'Exit reader',
     'settings.driveGroup':       'Google Drive',
     'settings.driveAutoSave':    'Auto-save bookmarks',
     'err.noContainerXml':   'META-INF/container.xml not found. This may not be a valid ePub file.',
@@ -684,6 +719,8 @@ const I18N = {
     'confirm.driveOverwrite':    '將以 Drive 的內容覆蓋本機書籤，確定嗎？',
     'btn.drive.download':        '從 Drive 載入書籤',
     'btn.drive.upload':          '儲存書籤至 Drive',
+    'btn.fullscreen':            '全螢幕',
+    'btn.fullscreen.exit':       '結束閱讀模式',
     'settings.driveGroup':       'Google Drive',
     'settings.driveAutoSave':    '自動儲存書籤',
     'err.noContainerXml':   '找不到 META-INF/container.xml，可能不是有效的 ePub 檔案。',
@@ -773,6 +810,8 @@ const I18N = {
     'confirm.driveOverwrite':    '将以 Drive 的内容覆盖本地书签，确定吗？',
     'btn.drive.download':        '从 Drive 加载书签',
     'btn.drive.upload':          '保存书签至 Drive',
+    'btn.fullscreen':            '全屏',
+    'btn.fullscreen.exit':       '退出阅读模式',
     'settings.driveGroup':       'Google Drive',
     'settings.driveAutoSave':    '自动保存书签',
     'err.noContainerXml':   '找不到 META-INF/container.xml，可能不是有效的 ePub 文件。',
@@ -846,6 +885,7 @@ const state = {
   bookKey:'',
   driveFileId:null,      // epub_bookmarks.json の Drive ファイルID（ページ滞在中キャッシュ）
   driveAutoSave:false,   // Drive自動保存が有効かどうか
+  fullscreen:false,      // フルスクリーン中（localStorageに保存しない）
 };
 
 // テーマ別 ePub 本文エリアの色（iframe 内に直接注入）
@@ -1510,6 +1550,10 @@ document.addEventListener('keydown', e => {
       renderPage(0, 'start'); e.preventDefault(); break;
     case 'End':
       renderPage(state.spine.length-1, 'end'); e.preventDefault(); break;
+    case 'f':
+      toggleFullscreen(); e.preventDefault(); break;
+    case 'Escape':
+      if (state.fullscreen) { toggleFullscreen(); e.preventDefault(); } break;
   }
 });
 
@@ -2050,6 +2094,58 @@ function closeModal() {
 }
 document.getElementById('modal-overlay').addEventListener('click', e => {
   if (e.target === document.getElementById('modal-overlay')) closeModal();
+});
+
+// ══════════════════════════════════════════
+//  Fullscreen
+// ══════════════════════════════════════════
+let _fsExitTimer = null;
+
+function toggleFullscreen() {
+  if (state.sidebarOpen) toggleSidebar();
+  const pop = document.getElementById('settings-popover');
+  if (pop.classList.contains('show')) toggleSettings();
+
+  state.fullscreen = !state.fullscreen;
+  document.body.classList.toggle('fullscreen', state.fullscreen);
+
+  if (state.fullscreen) {
+    if (document.documentElement.requestFullscreen) {
+      document.documentElement.requestFullscreen().catch(() => {});
+    }
+    history.pushState({ epub_fs: true }, '');
+  } else {
+    if (document.fullscreenElement) document.exitFullscreen();
+    _clearFsExitBtn();
+  }
+}
+
+function showFsExitBtn() {
+  if (!state.fullscreen) return;
+  const btn = document.getElementById('fs-exit-btn');
+  btn.classList.add('show');
+  if (_fsExitTimer) clearTimeout(_fsExitTimer);
+  _fsExitTimer = setTimeout(() => { btn.classList.remove('show'); _fsExitTimer = null; }, 2000);
+}
+
+function _clearFsExitBtn() {
+  const btn = document.getElementById('fs-exit-btn');
+  if (btn) btn.classList.remove('show');
+  if (_fsExitTimer) { clearTimeout(_fsExitTimer); _fsExitTimer = null; }
+}
+
+// Layer2（ブラウザフルスクリーン）の外部解除をLayer1に同期
+document.addEventListener('fullscreenchange', () => {
+  if (!document.fullscreenElement && state.fullscreen) {
+    state.fullscreen = false;
+    document.body.classList.remove('fullscreen');
+    _clearFsExitBtn();
+  }
+});
+
+// Android バックボタン対応
+window.addEventListener('popstate', () => {
+  if (state.fullscreen) toggleFullscreen();
 });
 
 // Toolbar horizontal scroll via mouse wheel
