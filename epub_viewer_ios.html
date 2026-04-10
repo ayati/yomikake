@@ -1601,8 +1601,10 @@ function flashNavButtons() {
 function updatePageInfo() {
   const total = state.spine.length, cur = state.currentSpineIdx+1;
   document.getElementById('page-info').textContent = cur + ' / ' + total;
-  document.getElementById('progress-fill').style.width =
-    (total > 1 ? (cur-1)/(total-1)*100 : 100) + '%';
+  const fill = document.getElementById('progress-fill');
+  fill.style.width = (total > 1 ? (cur-1)/(total-1)*100 : 100) + '%';
+  // 縦書きは右→左方向に読み進めるためバーを右端起点に
+  fill.style.marginLeft = state.writingMode === 'vertical' ? 'auto' : '';
 }
 
 // ══════════════════════════════════════════
