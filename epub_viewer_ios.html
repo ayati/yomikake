@@ -25,6 +25,7 @@
   #toolbar button svg, .icon-btn svg { width:16px; height:16px; opacity:0.8; }
   #toolbar button.active { background:var(--hover-bg); color:var(--accent); }
   #toolbar button.active svg { opacity:1; stroke:var(--accent); }
+  #drive-upload-btn.auto-save-on { box-shadow:0 0 0 1.5px var(--ui-text); }
   #toolbar .tb-sep { width:1px; height:20px; background:var(--ui-border); margin:0 4px; flex-shrink:0; }
 
   #book-title { font-size:13px; font-weight:600; opacity:.9; flex:1; text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding:0 12px; }
@@ -2144,6 +2145,12 @@ function updateAutoSaveToggleUI() {
   btn.textContent = on ? 'ON' : 'OFF';
   btn.style.background = on ? 'var(--accent)' : '';
   btn.style.color = on ? '#fff' : '';
+  const upBtn = document.getElementById('drive-upload-btn');
+  if (upBtn) {
+    upBtn.classList.toggle('auto-save-on', on);
+    const path = upBtn.querySelector('path');
+    if (path) path.setAttribute('stroke-dasharray', on ? '' : '3 2');
+  }
 }
 
 async function driveDownload() {

@@ -51,7 +51,7 @@ When fixing a bug or adding a feature that is not in the "only" lists above, app
 
 ## Architecture
 
-Each viewer is a single self-contained HTML file (`epub_viewer.html` ~2276 lines, `epub_viewer_ios.html` ~2297 lines). Both follow a modular functional style with a single central state object. The architecture below describes `epub_viewer.html`; `epub_viewer_ios.html` is identical except for the scroll mechanism (see iOS Viewer section below).
+Each viewer is a single self-contained HTML file (`epub_viewer.html` ~2283 lines, `epub_viewer_ios.html` ~2304 lines). Both follow a modular functional style with a single central state object. The architecture below describes `epub_viewer.html`; `epub_viewer_ios.html` is identical except for the scroll mechanism (see iOS Viewer section below).
 
 ### State
 
@@ -70,6 +70,7 @@ const state = {
   writingMode,      // 'vertical' | 'horizontal' | 'publisher'
   fwdBtnSize,       // 'small' | 'medium' | 'large' — size of #btn-scroll-fwd
   driveFileId,      // cached Drive file ID for epub_bookmarks.json (session only)
+  publisherAxis,    // 'h' (vertical-rl) | 'v' (horizontal-tb) | null — detected by EPUB_AXIS from iframe in publisher mode
   // UI preferences (persisted in epub_settings):
   fontMode,         // 'publisher' | 'mincho' | 'gothic' | 'meiryo' | 'serif' | 'sans-serif'
   fontSize,         // 60–400 (percent, default 100)
@@ -144,6 +145,7 @@ iOS Safari silently ignores both `document.documentElement.scrollLeft` assignmen
 | `EPUB_EDGE` | iframe → parent | `{direction: 1\|-1}` triggers chapter change |
 | `EPUB_POS` | iframe → parent | `{ratio: 0–1}` triggers bookmark save (debounced 500 ms) |
 | `EPUB_LINK` | iframe → parent | `{href: string}` internal link clicked; parent resolves to spine index |
+| `EPUB_AXIS` | iframe → parent | `{axis: 'h'\|'v'}` sent by publisher-mode iframe from `applyInit()`; parent stores in `state.publisherAxis` for `isVerticalAxis()` |
 | `EPUB_READY` | iframe → parent | `{seq: number}` sent by iframe after `applyInit()` completes; parent clears `_isRendering` and applies any pending scroll |
 
 ### Internationalization (i18n)
