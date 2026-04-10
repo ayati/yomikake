@@ -1082,7 +1082,7 @@ async function resolveCssText(css, cssDir) {
   return css;
 }
 
-async function buildSrcdoc(xhtmlText, xhtmlAbsPath, scrollTarget) {
+async function buildSrcdoc(xhtmlText, xhtmlAbsPath, scrollTarget, readySeq) {
   const dir = xhtmlAbsPath.includes('/')
     ? xhtmlAbsPath.slice(0, xhtmlAbsPath.lastIndexOf('/')+1)
     : '';
@@ -1175,7 +1175,7 @@ async function buildSrcdoc(xhtmlText, xhtmlAbsPath, scrollTarget) {
   doc.head.appendChild(overrideStyle);
 
   const scrollScript = doc.createElement('script');
-  scrollScript.textContent = buildScrollScript(scrollTarget, state.writingMode);
+  scrollScript.textContent = buildScrollScript(scrollTarget, state.writingMode, readySeq);
   doc.body.appendChild(scrollScript);
 
   return '<!DOCTYPE html>\n' + doc.documentElement.outerHTML;
@@ -1184,7 +1184,7 @@ async function buildSrcdoc(xhtmlText, xhtmlAbsPath, scrollTarget) {
 // ══════════════════════════════════════════
 //  Scroll Script（iOS Safari 専用設計 - CSS transform 方式）
 // ══════════════════════════════════════════
-function buildScrollScript(scrollTarget, writingMode) {
+function buildScrollScript(scrollTarget, writingMode, readySeq) {
   // iOS Safari の scroll API を完全に回避し、CSS transform で列をスライドする。
   //
   // 縦書き（vertical）: translateX
@@ -1221,6 +1221,7 @@ function buildScrollScript(scrollTarget, writingMode) {
       if(_initApplied) return;
       _initApplied = true;
       applyInit();
+      window.parent.postMessage({type:'EPUB_READY',seq:${readySeq}},'*');
     }
     function run(){
       // double-rAF: iPhoneでは十分。iPadは500msフォールバックで再測定。
@@ -1524,20 +1525,15 @@ async function renderPage(idx, scrollTarget) {
   const spineFile = state.epub.file(spineItem.absPath);
   if (!spineFile) { _isRendering = false; showToast(t('toast.fileMissing', {path: spineItem.absPath})); return; }
   const xhtmlText = await spineFile.async('text');
-  if (seq !== _renderSeq) { _isRendering = false; return; }
-  const srcdoc = await buildSrcdoc(xhtmlText, spineItem.absPath, scrollTarget);
-  if (seq !== _renderSeq) { _isRendering = false; return; }
+  if (seq !== _renderSeq) { return; }
+  const srcdoc = await buildSrcdoc(xhtmlText, spineItem.absPath, scrollTarget, seq);
+  if (seq !== _renderSeq) { return; }
 
   const iframe = document.getElementById('content-iframe');
   iframe.srcdoc = srcdoc;
-  _isRendering = false;
-
-  // 描画中に連打された場合、load 後にスクロールを1回実行して期待動作に近づける
-  const pendingDir = _pendingScrollAfterRender;
-  _pendingScrollAfterRender = 0;
-  if (pendingDir !== 0) {
-    iframe.addEventListener('load', () => scrollPage(pendingDir), { once: true });
-  }
+  // _isRendering は iframe の applyInit() 完了後に送られる EPUB_READY で false にする。
+  // ここでは false にしない（旧 iframe からの遅延 EPUB_EDGE や applyInit 前の doScroll による
+  // 誤チャプタースキップを防ぐため）。
 
   updatePageInfo();
   updateTocHighlight();
@@ -1567,6 +1563,17 @@ window.addEventListener('message', e => {
   const iframe = document.getElementById('content-iframe');
   if (!iframe || e.source !== iframe.contentWindow) return;
   if (!e.data) return;
+  if (e.data.type === 'EPUB_READY') {
+    // iframe の applyInit() 完了後に届く。レンダリング完了を確認して _isRendering を解除し、
+    // 連打分のペンディングスクロールを安全に適用する。
+    // seq が一致しない場合は古い（supersedeされた）チャプターからのメッセージなので無視。
+    if (e.data.seq !== _renderSeq) return;
+    _isRendering = false;
+    const pendingDir = _pendingScrollAfterRender;
+    _pendingScrollAfterRender = 0;
+    if (pendingDir !== 0) scrollPage(pendingDir);
+    return;
+  }
   if (e.data.type === 'EPUB_EDGE') {
     const dir = e.data.direction;
     if (_isRendering) {

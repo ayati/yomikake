@@ -40,9 +40,18 @@ python3 -m http.server 8080
 
 There are no automated tests. Manual testing requires a `.epub` or `.kepub` file.
 
+### Keeping both files in sync
+
+Most features exist in both files. As a rule:
+- **`epub_viewer.html` only**: drag-and-drop, toolbar mouse-wheel scroll, `SHARED_TAIL` (Chrome `text-combine-upright` fix), `isNeg()` sign detection in horizontal/publisher scroll.
+- **`epub_viewer_ios.html` only**: CSS-transform scroll mechanism, touch swipe inside iframe, `CLICK_HANDLER` / `INIT_FN` template variables, double-rAF + 500ms `INIT_FN` timing, `will-change:transform` on body.
+- **Both files**: all other features — rendering pipeline, postMessage protocol, i18n, settings, bookmarks, Drive sync, fullscreen, progress bar, `_renderSeq`, `_isRendering` / `_pendingScrollAfterRender`, chapter-end blank page, `flashOverlay()`, `flashNavButtons()`, `showResumeBanner()`, `showToast()`, `toggleSidebar()`.
+
+When fixing a bug or adding a feature that is not in the "only" lists above, apply the change to **both files**.
+
 ## Architecture
 
-Each viewer is a single self-contained HTML file (`epub_viewer.html` ~2251 lines, `epub_viewer_ios.html` ~2284 lines). Both follow a modular functional style with a single central state object. The architecture below describes `epub_viewer.html`; `epub_viewer_ios.html` is identical except for the scroll mechanism (see iOS Viewer section below).
+Each viewer is a single self-contained HTML file (`epub_viewer.html` ~2276 lines, `epub_viewer_ios.html` ~2297 lines). Both follow a modular functional style with a single central state object. The architecture below describes `epub_viewer.html`; `epub_viewer_ios.html` is identical except for the scroll mechanism (see iOS Viewer section below).
 
 ### State
 
@@ -79,6 +88,7 @@ const state = {
 2. **Resource Resolution** — `toDataUri(absPath)` converts images/CSS to base64 data URIs; `resolveCssText()` rewrites `url()` references inside stylesheets.
 3. **Rendering** — `renderPage(idx)` calls `buildSrcdoc()` which processes XHTML (inlining all external resources), injects vertical-text CSS, and sets the iframe's `srcdoc`.
 4. **Scroll Control** — an injected `buildScrollScript()` in the iframe handles RTL scroll via `postMessage` back to the parent; Chrome and Firefox differ in how they represent `scrollLeft` for RTL content.
+5. **UI Feedback** — `showToast(msg)` displays a transient notification overlay. `showResumeBanner()` renders the welcome-screen hint when `epub_last_book` exists in localStorage; clicking it calls `resumeBook()`. `flashOverlay()` / `flashNavButtons()` give visual feedback on chapter load and initial open.
 
 ### Key Design Decisions
 
@@ -101,7 +111,7 @@ const state = {
 - **Chapter-end blank page** — `buildSrcdoc()` injects a blank end-page via padding: `padding-left:100vw` for vertical mode (blank space at physical left = reading end), `padding-bottom:100vh` for horizontal mode (blank space at bottom). `buildScrollScript()` accounts for this by using `sw - 2*vw` (vertical) or `sh - 2*vh` (horizontal) as the real content range. `doScroll` fires `EPUB_EDGE` when the scroll position is 2+ px into the blank zone, so the prior scroll shows the last content alongside blank — the intended UX. `epub_viewer_ios.html` uses the same "one step of blank" pattern via CSS-transform: `tx > 0` is the blank zone; `setTx(Math.min(tx + step, step))` caps blank travel at one step; `EPUB_EDGE` fires when `tx >= 2`. **`'publisher'` mode** cannot inject padding at CSS time (axis is unknown until layout). Instead, `applyInit()` detects the writing-mode via `getComputedStyle`, injects `html{padding-left:100vw!important}` or `html{padding-bottom:100vh!important}` via a `<style>` element, resets `_neg = null` (the sign cache may have been set when `sw <= vw` before padding), then uses the same `sw - 2*vw` / `sh - 2*vh` range arithmetic as the dedicated modes. For `epub_viewer_ios.html` publisher mode, the same blank-zone fix is applied: `tx` is allowed to go up to `+step` (dir=1 EPUB_EDGE fires at `tx >= 2`) and `ty` to `ms + step` (EPUB_EDGE at `ty >= ms + 2`).
 - **Chrome `text-combine-upright` initial-paint fix** — Chrome has a rendering bug where `text-combine-upright: all` spans (縦中横, e.g. `<span class="tcy">DLC</span>`) are placed to the left of center on the very first paint in vertical writing mode. Subsequent renders (e.g. switching writing mode) are correct. The fix is in `SHARED_TAIL`'s `init` function: after `applyInit()` sets the scroll position, a synchronous `visibility:hidden` → `offsetWidth` (layout flush) → `visibility:""` cycle forces Chrome to re-resolve tcy positions before the browser paints the frame. Because JS blocks the paint thread, this is invisible to the user. Applies to all three writing modes via `SHARED_TAIL` (`epub_viewer.html` only — Chrome/Android; not needed in `epub_viewer_ios.html`).
 - **`_renderSeq` (render sequence counter)** guards against race conditions when `renderPage` is called rapidly. Each call captures the current sequence number; after each `await`, the function checks if a newer call has started and returns early if so. This ensures only the last-requested chapter is rendered.
-- **`_isRendering` / `_pendingScrollAfterRender` (double-tap chapter-end fix)** — `_isRendering` is set to `true` at the start of `renderPage` and cleared to `false` immediately after `iframe.srcdoc` is committed. While `_isRendering` is true, the old iframe still holds the previous chapter at its scroll-end position. If the user taps the forward button again during this window, the old iframe fires `EPUB_EDGE` again; without the guard this would advance `currentSpineIdx` a second time and skip a chapter. The fix: the `EPUB_EDGE` handler checks `_isRendering` and, instead of calling `renderPage`, stores the direction in `_pendingScrollAfterRender`. After `srcdoc` is set, `renderPage` hooks the iframe's `load` event and calls `scrollPage(pendingDir)` once — so the new chapter opens and immediately advances one page, matching the user's intent.
+- **`_isRendering` / `_pendingScrollAfterRender` (double-tap chapter-end fix)** — `_isRendering` is set to `true` at the start of `renderPage` and stays `true` until the new iframe's `applyInit()` fires. While `_isRendering` is true, `EPUB_EDGE` is queued in `_pendingScrollAfterRender` instead of advancing the chapter. After `iframe.srcdoc` is committed, the iframe sends `EPUB_READY {seq}` (from inside the 80ms setTimeout in `SHARED_TAIL` / `runApplyInit` in `INIT_FN`) once `applyInit()` completes. The parent's `EPUB_READY` handler verifies the seq matches `_renderSeq` (to ignore stale messages from superseded renders), then clears `_isRendering` and calls `scrollPage(pendingDir)` if needed. **Why not `load` event:** the old approach fired `scrollPage` on the iframe `load` event, before `applyInit()` ran. On iOS, `body.offsetWidth` is 0 at `load` time (layout not yet settled), so `maxS()=0` and `doScroll` immediately fired `EPUB_EDGE`, causing a chapter skip for any chapter. **Why not `_isRendering=false` after srcdoc:** the race window between srcdoc assignment and `applyInit()` completion is where stray `EPUB_EDGE` messages from old-iframe postMessage backlog or premature new-iframe `doScroll` could cause a second chapter advance.
 - **`zip.file()` null checks** — `state.epub.file(absPath)` can return null if the ePub ZIP is missing a declared file. `renderPage` shows a toast and aborts; `loadEpub` skips TOC parsing (the book still opens without a table of contents).
 - **Progress bar (`#progress-bar` / `#progress-fill`)** — lives in `#statusbar`. `updatePageInfo()` sets `#progress-fill` width as `(cur-1)/(total-1)*100%`; for vertical mode it sets `marginLeft:auto` so the bar fills from the right (matching RTL reading direction). An IIFE after `updatePageInfo()` wires click-to-jump and mousemove-tooltip: `ratioFromEvent()` converts `clientX` to a spine ratio (inverted for vertical), `idxFromRatio()` maps ratio to spine index. Tooltip text uses i18n key `progress.tooltip`; `#progress-tooltip` is `position:fixed` so it is not clipped by `overflow:hidden` on `#progress-bar`.
 
@@ -134,6 +144,7 @@ iOS Safari silently ignores both `document.documentElement.scrollLeft` assignmen
 | `EPUB_EDGE` | iframe → parent | `{direction: 1\|-1}` triggers chapter change |
 | `EPUB_POS` | iframe → parent | `{ratio: 0–1}` triggers bookmark save (debounced 500 ms) |
 | `EPUB_LINK` | iframe → parent | `{href: string}` internal link clicked; parent resolves to spine index |
+| `EPUB_READY` | iframe → parent | `{seq: number}` sent by iframe after `applyInit()` completes; parent clears `_isRendering` and applies any pending scroll |
 
 ### Internationalization (i18n)
 

@@ -1108,7 +1108,7 @@ async function resolveCssText(css, cssDir) {
 }
 
 // Parse xhtml/html text, resolve all resources, return HTML string ready for srcdoc
-async function buildSrcdoc(xhtmlText, xhtmlAbsPath, scrollTarget) {
+async function buildSrcdoc(xhtmlText, xhtmlAbsPath, scrollTarget, readySeq) {
   const dir = xhtmlAbsPath.includes('/')
     ? xhtmlAbsPath.slice(0, xhtmlAbsPath.lastIndexOf('/')+1)
     : '';
@@ -1200,13 +1200,13 @@ async function buildSrcdoc(xhtmlText, xhtmlAbsPath, scrollTarget) {
   // ── Inject scroll controller script
   //    (baked-in scrollTarget avoids any async race)
   const scrollScript = doc.createElement('script');
-  scrollScript.textContent = buildScrollScript(scrollTarget, state.writingMode);
+  scrollScript.textContent = buildScrollScript(scrollTarget, state.writingMode, readySeq);
   doc.body.appendChild(scrollScript);
 
   return '<!DOCTYPE html>\n' + doc.documentElement.outerHTML;
 }
 
-function buildScrollScript(scrollTarget, writingMode) {
+function buildScrollScript(scrollTarget, writingMode, readySeq) {
   // Returns a self-contained IIFE string baked into the iframe.
   // writingMode: 'vertical' | 'horizontal' | 'publisher'
   const t = JSON.stringify(scrollTarget);
@@ -1246,6 +1246,7 @@ function buildScrollScript(scrollTarget, writingMode) {
     '      _d.style.visibility = "hidden";',
     '      _d.offsetWidth;',
     '      _d.style.visibility = "";',
+    '      window.parent.postMessage({type:"EPUB_READY",seq:' + readySeq + '},"*");',
     '    }, 80);',
     '  }',
     '  if(document.readyState === "loading")',
@@ -1489,21 +1490,16 @@ async function renderPage(idx, scrollTarget) {
   const spineFile = state.epub.file(spineItem.absPath);
   if (!spineFile) { _isRendering = false; showToast(t('toast.fileMissing', {path: spineItem.absPath})); return; }
   const xhtmlText = await spineFile.async('text');
-  if (seq !== _renderSeq) { _isRendering = false; return; }
-  const srcdoc = await buildSrcdoc(xhtmlText, spineItem.absPath, scrollTarget);
-  if (seq !== _renderSeq) { _isRendering = false; return; }
+  if (seq !== _renderSeq) { return; }
+  const srcdoc = await buildSrcdoc(xhtmlText, spineItem.absPath, scrollTarget, seq);
+  if (seq !== _renderSeq) { return; }
 
   const iframe = document.getElementById('content-iframe');
   // Setting srcdoc directly – no blob URL, no origin issue
   iframe.srcdoc = srcdoc;
-  _isRendering = false;
-
-  // 描画中に連打された場合、load 後にスクロールを1回実行して期待動作に近づける
-  const pendingDir = _pendingScrollAfterRender;
-  _pendingScrollAfterRender = 0;
-  if (pendingDir !== 0) {
-    iframe.addEventListener('load', () => scrollPage(pendingDir), { once: true });
-  }
+  // _isRendering は iframe の applyInit() 完了後に送られる EPUB_READY で false にする。
+  // ここでは false にしない（旧 iframe からの遅延 EPUB_EDGE や applyInit 前の doScroll による
+  // 誤チャプタースキップを防ぐため）。
 
   updatePageInfo();
   updateTocHighlight();
@@ -1532,6 +1528,17 @@ window.addEventListener('message', e => {
   const iframe = document.getElementById('content-iframe');
   if (!iframe || e.source !== iframe.contentWindow) return;
   if (!e.data) return;
+  if (e.data.type === 'EPUB_READY') {
+    // iframe の applyInit() 完了後に届く。レンダリング完了を確認して _isRendering を解除し、
+    // 連打分のペンディングスクロールを安全に適用する。
+    // seq が一致しない場合は古い（supersedeされた）チャプターからのメッセージなので無視。
+    if (e.data.seq !== _renderSeq) return;
+    _isRendering = false;
+    const pendingDir = _pendingScrollAfterRender;
+    _pendingScrollAfterRender = 0;
+    if (pendingDir !== 0) scrollPage(pendingDir);
+    return;
+  }
   if (e.data.type === 'EPUB_EDGE') {
     const dir = e.data.direction;
     if (_isRendering) {
