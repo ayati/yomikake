@@ -1450,25 +1450,36 @@ function buildScrollScript(scrollTarget, writingMode) {
 //  Render Page
 // ══════════════════════════════════════════
 let _renderSeq = 0;
+let _isRendering = false;          // true: srcdoc 未コミット（旧 iframe が残存中）
+let _pendingScrollAfterRender = 0; // 描画中に受け取ったスクロール方向をキュー
 
 async function renderPage(idx, scrollTarget) {
   if (!state.epub || idx < 0 || idx >= state.spine.length) return;
   if (scrollTarget === undefined) scrollTarget = 'start';
   const seq = ++_renderSeq;
+  _isRendering = true;
   state.currentSpineIdx = idx;
   flashOverlay();
 
   const spineItem = state.spine[idx];
   const spineFile = state.epub.file(spineItem.absPath);
-  if (!spineFile) { showToast(t('toast.fileMissing', {path: spineItem.absPath})); return; }
+  if (!spineFile) { _isRendering = false; showToast(t('toast.fileMissing', {path: spineItem.absPath})); return; }
   const xhtmlText = await spineFile.async('text');
-  if (seq !== _renderSeq) return;
+  if (seq !== _renderSeq) { _isRendering = false; return; }
   const srcdoc = await buildSrcdoc(xhtmlText, spineItem.absPath, scrollTarget);
-  if (seq !== _renderSeq) return;
+  if (seq !== _renderSeq) { _isRendering = false; return; }
 
   const iframe = document.getElementById('content-iframe');
   // Setting srcdoc directly – no blob URL, no origin issue
   iframe.srcdoc = srcdoc;
+  _isRendering = false;
+
+  // 描画中に連打された場合、load 後にスクロールを1回実行して期待動作に近づける
+  const pendingDir = _pendingScrollAfterRender;
+  _pendingScrollAfterRender = 0;
+  if (pendingDir !== 0) {
+    iframe.addEventListener('load', () => scrollPage(pendingDir), { once: true });
+  }
 
   updatePageInfo();
   updateTocHighlight();
@@ -1499,6 +1510,11 @@ window.addEventListener('message', e => {
   if (!e.data) return;
   if (e.data.type === 'EPUB_EDGE') {
     const dir = e.data.direction;
+    if (_isRendering) {
+      // 旧 iframe からの EPUB_EDGE：章送りせずスクロールをキューして次チャプター冒頭で1ページ進める
+      _pendingScrollAfterRender = dir;
+      return;
+    }
     if (dir === 1  && state.currentSpineIdx < state.spine.length-1) renderPage(state.currentSpineIdx+1, 'start');
     if (dir === -1 && state.currentSpineIdx > 0)                    renderPage(state.currentSpineIdx-1, 'end');
   }
