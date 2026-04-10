@@ -127,8 +127,12 @@
 
   #statusbar { height:36px; background:var(--ui-bg); border-top:1px solid var(--ui-border); display:flex; align-items:center; padding:0 16px; gap:16px; font-size:13px; color:var(--ui-text); flex-shrink:0; position:relative; z-index:30; }
   #page-info { flex:1; text-align:center; font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace; font-variant-numeric: tabular-nums; letter-spacing: 0.5px; opacity: 0.8; }
-  #progress-bar { width:160px; height:6px; background:var(--ui-border); border-radius:3px; overflow:hidden; }
+  #progress-bar { width:160px; height:6px; background:var(--ui-border); border-radius:3px; overflow:hidden; cursor:pointer; position:relative; }
+  #progress-bar::before { content:''; position:absolute; inset:-8px 0; } /* クリック領域を上下に拡張 */
+  #progress-bar:hover #progress-fill { filter:brightness(1.2); }
   #progress-fill { height:100%; background:var(--accent); border-radius:3px; transition:width .3s ease-out; width:0%; }
+  #progress-tooltip { position:fixed; background:var(--ui-bg); border:1px solid var(--ui-border); border-radius:6px; padding:3px 9px; font-size:11px; color:var(--ui-text); white-space:nowrap; pointer-events:none; opacity:0; transition:opacity .12s; transform:translate(-50%,-100%); z-index:50; box-shadow:0 2px 8px rgba(0,0,0,.15); margin-top:-8px; }
+  #progress-tooltip.show { opacity:1; }
   #key-hint { opacity:.5; font-size:12px; }
 
   #modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.6); backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px); z-index:200; display:none; align-items:center; justify-content:center; opacity:0; transition:opacity .2s; }
@@ -408,6 +412,7 @@
   <span id="key-hint" data-i18n="statusbar.keyHint">スペース/↓：次へスクロール　←→：章切替</span>
   <span id="page-info">—</span>
   <div id="progress-bar"><div id="progress-fill"></div></div>
+  <div id="progress-tooltip"></div>
 </div>
 
 <div id="fs-exit-zone" onclick="showFsExitBtn()"></div>
@@ -541,6 +546,7 @@ const I18N = {
     'btn.fullscreen.exit':       '読書モード終了',
     'settings.driveGroup':       'Google Drive',
     'settings.driveAutoSave':    'しおり自動保存',
+    'progress.tooltip':     '{n} 章 / 全 {total} 章',
     'err.noContainerXml':   'META-INF/container.xml が見つかりません。有効な ePub ファイルではない可能性があります。',
     'err.noRootfile':       'container.xml に rootfile 要素がありません。ePub の構造が不正です。',
     'err.noFullPath':       'rootfile の full-path 属性がありません。',
@@ -632,6 +638,7 @@ const I18N = {
     'btn.fullscreen.exit':       'Exit reader',
     'settings.driveGroup':       'Google Drive',
     'settings.driveAutoSave':    'Auto-save bookmarks',
+    'progress.tooltip':     'Chapter {n} of {total}',
     'err.noContainerXml':   'META-INF/container.xml not found. This may not be a valid ePub file.',
     'err.noRootfile':       'No rootfile element in container.xml. The ePub structure is invalid.',
     'err.noFullPath':       'Missing full-path attribute in rootfile.',
@@ -723,6 +730,7 @@ const I18N = {
     'btn.fullscreen.exit':       '結束閱讀模式',
     'settings.driveGroup':       'Google Drive',
     'settings.driveAutoSave':    '自動儲存書籤',
+    'progress.tooltip':     '第 {n} 章 / 共 {total} 章',
     'err.noContainerXml':   '找不到 META-INF/container.xml，可能不是有效的 ePub 檔案。',
     'err.noRootfile':       'container.xml 中找不到 rootfile 元素，ePub 結構無效。',
     'err.noFullPath':       'rootfile 缺少 full-path 屬性。',
@@ -814,6 +822,7 @@ const I18N = {
     'btn.fullscreen.exit':       '退出阅读模式',
     'settings.driveGroup':       'Google Drive',
     'settings.driveAutoSave':    '自动保存书签',
+    'progress.tooltip':     '第 {n} 章 / 共 {total} 章',
     'err.noContainerXml':   '找不到 META-INF/container.xml，可能不是有效的 ePub 文件。',
     'err.noRootfile':       'container.xml 中找不到 rootfile 元素，ePub 结构无效。',
     'err.noFullPath':       'rootfile 缺少 full-path 属性。',
@@ -1559,6 +1568,41 @@ function updatePageInfo() {
   // 縦書きは右→左方向に読み進めるためバーを右端起点に
   fill.style.marginLeft = state.writingMode === 'vertical' ? 'auto' : '';
 }
+
+// ══════════════════════════════════════════
+//  Progress Bar — クリックジャンプ & ツールチップ
+// ══════════════════════════════════════════
+(function () {
+  const bar     = document.getElementById('progress-bar');
+  const tooltip = document.getElementById('progress-tooltip');
+
+  function ratioFromEvent(e) {
+    const rect = bar.getBoundingClientRect();
+    const raw = (e.clientX - rect.left) / rect.width;
+    return state.writingMode === 'vertical' ? 1 - raw : raw;
+  }
+  function idxFromRatio(ratio) {
+    const total = state.spine.length;
+    return Math.round(Math.max(0, Math.min(ratio, 1)) * (total - 1));
+  }
+
+  bar.addEventListener('click', e => {
+    if (!state.epub || state.spine.length < 2) return;
+    renderPage(idxFromRatio(ratioFromEvent(e)), 'start');
+  });
+
+  bar.addEventListener('mousemove', e => {
+    if (!state.epub || state.spine.length < 2) { tooltip.classList.remove('show'); return; }
+    const idx   = idxFromRatio(ratioFromEvent(e));
+    const rect  = bar.getBoundingClientRect();
+    tooltip.textContent  = t('progress.tooltip', { n: idx + 1, total: state.spine.length });
+    tooltip.style.left   = e.clientX + 'px';
+    tooltip.style.top    = rect.top + 'px';
+    tooltip.classList.add('show');
+  });
+
+  bar.addEventListener('mouseleave', () => tooltip.classList.remove('show'));
+})();
 
 // ══════════════════════════════════════════
 //  Keyboard
