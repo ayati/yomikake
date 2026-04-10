@@ -1384,8 +1384,8 @@ ${INIT_FN}
       if(ms <= 0){ postEdge(dir); return; }
       step = vw() * STEP;
       if(dir === 1){
-        if(tx >= -2){ postEdge(1); return; }
-        setTx(Math.min(tx + step, 0));
+        if(tx >= 2){ postEdge(1); return; }
+        setTx(Math.min(tx + step, step));
       } else {
         if(tx <= -(ms - 2)){ postEdge(-1); return; }
         setTx(Math.max(tx - step, -ms));
@@ -1395,8 +1395,8 @@ ${INIT_FN}
       if(ms <= 0){ postEdge(dir); return; }
       step = vh() * STEP;
       if(dir === 1){
-        if(ty >= ms - 2){ postEdge(1); return; }
-        setTy(Math.min(ty + step, ms));
+        if(ty >= ms + 2){ postEdge(1); return; }
+        setTy(Math.min(ty + step, ms + step));
       } else {
         if(ty <= 2){ postEdge(-1); return; }
         setTy(Math.max(ty - step, 0));

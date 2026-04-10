@@ -1176,7 +1176,7 @@ async function buildSrcdoc(xhtmlText, xhtmlAbsPath, scrollTarget) {
   // Build writing-mode overrides and blank-end-page padding per mode.
   // 'vertical'  : force vertical-rl + padding-left:100vw (blank page at reading end)
   // 'horizontal': force horizontal-tb + padding-bottom:100vh (blank page at bottom)
-  // 'publisher' : no override — let the ePub's own CSS control writing direction
+  // 'publisher' : no CSS override — blank-end-page padding injected via JS in applyInit() after axis detection
   const wmHtml = wm === 'vertical'
     ? 'writing-mode:vertical-rl!important;-webkit-writing-mode:vertical-rl!important;padding-left:100vw!important;'
     : wm === 'horizontal'
@@ -1292,7 +1292,10 @@ function buildScrollScript(scrollTarget, writingMode) {
     ].join('\n');
   }
 
-  // ── ePub指定 (publisher): writing-mode を実行時に自動検出、余白なし ──
+  // ── ePub指定 (publisher): 実行時に writing-mode を検出し、dedicated モードと同じ余白＋スクロールロジックを適用 ──
+  // applyInit() 内で axis 検出後にブランクエンドページ用パディングを <style> 注入する。
+  // vertical-rl → padding-left:100vw（vertical モードと同じ）
+  // horizontal-tb → padding-bottom:100vh（horizontal モードと同じ）
   if (writingMode === 'publisher') {
     return [
       '(function(){',
@@ -1317,17 +1320,25 @@ function buildScrollScript(scrollTarget, writingMode) {
       '  }',
       '  function applyInit(){',
       '    var e = root();',
-      '    if(axis() === "h"){',
+      '    var ax = axis();',
+      '    // Inject blank-end-page padding (same pattern as dedicated vertical / horizontal modes).',
+      '    var pad = document.createElement("style");',
+      '    pad.textContent = ax === "h" ? "html{padding-left:100vw!important}" : "html{padding-bottom:100vh!important}";',
+      '    document.head.appendChild(pad);',
+      '    var _flush = e.scrollWidth; // force reflow so padding takes effect',
+      '    _neg = null; // reset sign cache — scrollWidth changed after padding injection',
+      '    if(ax === "h"){',
       '      var sw = e.scrollWidth, vw = e.clientWidth;',
+      '      var range = sw - 2*vw;',
       '      if(initTarget === "end"){',
-      '        if(isNeg()){ e.scrollLeft = -(sw-vw); } else { e.scrollLeft = sw-vw; }',
+      '        if(range > 0){ e.scrollLeft = isNeg() ? -range : (sw-vw-range); }',
       '      } else if(typeof initTarget === "number"){',
-      '        if(sw > vw){ var pos = initTarget*(sw-vw); e.scrollLeft = isNeg()?-pos:pos; }',
-      '      } else { e.scrollLeft = 0; }',
+      '        if(range > 0){ var pos = initTarget*range; e.scrollLeft = isNeg() ? -pos : (sw-vw-pos); }',
+      '      } else { e.scrollLeft = isNeg() ? 0 : (sw-vw); }',
       '    } else {',
       '      var sh = e.scrollHeight, vh = e.clientHeight;',
-      '      if(initTarget === "end"){ e.scrollTop = Math.max(0, sh-vh); }',
-      '      else if(typeof initTarget === "number"){ if(sh>vh) e.scrollTop = initTarget*(sh-vh); }',
+      '      if(initTarget === "end"){ e.scrollTop = Math.max(0, sh-2*vh); }',
+      '      else if(typeof initTarget === "number"){ if(sh>2*vh) e.scrollTop = initTarget*(sh-2*vh); }',
       '      else { e.scrollTop = 0; }',
       '    }',
       '  }',
@@ -1335,35 +1346,36 @@ function buildScrollScript(scrollTarget, writingMode) {
       '    var e = root(), step, cur;',
       '    if(axis() === "h"){',
       '      var vw = e.clientWidth, sw = e.scrollWidth;',
-      '      if(sw <= vw){ window.parent.postMessage({type:"EPUB_EDGE",direction:dir},"*"); return; }',
+      '      var max = sw - vw;         // 絶対スクロール限界（余白の最深部）',
+      '      var contentMax = sw - 2*vw; // 本文終端。これを超えると余白ゾーン',
+      '      if(sw <= 2*vw){ window.parent.postMessage({type:"EPUB_EDGE",direction:dir},"*"); return; }',
       '      step = vw*STEP; cur = e.scrollLeft;',
       '      if(isNeg()){',
-      '        var minS = -(sw-vw);',
-      '        if(dir===1){ if(cur<=minS+2){ window.parent.postMessage({type:"EPUB_EDGE",direction:1},"*"); return; } e.scrollLeft=Math.max(cur-step,minS); }',
-      '        else       { if(cur>=-2){    window.parent.postMessage({type:"EPUB_EDGE",direction:-1},"*"); return; } e.scrollLeft=Math.min(cur+step,0); }',
+      '        if(dir===1){ if(cur<=-(contentMax)-2){ window.parent.postMessage({type:"EPUB_EDGE",direction:1},"*"); return; } e.scrollLeft=Math.max(cur-step,-max); }',
+      '        else       { if(cur>=-2){              window.parent.postMessage({type:"EPUB_EDGE",direction:-1},"*"); return; } e.scrollLeft=Math.min(cur+step,0); }',
       '      } else {',
-      '        var maxS = sw-vw;',
-      '        if(dir===1){ if(cur>=maxS-2){ window.parent.postMessage({type:"EPUB_EDGE",direction:1},"*"); return; } e.scrollLeft=Math.min(cur+step,maxS); }',
-      '        else       { if(cur<=2){     window.parent.postMessage({type:"EPUB_EDGE",direction:-1},"*"); return; } e.scrollLeft=Math.max(cur-step,0); }',
+      '        if(dir===1){ if(cur>=contentMax+2){ window.parent.postMessage({type:"EPUB_EDGE",direction:1},"*"); return; } e.scrollLeft=Math.min(cur+step,max); }',
+      '        else       { if(cur<=2){             window.parent.postMessage({type:"EPUB_EDGE",direction:-1},"*"); return; } e.scrollLeft=Math.max(cur-step,0); }',
       '      }',
       '    } else {',
-      '      var vh = e.clientHeight, sh = e.scrollHeight, maxSv = sh-vh;',
-      '      if(sh <= vh){ window.parent.postMessage({type:"EPUB_EDGE",direction:dir},"*"); return; }',
+      '      var vh = e.clientHeight, sh = e.scrollHeight;',
+      '      var maxSReal = sh - 2*vh, maxS = sh - vh;',
+      '      if(sh <= 2*vh){ window.parent.postMessage({type:"EPUB_EDGE",direction:dir},"*"); return; }',
       '      step = vh*STEP; cur = e.scrollTop;',
-      '      if(dir===1){ if(cur>=maxSv-2){ window.parent.postMessage({type:"EPUB_EDGE",direction:1},"*"); return; } e.scrollTop=Math.min(cur+step,maxSv); }',
-      '      else       { if(cur<=2){      window.parent.postMessage({type:"EPUB_EDGE",direction:-1},"*"); return; } e.scrollTop=Math.max(cur-step,0); }',
+      '      if(dir===1){ if(cur>=maxSReal+2){ window.parent.postMessage({type:"EPUB_EDGE",direction:1},"*"); return; } e.scrollTop=Math.min(cur+step,maxS); }',
+      '      else       { if(cur<=2){          window.parent.postMessage({type:"EPUB_EDGE",direction:-1},"*"); return; } e.scrollTop=Math.max(cur-step,0); }',
       '    }',
       '  }',
       '  function reportPos(){',
       '    var e = root(), ratio;',
       '    if(axis() === "h"){',
       '      var sw = e.scrollWidth, vw = e.clientWidth;',
-      '      if(sw <= vw){ window.parent.postMessage({type:"EPUB_POS",ratio:0},"*"); return; }',
-      '      ratio = isNeg() ? (-e.scrollLeft/(sw-vw)) : (e.scrollLeft/(sw-vw));',
+      '      if(sw <= 2*vw){ window.parent.postMessage({type:"EPUB_POS",ratio:0},"*"); return; }',
+      '      ratio = isNeg() ? (-e.scrollLeft/(sw-2*vw)) : (e.scrollLeft/(sw-2*vw));',
       '    } else {',
       '      var sh = e.scrollHeight, vh = e.clientHeight;',
-      '      if(sh <= vh){ window.parent.postMessage({type:"EPUB_POS",ratio:0},"*"); return; }',
-      '      ratio = e.scrollTop / (sh-vh);',
+      '      if(sh <= 2*vh){ window.parent.postMessage({type:"EPUB_POS",ratio:0},"*"); return; }',
+      '      ratio = e.scrollTop / (sh-2*vh);',
       '    }',
       '    window.parent.postMessage({type:"EPUB_POS",ratio:Math.max(0,Math.min(1,ratio))},"*");',
       '  }',
