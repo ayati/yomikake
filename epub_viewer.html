@@ -895,6 +895,7 @@ const state = {
   driveFileId:null,      // epub_bookmarks.json の Drive ファイルID（ページ滞在中キャッシュ）
   driveAutoSave:false,   // Drive自動保存が有効かどうか
   fullscreen:false,      // フルスクリーン中（localStorageに保存しない）
+  publisherAxis:null,    // publisher モード時の検出軸 ('h'=vertical-rl | 'v'=horizontal-tb | null=未検出)
 };
 
 // テーマ別 ePub 本文エリアの色（iframe 内に直接注入）
@@ -1327,6 +1328,7 @@ function buildScrollScript(scrollTarget, writingMode) {
       '    document.head.appendChild(pad);',
       '    var _flush = e.scrollWidth; // force reflow so padding takes effect',
       '    _neg = null; // reset sign cache — scrollWidth changed after padding injection',
+      '    window.parent.postMessage({type:"EPUB_AXIS",axis:ax},"*");',
       '    if(ax === "h"){',
       '      var sw = e.scrollWidth, vw = e.clientWidth;',
       '      var range = sw - 2*vw;',
@@ -1479,6 +1481,7 @@ async function renderPage(idx, scrollTarget) {
   if (scrollTarget === undefined) scrollTarget = 'start';
   const seq = ++_renderSeq;
   _isRendering = true;
+  state.publisherAxis = null; // 新章の axis 検出まで不定とする
   state.currentSpineIdx = idx;
   flashOverlay();
 
@@ -1545,6 +1548,10 @@ window.addEventListener('message', e => {
   if (e.data.type === 'EPUB_LINK') {
     handleIframeLink(e.data.href);
   }
+  if (e.data.type === 'EPUB_AXIS') {
+    state.publisherAxis = e.data.axis;
+    updatePageInfo();
+  }
 });
 
 function handleIframeLink(href) {
@@ -1572,13 +1579,19 @@ function flashNavButtons() {
     btns.forEach(b => b.classList.remove('nav-hint'));
   }, 3500);
 }
+// 縦書き（vertical-rl）軸かどうかを返す。
+// publisher モードは iframe から EPUB_AXIS メッセージで検出した軸を参照する。
+function isVerticalAxis() {
+  return state.writingMode === 'vertical' ||
+    (state.writingMode === 'publisher' && state.publisherAxis === 'h');
+}
 function updatePageInfo() {
   const total = state.spine.length, cur = state.currentSpineIdx+1;
   document.getElementById('page-info').textContent = cur + ' / ' + total;
   const fill = document.getElementById('progress-fill');
   fill.style.width = (total > 1 ? (cur-1)/(total-1)*100 : 100) + '%';
   // 縦書きは右→左方向に読み進めるためバーを右端起点に
-  fill.style.marginLeft = state.writingMode === 'vertical' ? 'auto' : '';
+  fill.style.marginLeft = isVerticalAxis() ? 'auto' : '';
 }
 
 // ══════════════════════════════════════════
@@ -1591,7 +1604,7 @@ function updatePageInfo() {
   function ratioFromEvent(e) {
     const rect = bar.getBoundingClientRect();
     const raw = (e.clientX - rect.left) / rect.width;
-    return state.writingMode === 'vertical' ? 1 - raw : raw;
+    return isVerticalAxis() ? 1 - raw : raw;
   }
   function idxFromRatio(ratio) {
     const total = state.spine.length;
