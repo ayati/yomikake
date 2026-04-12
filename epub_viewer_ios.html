@@ -1521,6 +1521,10 @@ async function renderPage(idx, scrollTarget) {
   state.publisherAxis = null; // 新章の axis 検出まで不定とする
   state.currentSpineIdx = idx;
   flashOverlay();
+  // 章遷移時に開始位置を即時保存。applyInit() では scrollLeft が変化しない場合に
+  // scroll イベントが起きず EPUB_POS が送信されないため、アプリを閉じると
+  // 前章末尾位置が残ったまま復元される問題を防ぐ。
+  savePos(scrollTarget === 'end' ? 1.0 : typeof scrollTarget === 'number' ? scrollTarget : 0);
 
   const spineItem = state.spine[idx];
   const spineFile = state.epub.file(spineItem.absPath);
@@ -1586,7 +1590,9 @@ window.addEventListener('message', e => {
     if (dir === -1 && state.currentSpineIdx > 0)                    renderPage(state.currentSpineIdx-1, 'end');
   }
   if (e.data.type === 'EPUB_POS') {
-    savePos(e.data.ratio);
+    // _isRendering 中は旧 iframe からの遅延 EPUB_POS を無視し、
+    // 新章インデックスに古い ratio が上書きされるのを防ぐ
+    if (!_isRendering) savePos(e.data.ratio);
   }
   if (e.data.type === 'EPUB_LINK') {
     handleIframeLink(e.data.href);
