@@ -178,10 +178,11 @@
   }
   #fs-exit-btn.show { transform:translateX(-50%) translateY(0); opacity:.95; pointer-events:auto; }
 
-  /* ── タッチデバイス：ボタンをわずかに表示 ── */
+  /* ── タッチデバイス：前進ボタンのみわずかに表示 ── */
+  /* chapter-btn は opacity:0 / stroke:transparent のまま（基本値）とする。
+     scroll-fwd と同様に stroke を設定しないことで形が見えなくなり、
+     上下ボタンと見た目の一貫性を保つ。 */
   @media (hover: none) and (pointer: coarse) {
-    .chapter-btn { opacity:.3; }
-    .chapter-btn svg { stroke:var(--ui-text); }
     #btn-scroll-fwd { opacity:.22; }
   }
 
