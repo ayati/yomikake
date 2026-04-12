@@ -189,10 +189,11 @@
   @media (max-width: 640px) {
     #statusbar { display:none; }
     #reading-area { padding:var(--page-padding,8px); }
-    .chapter-btn { width:36px; height:60px; opacity:.8; border-radius:12px; }
-    #page-container:hover .chapter-btn { opacity:.8; }
-    .scroll-btn { width:120px; height:40px; opacity:.9; }
-    #page-container:hover .scroll-btn { opacity:.9; }
+    /* opacity はここで設定しない：タッチデバイスでは sticky hover により
+       #page-container:hover が粘着し、nav-hint 解除後も ＜＞ が残り続ける
+       Android Chrome バグを防ぐため。opacity は hover:hover 条件下でのみ指定する。 */
+    .chapter-btn { width:36px; height:60px; border-radius:12px; }
+    .scroll-btn { width:120px; height:40px; }
     #btn-scroll-fwd { bottom:max(16px, env(safe-area-inset-bottom, 16px)); }
     #btn-scroll-back { top:16px; }
     #sidebar { width:240px; position:absolute; left:0; top:56px; bottom:0; z-index:95; border-right:1px solid var(--glass-border); background:var(--backdrop); backdrop-filter:blur(16px); }
@@ -202,6 +203,14 @@
     #toolbar > * { flex-shrink:0; }
     #book-title { display:none; }
     #settings-popover { right:8px; width:calc(100vw - 16px); }
+  }
+  /* ── スマホ向け（ホバー可能デバイスのみ：PC幅縮小時など）── */
+  /* タッチデバイスは sticky hover で永続発動するためここには含めない */
+  @media (max-width: 640px) and (hover: hover) {
+    .chapter-btn { opacity:.8; }
+    #page-container:hover .chapter-btn { opacity:.8; }
+    .scroll-btn { opacity:.9; }
+    #page-container:hover .scroll-btn { opacity:.9; }
   }
 </style>
 </head>
