@@ -51,7 +51,27 @@ When fixing a bug or adding a feature that is not in the "only" lists above, app
 
 ## Architecture
 
-Each viewer is a single self-contained HTML file (`epub_viewer.html` ~2290 lines, `epub_viewer_ios.html` ~2311 lines). Both follow a modular functional style with a single central state object. The architecture below describes `epub_viewer.html`; `epub_viewer_ios.html` is identical except for the scroll mechanism (see iOS Viewer section below).
+Each viewer is a single self-contained HTML file (epub_viewer.html ~2320 lines, epub_viewer_ios.html ~2340 lines). Both follow a modular functional style with a single central state object. The architecture below describes `epub_viewer.html`; `epub_viewer_ios.html` is identical except for the scroll mechanism (see iOS Viewer section below).
+
+**Key locations in both files** (approximate — shift as code grows):
+
+| Symbol | `epub_viewer.html` | `epub_viewer_ios.html` |
+|--------|-------------------|----------------------|
+| `GOOGLE_CLIENT_ID` | ~462 | ~449 |
+| `I18N` translations | ~479 | ~466 |
+| `state` object | ~906 | ~893 |
+| `FONTS` constant | ~930 | ~917 |
+| `loadEpub()` | ~960 | ~934 |
+| `navigateToToc()` | ~1064 | ~1030 |
+| `buildSrcdoc()` | ~1134 | ~1098 |
+| `buildScrollScript()` | ~1232 | ~1200 |
+| `SHARED_TAIL` (epub_viewer.html only) | ~1239 | — |
+| `CLICK_HANDLER` / `INIT_FN` (ios only) | — | ~1216 / ~1230 |
+| `_intraChapterRatio` | ~1526 | ~1551 |
+| `renderPage()` | ~1528 | ~1553 |
+| `handleIframeLink()` | ~1623 | ~1648 |
+| `savePos()` | ~1902 | ~1925 |
+| `driveAuth()` | ~1974 | ~1997 |
 
 ### State
 
@@ -72,7 +92,7 @@ const state = {
   driveFileId,      // cached Drive file ID for epub_bookmarks.json (session only)
   publisherAxis,    // 'h' (vertical-rl) | 'v' (horizontal-tb) | null — detected by EPUB_AXIS from iframe in publisher mode
   // UI preferences (persisted in epub_settings):
-  fontMode,         // 'publisher' | 'mincho' | 'gothic' | 'meiryo' | 'serif' | 'sans-serif'
+  fontMode,         // 'publisher' | 'mincho' | 'gothic' | 'meiryo' | 'serif' | 'sans' — all 6 exposed in settings UI
   fontSize,         // 60–400 (percent, default 100)
   lineHeight,       // 1.6 | 2.0 | 2.4 | 2.8 (default 2.0)
   theme,            // '' | 'sepia' | 'white' | 'dark' (default '' = warm white)
@@ -117,7 +137,9 @@ const state = {
 - **`_renderSeq` (render sequence counter)** guards against race conditions when `renderPage` is called rapidly. Each call captures the current sequence number; after each `await`, the function checks if a newer call has started and returns early if so. This ensures only the last-requested chapter is rendered.
 - **`_isRendering` / `_pendingScrollAfterRender` (double-tap chapter-end fix)** — `_isRendering` is set to `true` at the start of `renderPage` and stays `true` until the new iframe's `applyInit()` fires. While `_isRendering` is true, `EPUB_EDGE` is queued in `_pendingScrollAfterRender` instead of advancing the chapter. After `iframe.srcdoc` is committed, the iframe sends `EPUB_READY {seq}` (from inside the 80ms setTimeout in `SHARED_TAIL` / `runApplyInit` in `INIT_FN`) once `applyInit()` completes. The parent's `EPUB_READY` handler verifies the seq matches `_renderSeq` (to ignore stale messages from superseded renders), then clears `_isRendering` and calls `scrollPage(pendingDir)` if needed. **Why not `load` event:** the old approach fired `scrollPage` on the iframe `load` event, before `applyInit()` ran. On iOS, `body.offsetWidth` is 0 at `load` time (layout not yet settled), so `maxS()=0` and `doScroll` immediately fired `EPUB_EDGE`, causing a chapter skip for any chapter. **Why not `_isRendering=false` after srcdoc:** the race window between srcdoc assignment and `applyInit()` completion is where stray `EPUB_EDGE` messages from old-iframe postMessage backlog or premature new-iframe `doScroll` could cause a second chapter advance.
 - **`zip.file()` null checks** — `state.epub.file(absPath)` can return null if the ePub ZIP is missing a declared file. `renderPage` shows a toast and aborts; `loadEpub` skips TOC parsing (the book still opens without a table of contents).
-- **Progress bar (`#progress-bar` / `#progress-fill`)** — lives in `#statusbar`. `updatePageInfo()` sets `#progress-fill` width as `(cur-1)/(total-1)*100%`; for vertical mode it sets `marginLeft:auto` so the bar fills from the right (matching RTL reading direction). An IIFE after `updatePageInfo()` wires click-to-jump and mousemove-tooltip: `ratioFromEvent()` converts `clientX` to a spine ratio (inverted for vertical), `idxFromRatio()` maps ratio to spine index. Tooltip text uses i18n key `progress.tooltip`; `#progress-tooltip` is `position:fixed` so it is not clipped by `overflow:hidden` on `#progress-bar`.
+- **Progress bar (`#progress-bar` / `#progress-fill`)** — lives in `#statusbar`. `updatePageInfo()` sets `#progress-fill` width using `_intraChapterRatio` for smooth intra-chapter progress: `pct = Math.min(100, (cur-1 + _intraChapterRatio) / (total-1) * 100)`. `_intraChapterRatio` (module-level, 0–1) is updated from each `EPUB_POS` message and reset to `0` at the start of `renderPage()`. For vertical mode, `marginLeft:auto` makes the bar fill from the right (RTL reading direction). An IIFE after `updatePageInfo()` wires click-to-jump and mousemove-tooltip: `ratioFromEvent()` converts `clientX` to a spine ratio (inverted for vertical), `idxFromRatio()` maps ratio to spine index. Tooltip text uses i18n key `progress.tooltip`; `#progress-tooltip` is `position:fixed` so it is not clipped by `overflow:hidden` on `#progress-bar`.
+- **Anchor/fragment navigation** — `renderPage(idx, scrollTarget)` accepts `scrollTarget` as `'start'`, `'end'`, a numeric ratio, or a `'#anchorId'` string. `navigateToToc()` and `handleIframeLink()` extract the `#fragment` from href and pass it as `scrollTarget`. Inside `buildScrollScript()`, `applyInit()` detects `initTarget.charAt(0)==='#'`, looks up the element via `getElementById` then `getElementsByName`, and scrolls to it. In `epub_viewer.html`: `el.scrollIntoView({behavior:"instant",block:"start",inline:"nearest"})` works for all writing modes. In `epub_viewer_ios.html` (CSS transform): vertical uses `setTx(max(-ms, min(0, vw()-el.getBoundingClientRect().left)))`, horizontal uses `setTy(max(0, min(ms, el.getBoundingClientRect().top)))` — both read `getBoundingClientRect()` before any transform is applied (when `tx=0`/`ty=0`).
+- **Font settings UI** — all 6 `FONTS` entries are now exposed in `<select id="font-select">`: publisher / mincho / gothic / meiryo / serif / sans. i18n keys `font.serif` and `font.sans` added in all 4 languages.
 
 ### iOS Viewer (`epub_viewer_ios.html`)
 

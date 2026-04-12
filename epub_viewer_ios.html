@@ -303,6 +303,8 @@
           <option value="mincho" data-i18n="font.mincho">明朝体</option>
           <option value="gothic" data-i18n="font.gothic">ゴシック体</option>
           <option value="meiryo" data-i18n="font.meiryo">メイリオ</option>
+          <option value="serif" data-i18n="font.serif">汎用セリフ</option>
+          <option value="sans" data-i18n="font.sans">汎用サンセリフ</option>
         </select>
       </div>
       <div class="set-row">
@@ -490,6 +492,8 @@ const I18N = {
     'font.mincho':          '明朝体',
     'font.gothic':          'ゴシック体',
     'font.meiryo':          'メイリオ',
+    'font.serif':           '汎用セリフ',
+    'font.sans':            '汎用サンセリフ',
     'settings.fontSize':    '文字サイズ',
     'settings.lineHeight':  '行間',
     'lh.narrow':            '狭い',
@@ -582,6 +586,8 @@ const I18N = {
     'font.mincho':          'Mincho',
     'font.gothic':          'Gothic',
     'font.meiryo':          'Meiryo',
+    'font.serif':           'Generic serif',
+    'font.sans':            'Generic sans-serif',
     'settings.fontSize':    'Font size',
     'settings.lineHeight':  'Line height',
     'lh.narrow':            'Narrow',
@@ -674,6 +680,8 @@ const I18N = {
     'font.mincho':          '明朝體',
     'font.gothic':          '黑體',
     'font.meiryo':          'Meiryo',
+    'font.serif':           '通用襯線',
+    'font.sans':            '通用非襯線',
     'settings.fontSize':    '字型大小',
     'settings.lineHeight':  '行距',
     'lh.narrow':            '緊縮',
@@ -766,6 +774,8 @@ const I18N = {
     'font.mincho':          '明朝体',
     'font.gothic':          '黑体',
     'font.meiryo':          'Meiryo',
+    'font.serif':           '通用衬线',
+    'font.sans':            '通用非衬线',
     'settings.fontSize':    '字体大小',
     'settings.lineHeight':  '行距',
     'lh.narrow':            '紧缩',
@@ -1018,13 +1028,15 @@ function buildTocList() {
   });
 }
 function navigateToToc(href) {
+  const hash = href.includes('#') ? '#' + href.split('#')[1] : null;
   const base = href.split('#')[0];
+  if (!base) return;
   const idx = state.spine.findIndex(s =>
     s.href === base ||
     s.absPath === state.opfDir + base ||
     s.absPath.endsWith('/' + base)
   );
-  if (idx >= 0) renderPage(idx);
+  if (idx >= 0) renderPage(idx, hash || 'start');
 }
 function updateTocHighlight() {
   const cur = state.spine[state.currentSpineIdx];
@@ -1270,6 +1282,12 @@ function buildScrollScript(scrollTarget, writingMode, readySeq) {
       setTy(ms);
     } else if(typeof initTarget === 'number'){
       setTy(initTarget * ms);
+    } else if(typeof initTarget === 'string' && initTarget.charAt(0) === '#'){
+      var anchorId = initTarget.slice(1);
+      var anchorEl = document.getElementById(anchorId);
+      if(!anchorEl){ var ns = document.getElementsByName(anchorId); if(ns.length) anchorEl = ns[0]; }
+      if(anchorEl){ setTy(Math.max(0, Math.min(ms, anchorEl.getBoundingClientRect().top))); }
+      else { setTy(0); }
     } else {
       setTy(0);
     }
@@ -1371,12 +1389,24 @@ ${INIT_FN}
       ms = Math.max(0, body.offsetWidth - vw());
       if(initTarget === 'end'){ setTx(0); }
       else if(typeof initTarget === 'number'){ setTx(-(1 - initTarget) * ms); }
-      else { setTx(-ms); }
+      else if(typeof initTarget === 'string' && initTarget.charAt(0) === '#'){
+        var anchorId = initTarget.slice(1);
+        var anchorEl = document.getElementById(anchorId);
+        if(!anchorEl){ var ns = document.getElementsByName(anchorId); if(ns.length) anchorEl = ns[0]; }
+        if(anchorEl){ setTx(Math.max(-ms, Math.min(0, vw() - anchorEl.getBoundingClientRect().left))); }
+        else { setTx(-ms); }
+      } else { setTx(-ms); }
     } else {
       ms = Math.max(0, body.offsetHeight - vh());
       if(initTarget === 'end'){ setTy(ms); }
       else if(typeof initTarget === 'number'){ setTy(initTarget * ms); }
-      else { setTy(0); }
+      else if(typeof initTarget === 'string' && initTarget.charAt(0) === '#'){
+        var anchorId = initTarget.slice(1);
+        var anchorEl = document.getElementById(anchorId);
+        if(!anchorEl){ var ns = document.getElementsByName(anchorId); if(ns.length) anchorEl = ns[0]; }
+        if(anchorEl){ setTy(Math.max(0, Math.min(ms, anchorEl.getBoundingClientRect().top))); }
+        else { setTy(0); }
+      } else { setTy(0); }
     }
     body.style.setProperty('opacity','1','important');
   }
@@ -1467,6 +1497,12 @@ ${INIT_FN}
       setTx(0);
     } else if(typeof initTarget === 'number'){
       setTx(-(1 - initTarget) * ms);
+    } else if(typeof initTarget === 'string' && initTarget.charAt(0) === '#'){
+      var anchorId = initTarget.slice(1);
+      var anchorEl = document.getElementById(anchorId);
+      if(!anchorEl){ var ns = document.getElementsByName(anchorId); if(ns.length) anchorEl = ns[0]; }
+      if(anchorEl){ setTx(Math.max(-ms, Math.min(0, vw() - anchorEl.getBoundingClientRect().left))); }
+      else { setTx(-ms); }
     } else {
       setTx(-ms); // 'start': body の右端を viewport 右端に合わせる
     }
@@ -1512,12 +1548,14 @@ ${INIT_FN}
 let _renderSeq = 0;
 let _isRendering = false;          // true: srcdoc 未コミット（旧 iframe が残存中）
 let _pendingScrollAfterRender = 0; // 描画中に受け取ったスクロール方向をキュー
+let _intraChapterRatio = 0;        // 章内スクロール比率（0–1）プログレスバー表示用
 
 async function renderPage(idx, scrollTarget) {
   if (!state.epub || idx < 0 || idx >= state.spine.length) return;
   if (scrollTarget === undefined) scrollTarget = 'start';
   const seq = ++_renderSeq;
   _isRendering = true;
+  _intraChapterRatio = 0;
   state.publisherAxis = null; // 新章の axis 検出まで不定とする
   state.currentSpineIdx = idx;
   flashOverlay();
@@ -1592,7 +1630,11 @@ window.addEventListener('message', e => {
   if (e.data.type === 'EPUB_POS') {
     // _isRendering 中は旧 iframe からの遅延 EPUB_POS を無視し、
     // 新章インデックスに古い ratio が上書きされるのを防ぐ
-    if (!_isRendering) savePos(e.data.ratio);
+    if (!_isRendering) {
+      _intraChapterRatio = e.data.ratio;
+      savePos(e.data.ratio);
+      updatePageInfo();
+    }
   }
   if (e.data.type === 'EPUB_LINK') {
     handleIframeLink(e.data.href);
@@ -1604,6 +1646,7 @@ window.addEventListener('message', e => {
 });
 
 function handleIframeLink(href) {
+  const hash   = href.includes('#') ? '#' + href.split('#')[1] : null;
   const base   = href.split('#')[0];
   if (!base) return;
   if (/^javascript:/i.test(base)) return; // javascript: スキームは拒否
@@ -1613,7 +1656,7 @@ function handleIframeLink(href) {
     : '';
   const absTarget = resolvePath(curDir, base);
   const idx = state.spine.findIndex(s => s.absPath === absTarget);
-  if (idx >= 0) renderPage(idx, 'start');
+  if (idx >= 0) renderPage(idx, hash || 'start');
 }
 
 function flashOverlay() {
@@ -1638,7 +1681,8 @@ function updatePageInfo() {
   const total = state.spine.length, cur = state.currentSpineIdx+1;
   document.getElementById('page-info').textContent = cur + ' / ' + total;
   const fill = document.getElementById('progress-fill');
-  fill.style.width = (total > 1 ? (cur-1)/(total-1)*100 : 100) + '%';
+  const pct = total > 1 ? Math.min(100, (cur - 1 + _intraChapterRatio) / (total - 1) * 100) : 100;
+  fill.style.width = pct + '%';
   // 縦書きは右→左方向に読み進めるためバーを右端起点に
   fill.style.marginLeft = isVerticalAxis() ? 'auto' : '';
 }
