@@ -81,6 +81,13 @@
   .toc-item { padding:12px 20px; color:var(--ui-text); cursor:pointer; font-size:14px; transition:all .15s; border-left:3px solid transparent; line-height:1.5; opacity:.85; }
   .toc-item:hover { background:var(--hover-bg); opacity:1; }
   .toc-item.current { border-left-color:var(--accent); background:var(--hover-bg); opacity:1; color:var(--accent); font-weight:500; }
+  #jump-history-section { flex-shrink:0; }
+  .history-item { padding:8px 20px 8px 16px; color:var(--ui-text); cursor:pointer; font-size:13px; transition:all .15s; border-left:3px solid transparent; display:flex; align-items:baseline; gap:5px; opacity:.8; }
+  .history-item:hover { background:var(--hover-bg); opacity:1; }
+  .history-icon { flex-shrink:0; }
+  .history-label { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .history-pct { opacity:.55; font-size:11px; flex-shrink:0; }
+  hr.history-divider { border:none; border-top:1px solid var(--ui-border); margin:4px 0 0; }
 
   #reading-area { flex:1; display:flex; align-items:center; justify-content:center; overflow:hidden; position:relative; padding:var(--page-padding,16px); background:var(--bg); transition:padding .3s; }
 
@@ -384,6 +391,7 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
       <span data-i18n="sidebar.toc">目次</span>
     </div>
+    <div id="jump-history-section" style="display:none"></div>
     <div id="toc-list"></div>
   </div>
   <div id="reading-area">
@@ -528,6 +536,7 @@ const I18N = {
     'fwdSize.medium':       '中',
     'fwdSize.large':        '大',
     'sidebar.toc':          '目次',
+    'sidebar.chapter':      '第{n}章',
     'resume.label':         '前回の続きから読みますか？',
     'resume.hint':          'クリックして再開（または同じファイルを開いてください）',
     'welcome.open.title':   'ePubファイルを開く',
@@ -624,6 +633,7 @@ const I18N = {
     'fwdSize.medium':       'Medium',
     'fwdSize.large':        'Large',
     'sidebar.toc':          'Contents',
+    'sidebar.chapter':      'Chapter {n}',
     'resume.label':         'Continue reading?',
     'resume.hint':          'Click to resume (or open the same file)',
     'welcome.open.title':   'Open ePub file',
@@ -720,6 +730,7 @@ const I18N = {
     'fwdSize.medium':       '中',
     'fwdSize.large':        '大',
     'sidebar.toc':          '目錄',
+    'sidebar.chapter':      '第 {n} 章',
     'resume.label':         '繼續上次閱讀？',
     'resume.hint':          '點擊繼續（或開啟相同檔案）',
     'welcome.open.title':   '開啟 ePub 檔案',
@@ -816,6 +827,7 @@ const I18N = {
     'fwdSize.medium':       '中',
     'fwdSize.large':        '大',
     'sidebar.toc':          '目录',
+    'sidebar.chapter':      '第 {n} 章',
     'resume.label':         '继续上次阅读？',
     'resume.hint':          '点击继续（或打开相同文件）',
     'welcome.open.title':   '打开 ePub 文件',
@@ -1038,7 +1050,13 @@ async function loadEpub(file) {
     buildTocList();
     // 最終書名をlocalStorageに保存（レジューム表示用）
     try { localStorage.setItem('epub_last_book', JSON.stringify({ title: titleText, bookKey: state.bookKey })); } catch(e) {}
+    _originalBookmark = null;
+    _jumpHistory = [];
     const saved = loadSavedPos();
+    if (saved && saved.spineIdx > 0 && saved.spineIdx < state.spine.length) {
+      _originalBookmark = {spineIdx: saved.spineIdx, ratio: typeof saved.ratio === 'number' ? saved.ratio : 0};
+    }
+    updateJumpHistoryUI();
     if (saved && saved.spineIdx > 0 && saved.spineIdx < state.spine.length) {
       if (state.sidebarOpen) toggleSidebar();
       await renderPage(saved.spineIdx, typeof saved.ratio === 'number' ? saved.ratio : 'start');
@@ -1078,7 +1096,7 @@ function navigateToToc(href) {
     s.absPath === state.opfDir + base ||
     s.absPath.endsWith('/' + base)
   );
-  if (idx >= 0) renderPage(idx, hash || 'start');
+  if (idx >= 0) { pushJumpHistory(); renderPage(idx, hash || 'start'); }
 }
 function updateTocHighlight() {
   const cur = state.spine[state.currentSpineIdx];
@@ -1532,6 +1550,8 @@ let _renderSeq = 0;
 let _isRendering = false;          // true: srcdoc 未コミット（旧 iframe が残存中）
 let _pendingScrollAfterRender = 0; // 描画中に受け取ったスクロール方向をキュー
 let _intraChapterRatio = 0;        // 章内スクロール比率（0–1）プログレスバー表示用
+let _originalBookmark  = null;     // {spineIdx, ratio} | null — 開いた時のしおり位置
+let _jumpHistory       = [];       // [{spineIdx, ratio}] 直近4件のジャンプ前位置（新しい順）
 
 async function renderPage(idx, scrollTarget) {
   if (!state.epub || idx < 0 || idx >= state.spine.length) return;
@@ -1689,6 +1709,7 @@ function updatePageInfo() {
 
   bar.addEventListener('click', e => {
     if (!state.epub || state.spine.length < 2) return;
+    pushJumpHistory();
     renderPage(idxFromRatio(ratioFromEvent(e)), 'start');
   });
 
@@ -1920,6 +1941,60 @@ function savePos(ratio) {
   scheduleAutoSave();
 }
 // ══════════════════════════════════════════
+//  Jump History (セッション内しおり履歴)
+// ══════════════════════════════════════════
+function labelForPos(spineIdx, ratio) {
+  const spineItem = state.spine[spineIdx];
+  let label = null;
+  if (spineItem) {
+    const tocEntry = state.toc.find(item => {
+      const base = item.href.split('#')[0];
+      return spineItem.href === base ||
+             spineItem.absPath === state.opfDir + base ||
+             spineItem.absPath.endsWith('/' + base);
+    });
+    if (tocEntry) label = tocEntry.label;
+  }
+  if (!label) label = t('sidebar.chapter', {n: spineIdx + 1});
+  const pct = Math.round((ratio || 0) * 100);
+  return esc(label) + '<span class="history-pct"> · ' + pct + '%</span>';
+}
+function pushJumpHistory() {
+  if (!state.epub) return;
+  const entry = {spineIdx: state.currentSpineIdx, ratio: _intraChapterRatio};
+  const last = _jumpHistory[0];
+  if (last && last.spineIdx === entry.spineIdx && Math.abs(last.ratio - entry.ratio) < 0.01) return;
+  _jumpHistory.unshift(entry);
+  if (_jumpHistory.length > 4) _jumpHistory.pop();
+  updateJumpHistoryUI();
+}
+function updateJumpHistoryUI() {
+  const section = document.getElementById('jump-history-section');
+  if (!section) return;
+  const hasOriginal = _originalBookmark !== null;
+  const hasHistory  = _jumpHistory.length > 0;
+  if (!hasOriginal && !hasHistory) { section.style.display = 'none'; return; }
+  section.innerHTML = '';
+  if (hasOriginal) {
+    const el = document.createElement('div');
+    el.className = 'history-item';
+    el.innerHTML = '<span class="history-icon">📌</span><span class="history-label">' + labelForPos(_originalBookmark.spineIdx, _originalBookmark.ratio) + '</span>';
+    el.onclick = () => { pushJumpHistory(); renderPage(_originalBookmark.spineIdx, _originalBookmark.ratio); };
+    section.appendChild(el);
+  }
+  _jumpHistory.forEach(entry => {
+    const el = document.createElement('div');
+    el.className = 'history-item';
+    el.innerHTML = '<span class="history-icon">↩</span><span class="history-label">' + labelForPos(entry.spineIdx, entry.ratio) + '</span>';
+    el.onclick = () => { pushJumpHistory(); renderPage(entry.spineIdx, entry.ratio); };
+    section.appendChild(el);
+  });
+  const divider = document.createElement('hr');
+  divider.className = 'history-divider';
+  section.appendChild(divider);
+  section.style.display = '';
+}
+// ══════════════════════════════════════════
 //  Bookmark Export / Import
 // ══════════════════════════════════════════
 function exportBookmarks() {
@@ -1977,6 +2052,7 @@ document.getElementById('bookmark-input').addEventListener('change', e => {
                              (newIdx === curIdx && newRatio > _intraChapterRatio + 0.01);
             const isNotFinal = newIdx < state.spine.length - 1;
             if (isAhead && isNotFinal) {
+              pushJumpHistory();
               renderPage(newIdx, newRatio);
               showToast(t('toast.localJumped', {n: newIdx + 1}));
               jumped = true;
@@ -2260,6 +2336,7 @@ async function driveDownload() {
                            (newIdx === curIdx && newRatio > _intraChapterRatio + 0.01);
           const isNotFinal = newIdx < state.spine.length - 1;
           if (isAhead && isNotFinal) {
+            pushJumpHistory();
             renderPage(newIdx, newRatio);
             showToast(t('toast.driveJumped', {n: newIdx + 1}));
             jumped = true;

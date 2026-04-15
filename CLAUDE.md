@@ -198,6 +198,19 @@ Both files support **4 languages**: `ja` (Japanese), `en` (English), `zh-TW` (Tr
 
 Bookmark key uses OPF title + spine count (not file path), so moving or renaming the file does not break saved positions. `exportBookmarks()` serialises all `epub_pos_*` and `epub_last_book` keys to a JSON file (`{ version, exportedAt, bookmarks: {} }`) for cross-device transfer. Import is handled by a `change` event listener on a hidden `<input type="file" id="bookmark-input">` (no named import function); it validates the JSON shape and writes matching keys back to `localStorage`. After writing, if the currently open book's key is present in the imported data and the new position is ahead of the current position but not on the last spine item, `renderPage()` is called with the new position and `toast.localJumped` is shown instead of `toast.imported`. `notifyStorageError()` shows a toast when any `localStorage.setItem` throws (quota exceeded). `resumeBook()` is invoked when the user clicks the welcome-screen resume banner; it calls `loadSavedPos()` then opens a file picker.
 
+### Jump History (セッション内しおり履歴)
+
+Two module-level variables track navigation history for the duration of the current ePub session (not persisted to localStorage):
+
+- **`_originalBookmark`** — `{spineIdx, ratio} | null`. Set in `loadEpub()` from `loadSavedPos()` when a saved position exists; reset to `null` on new book open.
+- **`_jumpHistory`** — `[{spineIdx, ratio}, ...]`, max 4 entries, newest first. Reset to `[]` on new book open.
+
+**`pushJumpHistory()`** — captures `{state.currentSpineIdx, _intraChapterRatio}` and prepends to `_jumpHistory` (capped at 4). Skips if the new entry is within 0.01 ratio of the most recent entry. Called before `renderPage()` in: `navigateToToc()`, progress bar `click` handler, Drive auto-jump, and local import auto-jump.
+
+**`updateJumpHistoryUI()`** — rebuilds `#jump-history-section` (in the TOC sidebar, above `#toc-list`). Hidden when both `_originalBookmark` is null and `_jumpHistory` is empty. When visible: shows a `📌` row for `_originalBookmark` (if set) and `↩` rows for each `_jumpHistory` entry, followed by a `<hr class="history-divider">` separator. Clicking any row calls `pushJumpHistory()` then `renderPage()` so the return trip is also recordable.
+
+**`labelForPos(spineIdx, ratio)`** — returns an HTML string with the chapter label (from `state.toc` if a matching entry exists, else `sidebar.chapter` i18n key) and a `<span class="history-pct">· N%</span>` suffix. Uses `esc()` for the label text.
+
 ### Google Drive Bookmark Sync
 
 Both files support syncing `epub_pos_*` / `epub_last_book` keys to/from Google Drive `appDataFolder` as `epub_bookmarks.json`.
