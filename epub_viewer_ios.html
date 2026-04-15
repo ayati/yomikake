@@ -533,10 +533,12 @@ const I18N = {
     'toast.noBookmarks':    '書き出せるしおりがありません',
     'toast.exported':       '📤 {count}冊分のしおりを書き出しました',
     'toast.imported':       '📥 {count}冊分のしおりを読み込みました',
+    'toast.localJumped':    '📥 しおりを読み込み、第{n}章に移動しました',
     'toast.storageError':   '⚠️ しおり・設定の保存に失敗しました（ストレージ容量不足の可能性）',
     'toast.resumeHint':     '同じファイル「{title}」を開いてください',
     'toast.driveUploaded':       '☁️ Driveにしおりを保存しました（{count}冊分）',
     'toast.driveDownloaded':     '☁️ Driveからしおりを読み込みました（{count}冊分）',
+    'toast.driveJumped':         '☁️ Driveからしおりを読み込み、第{n}章に移動しました',
     'toast.driveNoFile':         'Drive上にしおりファイルが見つかりません',
     'toast.driveNoClientId':     'Google Client IDが設定されていません',
     'toast.driveAutoSaveOn':     '☁️ Drive自動保存が有効になりました',
@@ -627,10 +629,12 @@ const I18N = {
     'toast.noBookmarks':    'No bookmarks to export',
     'toast.exported':       '📤 Exported {count} bookmark(s)',
     'toast.imported':       '📥 Imported {count} bookmark(s)',
+    'toast.localJumped':    '📥 Bookmarks imported — jumped to chapter {n}',
     'toast.storageError':   '⚠️ Failed to save (storage may be full)',
     'toast.resumeHint':     'Please open "{title}"',
     'toast.driveUploaded':       '☁️ Bookmarks saved to Drive ({count} book(s))',
     'toast.driveDownloaded':     '☁️ Bookmarks loaded from Drive ({count} book(s))',
+    'toast.driveJumped':         '☁️ Bookmarks loaded — jumped to chapter {n}',
     'toast.driveNoFile':         'No bookmark file found on Drive',
     'toast.driveNoClientId':     'Google Client ID is not configured',
     'toast.driveAutoSaveOn':     '☁️ Drive auto-save enabled',
@@ -721,10 +725,12 @@ const I18N = {
     'toast.noBookmarks':    '沒有可匯出的書籤',
     'toast.exported':       '📤 已匯出 {count} 本書的書籤',
     'toast.imported':       '📥 已匯入 {count} 本書的書籤',
+    'toast.localJumped':    '📥 已匯入書籤，跳轉至第 {n} 章',
     'toast.storageError':   '⚠️ 儲存失敗（可能儲存空間不足）',
     'toast.resumeHint':     '請開啟「{title}」',
     'toast.driveUploaded':       '☁️ 書籤已儲存至 Drive（{count} 本書）',
     'toast.driveDownloaded':     '☁️ 已從 Drive 載入書籤（{count} 本書）',
+    'toast.driveJumped':         '☁️ 已從 Drive 載入書籤，跳轉至第 {n} 章',
     'toast.driveNoFile':         'Drive 上找不到書籤檔案',
     'toast.driveNoClientId':     '未設定 Google Client ID',
     'toast.driveAutoSaveOn':     '☁️ 已啟用 Drive 自動儲存',
@@ -815,10 +821,12 @@ const I18N = {
     'toast.noBookmarks':    '没有可导出的书签',
     'toast.exported':       '📤 已导出 {count} 本书的书签',
     'toast.imported':       '📥 已导入 {count} 本书的书签',
+    'toast.localJumped':    '📥 已导入书签，跳转至第 {n} 章',
     'toast.storageError':   '⚠️ 保存失败（可能存储空间不足）',
     'toast.resumeHint':     '请打开「{title}」',
     'toast.driveUploaded':       '☁️ 书签已保存至 Drive（{count} 本书）',
     'toast.driveDownloaded':     '☁️ 已从 Drive 加载书签（{count} 本书）',
+    'toast.driveJumped':         '☁️ 已从 Drive 加载书签，跳转至第 {n} 章',
     'toast.driveNoFile':         'Drive 上找不到书签文件',
     'toast.driveNoClientId':     '未设置 Google Client ID',
     'toast.driveAutoSaveOn':     '☁️ 已启用 Drive 自动保存',
@@ -1979,7 +1987,28 @@ document.getElementById('bookmark-input').addEventListener('change', e => {
           if (key.startsWith('epub_pos_')) count++;
         } catch(e) { notifyStorageError(); break; }
       }
-      showToast(t('toast.imported', {count}));
+      let jumped = false;
+      if (state.epub && state.bookKey) {
+        const newVal = json.bookmarks[state.bookKey];
+        if (newVal != null) {
+          let newSaved;
+          try { newSaved = typeof newVal === 'string' ? JSON.parse(newVal) : newVal; } catch(e) {}
+          if (newSaved && typeof newSaved.spineIdx === 'number') {
+            const newIdx   = newSaved.spineIdx;
+            const newRatio = typeof newSaved.ratio === 'number' ? newSaved.ratio : 0;
+            const curIdx   = state.currentSpineIdx;
+            const isAhead  = newIdx > curIdx ||
+                             (newIdx === curIdx && newRatio > _intraChapterRatio + 0.01);
+            const isNotFinal = newIdx < state.spine.length - 1;
+            if (isAhead && isNotFinal) {
+              renderPage(newIdx, newRatio);
+              showToast(t('toast.localJumped', {n: newIdx + 1}));
+              jumped = true;
+            }
+          }
+        }
+      }
+      if (!jumped) showToast(t('toast.imported', {count}));
       showResumeBanner();
       updateThemeBtnUI();
     } catch(err) {
@@ -2236,7 +2265,28 @@ async function driveDownload() {
         if (key.startsWith('epub_pos_')) count++;
       } catch(e) { notifyStorageError(); break; }
     }
-    showToast(t('toast.driveDownloaded', {count}));
+    let jumped = false;
+    if (state.epub && state.bookKey) {
+      const newVal = json.bookmarks[state.bookKey];
+      if (newVal != null) {
+        let newSaved;
+        try { newSaved = typeof newVal === 'string' ? JSON.parse(newVal) : newVal; } catch(e) {}
+        if (newSaved && typeof newSaved.spineIdx === 'number') {
+          const newIdx   = newSaved.spineIdx;
+          const newRatio = typeof newSaved.ratio === 'number' ? newSaved.ratio : 0;
+          const curIdx   = state.currentSpineIdx;
+          const isAhead  = newIdx > curIdx ||
+                           (newIdx === curIdx && newRatio > _intraChapterRatio + 0.01);
+          const isNotFinal = newIdx < state.spine.length - 1;
+          if (isAhead && isNotFinal) {
+            renderPage(newIdx, newRatio);
+            showToast(t('toast.driveJumped', {n: newIdx + 1}));
+            jumped = true;
+          }
+        }
+      }
+    }
+    if (!jumped) showToast(t('toast.driveDownloaded', {count}));
     showResumeBanner();
   } catch(err) {
     if (err.message !== 'no_client_id') alert(t('err.driveFailed', {msg: err.message}));
