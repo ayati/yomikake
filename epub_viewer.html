@@ -1962,8 +1962,7 @@ function labelForPos(spineIdx, ratio) {
 function pushJumpHistory() {
   if (!state.epub) return;
   const entry = {spineIdx: state.currentSpineIdx, ratio: _intraChapterRatio};
-  const last = _jumpHistory[0];
-  if (last && last.spineIdx === entry.spineIdx && Math.abs(last.ratio - entry.ratio) < 0.01) return;
+  if (_jumpHistory.some(h => h.spineIdx === entry.spineIdx && Math.abs(h.ratio - entry.ratio) < 0.01)) return;
   _jumpHistory.unshift(entry);
   if (_jumpHistory.length > 4) _jumpHistory.pop();
   updateJumpHistoryUI();
