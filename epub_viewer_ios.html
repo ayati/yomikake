@@ -11,9 +11,13 @@
     --ui-border:#e5dfd5; --shadow:rgba(0,0,0,0.08); --page-shadow:rgba(0,0,0,0.05);
     --hover-bg:rgba(0,0,0,0.04); --backdrop:rgba(255,255,255,0.85); --glass-border:rgba(255,255,255,0.4);
   }
-  .theme-dark  { --bg:#141417; --paper:#1c1c20; --text:#e0dcd5; --accent:#dc6e4c; --ui-bg:#1c1c20; --ui-text:#e0dcd5; --ui-border:#33333b; --shadow:rgba(0,0,0,0.7); --page-shadow:rgba(0,0,0,0.5); --hover-bg:rgba(255,255,255,0.08); --backdrop:rgba(28,28,32,0.85); --glass-border:rgba(255,255,255,0.08); }
-  .theme-sepia { --bg:#f4ecd8; --paper:#fbf6eb; --text:#4a3825; --accent:#9c6142; --ui-bg:#fbf6eb; --ui-text:#4a3825; --ui-border:#d9cbb0; --shadow:rgba(74,56,37,0.1); --page-shadow:rgba(74,56,37,0.06); --hover-bg:rgba(74,56,37,0.06); --backdrop:rgba(251,246,235,0.85); --glass-border:rgba(255,255,255,0.3); }
-  .theme-white { --bg:#ececec; --paper:#ffffff; --text:#181818; --accent:#1e78a0; --ui-bg:#ffffff; --ui-text:#222; --ui-border:#d4d4d4; --shadow:rgba(0,0,0,0.15); --page-shadow:rgba(0,0,0,0.08); --hover-bg:rgba(0,0,0,0.05); --backdrop:rgba(255,255,255,0.9); --glass-border:rgba(255,255,255,0.5); }
+  .theme-dark   { --bg:#141417; --paper:#1c1c20; --text:#e0dcd5; --accent:#dc6e4c; --ui-bg:#1c1c20; --ui-text:#e0dcd5; --ui-border:#33333b; --shadow:rgba(0,0,0,0.7); --page-shadow:rgba(0,0,0,0.5); --hover-bg:rgba(255,255,255,0.08); --backdrop:rgba(28,28,32,0.85); --glass-border:rgba(255,255,255,0.08); }
+  .theme-sepia  { --bg:#f4ecd8; --paper:#fbf6eb; --text:#4a3825; --accent:#9c6142; --ui-bg:#fbf6eb; --ui-text:#4a3825; --ui-border:#d9cbb0; --shadow:rgba(74,56,37,0.1); --page-shadow:rgba(74,56,37,0.06); --hover-bg:rgba(74,56,37,0.06); --backdrop:rgba(251,246,235,0.85); --glass-border:rgba(255,255,255,0.3); }
+  .theme-white  { --bg:#ececec; --paper:#ffffff; --text:#181818; --accent:#1e78a0; --ui-bg:#ffffff; --ui-text:#222; --ui-border:#d4d4d4; --shadow:rgba(0,0,0,0.15); --page-shadow:rgba(0,0,0,0.08); --hover-bg:rgba(0,0,0,0.05); --backdrop:rgba(255,255,255,0.9); --glass-border:rgba(255,255,255,0.5); }
+  .theme-sakura { --bg:#f5e0e5; --paper:#fff5f7; --text:#3d1020; --accent:#c06070; --ui-bg:#fff5f7; --ui-text:#3d1020; --ui-border:#f0cdd5; --shadow:rgba(180,90,100,0.08); --page-shadow:rgba(180,90,100,0.05); --hover-bg:rgba(180,90,100,0.06); --backdrop:rgba(255,245,247,0.88); --glass-border:rgba(240,180,190,0.35); }
+  .theme-hoshi  { --bg:#080e18; --paper:#0e1a2e; --text:#c8daf0; --accent:#5588cc; --ui-bg:#0e1a2e; --ui-text:#c8daf0; --ui-border:#1e3050; --shadow:rgba(0,0,0,0.6); --page-shadow:rgba(0,0,0,0.4); --hover-bg:rgba(255,255,255,0.07); --backdrop:rgba(14,26,46,0.88); --glass-border:rgba(255,255,255,0.07); }
+  .theme-matcha { --bg:#d8e8c8; --paper:#f0f5e8; --text:#1e301a; --accent:#507840; --ui-bg:#f0f5e8; --ui-text:#1e301a; --ui-border:#c0d8a8; --shadow:rgba(30,48,26,0.08); --page-shadow:rgba(30,48,26,0.05); --hover-bg:rgba(30,48,26,0.06); --backdrop:rgba(240,245,232,0.88); --glass-border:rgba(160,200,140,0.3); }
+  .theme-tsuki  { --bg:#d8d8f0; --paper:#f0f0fa; --text:#1a1840; --accent:#5858a0; --ui-bg:#f0f0fa; --ui-text:#1a1840; --ui-border:#c8c8e8; --shadow:rgba(26,24,64,0.08); --page-shadow:rgba(26,24,64,0.05); --hover-bg:rgba(26,24,64,0.05); --backdrop:rgba(240,240,250,0.88); --glass-border:rgba(180,180,220,0.35); }
 
   * { box-sizing:border-box; margin:0; padding:0; }
   body { font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background:var(--bg); color:var(--text); height:100vh; height:100dvh; overflow:hidden; display:flex; flex-direction:column; user-select:none; padding-bottom:env(safe-area-inset-bottom,0); }
@@ -54,17 +58,40 @@
   .btn-group button:hover { background:var(--hover-bg); }
   .btn-group span { display:flex; align-items:center; justify-content:center; padding:0 8px; font-size:13px; font-weight:500; border-left:1px solid var(--ui-border); border-right:1px solid var(--ui-border); min-width:54px; color:var(--ui-text); }
 
-  .theme-options { display:flex; gap:8px; }
+  .theme-options { display:grid; grid-template-columns:repeat(4,32px); gap:6px; }
   .theme-btn { width:32px; height:32px; border-radius:50%; border:2px solid var(--ui-border); cursor:pointer; transition:transform .15s; display:flex; align-items:center; justify-content:center; }
   .theme-btn:hover { transform:scale(1.1); }
   .theme-btn.active { border-color:var(--accent); }
   .theme-btn svg { width:14px; height:14px; stroke:var(--accent); stroke-width:3; opacity:0; }
   .theme-btn.active svg { opacity:1; }
 
-  .tb-std { background:#fff; border-color:#e5dfd5; }
-  .tb-sepia { background:#fbf6eb; border-color:#d9cbb0; }
-  .tb-dark { background:#1c1c20; border-color:#33333b; }
-  .tb-white { background:#ffffff; border-color:#d4d4d4; }
+  .tb-std    { background:#fdf8f0; border-color:#e5dfd5; }
+  .tb-sepia  { background:#fbf6eb; border-color:#d9cbb0; }
+  .tb-dark   { background:#1c1c20; border-color:#33333b; }
+  .tb-white  { background:#ffffff; border-color:#d4d4d4; }
+  .tb-sakura { background:#fff5f7; border-color:#f0cdd5; }
+  .tb-hoshi  { background:#0e1a2e; border-color:#1e3050; }
+  .tb-matcha { background:#f0f5e8; border-color:#c0d8a8; }
+  .tb-tsuki  { background:#f0f0fa; border-color:#c8c8e8; }
+
+  /* Font Picker */
+  #font-picker { width:100%; }
+  #font-picker-btn { width:100%; display:flex; justify-content:space-between; align-items:center; gap:6px; padding:7px 10px; border-radius:8px; border:1px solid var(--ui-border); background:var(--ui-bg); color:var(--ui-text); cursor:pointer; font-size:13px; font-family:inherit; box-shadow:inset 0 1px 2px rgba(0,0,0,0.02); }
+  #font-picker-btn:hover { background:var(--hover-bg); }
+  #font-picker-label { flex:1; text-align:left; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #font-picker-arrow { flex-shrink:0; font-size:10px; opacity:.6; transition:transform .2s; }
+  #font-picker-btn[aria-expanded="true"] #font-picker-arrow { transform:rotate(180deg); }
+  #font-picker-list { margin-top:4px; border:1px solid var(--ui-border); border-radius:8px; background:var(--ui-bg); max-height:220px; overflow-y:auto; -webkit-overflow-scrolling:touch; display:none; }
+  #font-picker-list.open { display:block; }
+  .fp-group-header { padding:5px 10px 3px; font-size:11px; font-weight:600; color:var(--ui-text); opacity:.5; letter-spacing:.3px; }
+  .fp-group-header:not(:first-child) { border-top:1px solid var(--ui-border); margin-top:2px; padding-top:7px; }
+  .fp-item { display:flex; justify-content:space-between; align-items:center; padding:6px 10px; cursor:pointer; gap:8px; }
+  .fp-item:hover { background:var(--accent); color:#fff; }
+  .fp-item:hover .fp-sample { color:#fff; opacity:.8; }
+  .fp-item.fp-selected { background:var(--hover-bg); }
+  .fp-item.fp-selected .fp-name::before { content:'✓ '; }
+  .fp-name { font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .fp-sample { font-size:13px; white-space:nowrap; color:var(--ui-text); opacity:.55; flex-shrink:0; }
 
   .lang-select { appearance:none; background:var(--ui-bg); border:1px solid var(--ui-border); color:var(--ui-text); padding:4px 20px 4px 8px; border-radius:6px; font-size:12px; cursor:pointer; font-family:inherit; font-weight:500; background-image:url('data:image/svg+xml;utf8,<svg viewBox="0 0 24 24" fill="none" stroke="%23888" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>'); background-repeat:no-repeat; background-position:right 4px center; background-size:12px; outline:none; }
   .lang-select:hover { background-color:var(--hover-bg); }
@@ -73,9 +100,34 @@
 
   #sidebar { width:280px; background:var(--ui-bg); border-right:1px solid var(--ui-border); display:flex; flex-direction:column; transition:transform .3s cubic-bezier(0.16,1,0.3,1); overflow:hidden; flex-shrink:0; position:relative; z-index:90; }
   #sidebar.hidden { transform:translateX(-100%); margin-right:-280px; }
-  #sidebar-header { padding:16px; font-size:15px; color:var(--ui-text); border-bottom:1px solid var(--ui-border); font-weight:bold; flex-shrink:0; display:flex; align-items:center; gap:8px; }
-  #sidebar-header svg { stroke:var(--ui-text); stroke-width:2; }
+  #sidebar-tabs { display:flex; border-bottom:1px solid var(--ui-border); flex-shrink:0; }
+  .sidebar-tab { flex:1; display:flex; align-items:center; justify-content:center; gap:5px; padding:10px 8px; background:transparent; border:none; border-bottom:2px solid transparent; color:var(--ui-text); cursor:pointer; font-size:13px; font-family:inherit; font-weight:500; opacity:.6; transition:all .15s; }
+  .sidebar-tab:hover { opacity:.9; background:var(--hover-bg); }
+  .sidebar-tab.active { opacity:1; color:var(--accent); border-bottom-color:var(--accent); }
+  .sidebar-tab svg { width:14px; height:14px; stroke:currentColor; stroke-width:2; fill:none; }
+  #toc-panel { flex:1; display:flex; flex-direction:column; overflow:hidden; }
   #toc-list { flex:1; overflow-y:auto; padding:8px 0; }
+  #search-panel { flex:1; display:flex; flex-direction:column; overflow:hidden; }
+  #search-input-area { padding:10px 12px; display:flex; gap:6px; border-bottom:1px solid var(--ui-border); flex-shrink:0; }
+  #search-input { flex:1; padding:7px 10px; border:1px solid var(--ui-border); border-radius:8px; background:var(--ui-bg); color:var(--ui-text); font-size:13px; font-family:inherit; outline:none; }
+  #search-input:focus { border-color:var(--accent); }
+  #search-input::placeholder { color:var(--ui-text); opacity:.4; }
+  #search-btn { padding:7px 12px; background:var(--accent); color:#fff; border:none; border-radius:8px; font-size:13px; cursor:pointer; font-family:inherit; white-space:nowrap; }
+  #search-btn:disabled { opacity:.45; cursor:default; }
+  #search-progress-bar { height:2px; background:var(--ui-border); flex-shrink:0; }
+  #search-progress-fill { height:100%; background:var(--accent); transition:width .15s; width:0%; }
+  #search-status { padding:5px 12px; font-size:12px; color:var(--ui-text); opacity:.65; flex-shrink:0; display:flex; align-items:center; justify-content:space-between; min-height:26px; }
+  #search-cancel-btn { font-size:12px; color:var(--accent); background:transparent; border:none; cursor:pointer; padding:2px 6px; font-family:inherit; }
+  #search-results { flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:4px 0; }
+  .sr-item { padding:9px 14px; cursor:pointer; border-bottom:1px solid var(--ui-border); transition:background .15s; }
+  .sr-item:last-child { border-bottom:none; }
+  .sr-item:hover { background:var(--hover-bg); }
+  .sr-chapter { font-size:13px; font-weight:600; color:var(--ui-text); margin-bottom:4px; display:flex; align-items:center; justify-content:space-between; gap:6px; }
+  .sr-chapter-title { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .sr-badge { font-size:11px; background:var(--accent); color:#fff; border-radius:10px; padding:1px 7px; font-weight:500; flex-shrink:0; }
+  .sr-snippet { font-size:12px; color:var(--ui-text); opacity:.75; line-height:1.65; margin-top:2px; overflow:hidden; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; }
+  .sr-snippet mark { background:transparent; color:var(--accent); font-weight:600; }
+  .sr-more { font-size:11px; color:var(--accent); opacity:.85; margin-top:3px; }
   #toc-list::-webkit-scrollbar { width:6px; }
   #toc-list::-webkit-scrollbar-thumb { background:var(--ui-border); border-radius:3px; }
   .toc-item { padding:12px 20px; color:var(--ui-text); cursor:pointer; font-size:14px; transition:all .15s; border-left:3px solid transparent; line-height:1.5; opacity:.85; }
@@ -293,10 +345,14 @@
       <div class="set-row">
         <span class="set-label" data-i18n="settings.theme">テーマ</span>
         <div class="theme-options">
-          <div class="theme-btn tb-std" onclick="changeTheme('')" data-i18n-title="theme.std"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
-          <div class="theme-btn tb-sepia" onclick="changeTheme('sepia')" data-i18n-title="theme.sepia"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
-          <div class="theme-btn tb-white" onclick="changeTheme('white')" data-i18n-title="theme.white"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
-          <div class="theme-btn tb-dark" onclick="changeTheme('dark')" data-i18n-title="theme.dark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
+          <div class="theme-btn tb-std"    onclick="changeTheme('')"       data-i18n-title="theme.std"   ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
+          <div class="theme-btn tb-sepia"  onclick="changeTheme('sepia')"  data-i18n-title="theme.sepia" ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
+          <div class="theme-btn tb-white"  onclick="changeTheme('white')"  data-i18n-title="theme.white" ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
+          <div class="theme-btn tb-dark"   onclick="changeTheme('dark')"   data-i18n-title="theme.dark"  ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
+          <div class="theme-btn tb-sakura" onclick="changeTheme('sakura')" data-i18n-title="theme.sakura"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
+          <div class="theme-btn tb-hoshi"  onclick="changeTheme('hoshi')"  data-i18n-title="theme.hoshi" ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
+          <div class="theme-btn tb-matcha" onclick="changeTheme('matcha')" data-i18n-title="theme.matcha"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
+          <div class="theme-btn tb-tsuki"  onclick="changeTheme('tsuki')"  data-i18n-title="theme.tsuki" ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
         </div>
       </div>
     </div>
@@ -305,14 +361,12 @@
       <h4 data-i18n="settings.typography">タイポグラフィ</h4>
       <div class="set-row">
         <span class="set-label" data-i18n="settings.font">フォント</span>
-        <select class="modern-select" id="font-select" onchange="changeFont(this.value)">
-          <option value="publisher" data-i18n="font.publisher">指定なし</option>
-          <option value="mincho" data-i18n="font.mincho">明朝体</option>
-          <option value="gothic" data-i18n="font.gothic">ゴシック体</option>
-          <option value="meiryo" data-i18n="font.meiryo">メイリオ</option>
-          <option value="serif" data-i18n="font.serif">汎用セリフ</option>
-          <option value="sans" data-i18n="font.sans">汎用サンセリフ</option>
-        </select>
+        <div id="font-picker">
+          <button id="font-picker-btn" type="button" onclick="toggleFontPicker()" aria-expanded="false">
+            <span id="font-picker-label"></span><span id="font-picker-arrow">▾</span>
+          </button>
+          <div id="font-picker-list"></div>
+        </div>
       </div>
       <div class="set-row">
         <span class="set-label" data-i18n="settings.fontSize">文字サイズ</span>
@@ -375,12 +429,29 @@
 
 <div id="main">
   <div id="sidebar" class="hidden">
-    <div id="sidebar-header">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
-      <span data-i18n="sidebar.toc">目次</span>
+    <div id="sidebar-tabs">
+      <button id="tab-toc" class="sidebar-tab active" onclick="switchSidebarTab('toc')">
+        <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+        <span data-i18n="sidebar.toc">目次</span>
+      </button>
+      <button id="tab-search" class="sidebar-tab" onclick="switchSidebarTab('search')">
+        <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <span data-i18n="sidebar.search">検索</span>
+      </button>
     </div>
-    <div id="jump-history-section" style="display:none"></div>
-    <div id="toc-list"></div>
+    <div id="toc-panel">
+      <div id="jump-history-section" style="display:none"></div>
+      <div id="toc-list"></div>
+    </div>
+    <div id="search-panel" style="display:none">
+      <div id="search-input-area">
+        <input id="search-input" type="search" autocomplete="off" data-i18n-placeholder="search.placeholder" placeholder="キーワードを入力">
+        <button id="search-btn" onclick="startSearch()" data-i18n="search.btn">検索</button>
+      </div>
+      <div id="search-progress-bar"><div id="search-progress-fill"></div></div>
+      <div id="search-status"></div>
+      <div id="search-results"></div>
+    </div>
   </div>
   <div id="reading-area">
     <div id="welcome">
@@ -494,6 +565,10 @@ const I18N = {
     'theme.sepia':          'セピア',
     'theme.white':          '白紙',
     'theme.dark':           'ダーク',
+    'theme.sakura':         'さくら',
+    'theme.hoshi':          '星空',
+    'theme.matcha':         '抹茶',
+    'theme.tsuki':          '月夜',
     'settings.typography':  'タイポグラフィ',
     'settings.font':        'フォント',
     'font.publisher':       '指定なし',
@@ -523,7 +598,16 @@ const I18N = {
     'fwdSize.medium':       '中',
     'fwdSize.large':        '大',
     'sidebar.toc':          '目次',
+    'sidebar.search':       '検索',
     'sidebar.chapter':      '第{n}章',
+    'search.placeholder':   'キーワードを入力',
+    'search.btn':           '検索',
+    'search.progress':      '{n}/{total}章を検索中…',
+    'search.cancel':        '中止',
+    'search.done':          '{count}件（{total}章中）',
+    'search.none':          '見つかりませんでした',
+    'search.noEpub':        '書籍を開いてください',
+    'search.more':          '他{n}件',
     'resume.label':         '前回の続きから読みますか？',
     'resume.hint':          '同じファイルを開くと続きから再開します',
     'welcome.open.title':   'ePubファイルを開く',
@@ -536,7 +620,8 @@ const I18N = {
     'help.author':          '著者：{creator}',
     'help.chapters':        'チャプター数：{n}',
     'help.tocItems':        '目次項目数：{n}',
-    'help.body':            '<p><strong>📱 ページスクロール（主操作）</strong></p><p>　左スワイプ：1画面分 前進スクロール</p><p>　右スワイプ：1画面分 後退スクロール</p><p>　画面下「次へ」・上「前へ」ボタン</p><p>　※章末尾/先頭で自動的に章移動</p><br><p><strong>📖 章切り替え</strong></p><p>　右「›」ボタン：前の章</p><p>　左「‹」ボタン：次の章</p><br><p><strong>🔵 Bluetoothキーボード</strong></p><p>　スペース：次へ　Shift+スペース：前へ</p><p>　← 次の章　→ 前の章</p><br><p><strong>フォント／テーマ</strong></p><p>　設定パネル（歯車アイコン）で変更</p><br><p><strong>ファイル形式</strong></p><p>　.epub / .kepub（Kobo）対応</p><br><p><strong>🔖 しおり</strong></p><p>　読み位置は自動記録されます。ツールバーの4つのアイコンでバックアップ・同期が可能です。</p><p>　📥 ローカル読込：保存済み .json ファイルからしおりを読み込む</p><p>　📤 ローカル書出：しおりを .json ファイルとして書き出す</p><p>　☁↓ Drive読込：Google Driveからしおりを読み込む（ローカルを上書き）</p><p>　☁↑ Drive保存：しおりをGoogle Driveに保存する（複数デバイス間で共有可能）</p><p style="font-size:12px;opacity:.6;">　※ Drive機能はHTTP/HTTPSサーバー経由の起動とGoogle Client IDの設定が必要です</p>',
+    'help.body':            '<p><strong>📱 ページスクロール（主操作）</strong></p><p>　左スワイプ：1画面分 前進スクロール</p><p>　右スワイプ：1画面分 後退スクロール</p><p>　画面下「次へ」・上「前へ」ボタン</p><p>　※章末尾/先頭で自動的に章移動</p><br><p><strong>📖 章切り替え</strong></p><p>　右「›」ボタン：前の章</p><p>　左「‹」ボタン：次の章</p><br><p><strong>🔵 Bluetoothキーボード</strong></p><p>　スペース：次へ　Shift+スペース：前へ</p><p>　← 次の章　→ 前の章</p><br><p><strong>🔍 全文検索</strong></p><p>　サイドバー（目次ボタン）→「検索」タブにキーワードを入力してEnter</p><p>　タップするとその章に移動（ジャンプ履歴にも記録）</p><br><p><strong>🎨 表示設定（歯車アイコン）</strong></p><p>　フォント：22種（游明朝・ゴシック・Google Fonts など）</p><p>　テーマ：8色（標準・セピア・白紙・ダーク・さくら・星空・抹茶・月夜）</p><p>　文字サイズ・行間・余白・書字方向も変更可能</p><br><p><strong>🔖 しおり・ジャンプ履歴</strong></p><p>　読み位置は自動記録。サイドバーの目次タブでジャンプ履歴と元の位置に戻れます</p><p>　📥 ローカル読込　📤 ローカル書出　☁↓ Drive読込　☁↑ Drive保存</p><p style="font-size:12px;opacity:.6;">　※ Drive機能はHTTP/HTTPSサーバー経由の起動とGoogle Client IDの設定が必要です</p><br><p><strong>ファイル形式</strong></p><p>　.epub / .kepub（Kobo）対応</p>',
+    'toast.webFontFile':    '☁ ウェブフォントはオフラインまたはfile://環境で表示されない場合があります',
     'toast.resume':         '📖 前回の続きから再開（{n} / {total}章）',
     'toast.fileMissing':    '⚠️ ファイルが見つかりません: {path}',
     'toast.noBookmarks':    '書き出せるしおりがありません',
@@ -591,6 +676,10 @@ const I18N = {
     'theme.sepia':          'Sepia',
     'theme.white':          'White',
     'theme.dark':           'Dark',
+    'theme.sakura':         'Sakura',
+    'theme.hoshi':          'Starry Night',
+    'theme.matcha':         'Matcha',
+    'theme.tsuki':          'Moonlit',
     'settings.typography':  'Typography',
     'settings.font':        'Font',
     'font.publisher':       'Default',
@@ -620,7 +709,16 @@ const I18N = {
     'fwdSize.medium':       'Medium',
     'fwdSize.large':        'Large',
     'sidebar.toc':          'Contents',
+    'sidebar.search':       'Search',
     'sidebar.chapter':      'Chapter {n}',
+    'search.placeholder':   'Enter keyword',
+    'search.btn':           'Search',
+    'search.progress':      'Searching {n}/{total}…',
+    'search.cancel':        'Cancel',
+    'search.done':          '{count} hit(s) in {total} ch.',
+    'search.none':          'Not found',
+    'search.noEpub':        'Open a book first',
+    'search.more':          '+{n} more',
     'resume.label':         'Continue reading?',
     'resume.hint':          'Open the same file to resume',
     'welcome.open.title':   'Open ePub file',
@@ -633,7 +731,8 @@ const I18N = {
     'help.author':          'Author: {creator}',
     'help.chapters':        'Chapters: {n}',
     'help.tocItems':        'TOC items: {n}',
-    'help.body':            '<p><strong>📱 Page scroll (main operation)</strong></p><p>&nbsp;Swipe left: scroll forward one page</p><p>&nbsp;Swipe right: scroll back one page</p><p>&nbsp;"Next" button (bottom) / "Prev" button (top)</p><p>&nbsp;※ Automatically advances chapter at boundaries</p><br><p><strong>📖 Chapter navigation</strong></p><p>&nbsp;"›" button (right): previous chapter</p><p>&nbsp;"‹" button (left): next chapter</p><br><p><strong>🔵 Bluetooth keyboard</strong></p><p>&nbsp;Space: forward　Shift+Space: back</p><p>&nbsp;← next chapter　→ previous chapter</p><br><p><strong>Font / Theme</strong></p><p>&nbsp;Change via the settings panel (⚙ icon)</p><br><p><strong>File formats</strong></p><p>&nbsp;.epub / .kepub (Kobo) supported</p><br><p><strong>🔖 Bookmarks</strong></p><p>&nbsp;Reading position is saved automatically. Use the 4 toolbar icons to back up and sync.</p><p>&nbsp;📥 Local import: Load bookmarks from a saved .json file</p><p>&nbsp;📤 Local export: Download bookmarks as a .json file</p><p>&nbsp;☁↓ Drive load: Load bookmarks from Google Drive (overwrites local data)</p><p>&nbsp;☁↑ Drive save: Save bookmarks to Google Drive (share across devices)</p><p style="font-size:12px;opacity:.6;">&nbsp;※ Drive features require HTTP/HTTPS server and Google Client ID configuration</p>',
+    'help.body':            '<p><strong>📱 Page scroll (main operation)</strong></p><p>&nbsp;Swipe left: scroll forward one page</p><p>&nbsp;Swipe right: scroll back one page</p><p>&nbsp;"Next" button (bottom) / "Prev" button (top)</p><p>&nbsp;※ Automatically advances chapter at boundaries</p><br><p><strong>📖 Chapter navigation</strong></p><p>&nbsp;"›" button (right): previous chapter</p><p>&nbsp;"‹" button (left): next chapter</p><br><p><strong>🔵 Bluetooth keyboard</strong></p><p>&nbsp;Space: forward　Shift+Space: back</p><p>&nbsp;← next chapter　→ previous chapter</p><br><p><strong>🔍 Full-text search</strong></p><p>&nbsp;Open sidebar (Contents button) → "Search" tab, type a keyword and press Enter</p><p>&nbsp;Tap a result to jump to that chapter (also recorded in jump history)</p><br><p><strong>🎨 Display settings (⚙ icon)</strong></p><p>&nbsp;Font: 22 options (Mincho, Gothic, Google Fonts, etc.)</p><p>&nbsp;Theme: 8 colors (Standard, Sepia, White, Dark, Sakura, Starry Night, Matcha, Moonlit)</p><p>&nbsp;Font size, line height, margin, and writing mode</p><br><p><strong>🔖 Bookmarks &amp; jump history</strong></p><p>&nbsp;Reading position is saved automatically. Sidebar TOC tab shows jump history.</p><p>&nbsp;📥 Local import　📤 Local export　☁↓ Drive load　☁↑ Drive save</p><p style="font-size:12px;opacity:.6;">&nbsp;※ Drive features require HTTP/HTTPS server and Google Client ID configuration</p><br><p><strong>File formats</strong></p><p>&nbsp;.epub / .kepub (Kobo) supported</p>',
+    'toast.webFontFile':    '☁ Web fonts may not display in offline or file:// environments',
     'toast.resume':         '📖 Resumed from chapter {n} of {total}',
     'toast.fileMissing':    '⚠️ File not found: {path}',
     'toast.noBookmarks':    'No bookmarks to export',
@@ -688,6 +787,10 @@ const I18N = {
     'theme.sepia':          '棕褐',
     'theme.white':          '白紙',
     'theme.dark':           '暗色',
+    'theme.sakura':         '櫻花',
+    'theme.hoshi':          '星空',
+    'theme.matcha':         '抹茶',
+    'theme.tsuki':          '月夜',
     'settings.typography':  '排版',
     'settings.font':        '字型',
     'font.publisher':       '預設',
@@ -717,7 +820,16 @@ const I18N = {
     'fwdSize.medium':       '中',
     'fwdSize.large':        '大',
     'sidebar.toc':          '目錄',
+    'sidebar.search':       '搜尋',
     'sidebar.chapter':      '第 {n} 章',
+    'search.placeholder':   '輸入關鍵字',
+    'search.btn':           '搜尋',
+    'search.progress':      '搜尋第{n}/{total}章…',
+    'search.cancel':        '取消',
+    'search.done':          '{count}筆（共{total}章）',
+    'search.none':          '找不到結果',
+    'search.noEpub':        '請先開啟書籍',
+    'search.more':          '另{n}筆',
     'resume.label':         '繼續上次閱讀？',
     'resume.hint':          '開啟相同檔案以繼續閱讀',
     'welcome.open.title':   '開啟 ePub 檔案',
@@ -730,7 +842,8 @@ const I18N = {
     'help.author':          '作者：{creator}',
     'help.chapters':        '章節數：{n}',
     'help.tocItems':        '目錄項目數：{n}',
-    'help.body':            '<p><strong>📱 頁面捲動（主要操作）</strong></p><p>　向左滑動：前進一頁</p><p>　向右滑動：後退一頁</p><p>　畫面下方「下一頁」・上方「上一頁」按鈕</p><p>　※章節末尾/開頭時自動切換章節</p><br><p><strong>📖 章節切換</strong></p><p>　右側「›」按鈕：上一章</p><p>　左側「‹」按鈕：下一章</p><br><p><strong>🔵 藍牙鍵盤</strong></p><p>　空白鍵：前進　Shift+空白：後退</p><p>　← 下一章　→ 上一章</p><br><p><strong>字型／主題</strong></p><p>　於設定面板（⚙圖示）中變更</p><br><p><strong>支援格式</strong></p><p>　.epub / .kepub（Kobo）</p><br><p><strong>🔖 書籤</strong></p><p>　閱讀位置會自動記錄。工具列的 4 個圖示可用於備份與同步。</p><p>　📥 本機匯入：從已儲存的 .json 檔案載入書籤</p><p>　📤 本機匯出：將書籤下載為 .json 檔案</p><p>　☁↓ 從 Drive 載入：從 Google Drive 載入書籤（覆蓋本機資料）</p><p>　☁↑ 儲存至 Drive：將書籤儲存至 Google Drive（可跨裝置共用）</p><p style="font-size:12px;opacity:.6;">　※ Drive 功能需透過 HTTP/HTTPS 伺服器啟動並設定 Google Client ID</p>',
+    'help.body':            '<p><strong>📱 頁面捲動（主要操作）</strong></p><p>　向左滑動：前進一頁</p><p>　向右滑動：後退一頁</p><p>　畫面下方「下一頁」・上方「上一頁」按鈕</p><p>　※章節末尾/開頭時自動切換章節</p><br><p><strong>📖 章節切換</strong></p><p>　右側「›」按鈕：上一章</p><p>　左側「‹」按鈕：下一章</p><br><p><strong>🔵 藍牙鍵盤</strong></p><p>　空白鍵：前進　Shift+空白：後退</p><p>　← 下一章　→ 上一章</p><br><p><strong>🔍 全文搜尋</strong></p><p>　側邊欄（目錄按鈕）→「搜尋」索引標籤，輸入關鍵字後按 Enter</p><p>　點擊結果即可跳轉至該章（同時記錄於跳轉歷史）</p><br><p><strong>🎨 顯示設定（⚙圖示）</strong></p><p>　字型：22 種（明朝體・黑體・Google Fonts 等）</p><p>　主題：8 色（標準・棕褐・白紙・暗色・櫻花・星空・抹茶・月夜）</p><p>　字型大小・行距・邊距・書寫方向</p><br><p><strong>🔖 書籤・跳轉歷史</strong></p><p>　閱讀位置自動記錄。側邊欄目錄索引標籤可查看跳轉歷史</p><p>　📥 本機匯入　📤 本機匯出　☁↓ Drive 載入　☁↑ Drive 儲存</p><p style="font-size:12px;opacity:.6;">　※ Drive 功能需透過 HTTP/HTTPS 伺服器啟動並設定 Google Client ID</p><br><p><strong>支援格式</strong></p><p>　.epub / .kepub（Kobo）</p>',
+    'toast.webFontFile':    '☁ 離線或 file:// 環境下，網路字型可能無法顯示',
     'toast.resume':         '📖 從第 {n} 章（共 {total} 章）繼續閱讀',
     'toast.fileMissing':    '⚠️ 找不到檔案：{path}',
     'toast.noBookmarks':    '沒有可匯出的書籤',
@@ -785,6 +898,10 @@ const I18N = {
     'theme.sepia':          '棕褐',
     'theme.white':          '白纸',
     'theme.dark':           '深色',
+    'theme.sakura':         '樱花',
+    'theme.hoshi':          '星空',
+    'theme.matcha':         '抹茶',
+    'theme.tsuki':          '月夜',
     'settings.typography':  '排版',
     'settings.font':        '字体',
     'font.publisher':       '默认',
@@ -814,7 +931,16 @@ const I18N = {
     'fwdSize.medium':       '中',
     'fwdSize.large':        '大',
     'sidebar.toc':          '目录',
+    'sidebar.search':       '搜索',
     'sidebar.chapter':      '第 {n} 章',
+    'search.placeholder':   '输入关键词',
+    'search.btn':           '搜索',
+    'search.progress':      '搜索第{n}/{total}章…',
+    'search.cancel':        '取消',
+    'search.done':          '{count}条（共{total}章）',
+    'search.none':          '找不到结果',
+    'search.noEpub':        '请先打开书籍',
+    'search.more':          '另{n}条',
     'resume.label':         '继续上次阅读？',
     'resume.hint':          '打开相同文件以继续阅读',
     'welcome.open.title':   '打开 ePub 文件',
@@ -827,7 +953,8 @@ const I18N = {
     'help.author':          '作者：{creator}',
     'help.chapters':        '章节数：{n}',
     'help.tocItems':        '目录项目数：{n}',
-    'help.body':            '<p><strong>📱 页面滚动（主要操作）</strong></p><p>　向左滑动：前进一页</p><p>　向右滑动：后退一页</p><p>　画面下方「下一页」・上方「上一页」按钮</p><p>　※章节末尾/开头时自动切换章节</p><br><p><strong>📖 章节切换</strong></p><p>　右侧「›」按钮：上一章</p><p>　左侧「‹」按钮：下一章</p><br><p><strong>🔵 蓝牙键盘</strong></p><p>　空格键：前进　Shift+空格：后退</p><p>　← 下一章　→ 上一章</p><br><p><strong>字体／主题</strong></p><p>　在设置面板（⚙图标）中更改</p><br><p><strong>支持格式</strong></p><p>　.epub / .kepub（Kobo）</p><br><p><strong>🔖 书签</strong></p><p>　阅读位置会自动记录。工具栏的 4 个图标可用于备份与同步。</p><p>　📥 本地导入：从已保存的 .json 文件加载书签</p><p>　📤 本地导出：将书签下载为 .json 文件</p><p>　☁↓ 从 Drive 加载：从 Google Drive 加载书签（覆盖本地数据）</p><p>　☁↑ 保存至 Drive：将书签保存至 Google Drive（可跨设备共用）</p><p style="font-size:12px;opacity:.6;">　※ Drive 功能需通过 HTTP/HTTPS 服务器启动并配置 Google Client ID</p>',
+    'help.body':            '<p><strong>📱 页面滚动（主要操作）</strong></p><p>　向左滑动：前进一页</p><p>　向右滑动：后退一页</p><p>　画面下方「下一页」・上方「上一页」按钮</p><p>　※章节末尾/开头时自动切换章节</p><br><p><strong>📖 章节切换</strong></p><p>　右侧「›」按钮：上一章</p><p>　左侧「‹」按钮：下一章</p><br><p><strong>🔵 蓝牙键盘</strong></p><p>　空格键：前进　Shift+空格：后退</p><p>　← 下一章　→ 上一章</p><br><p><strong>🔍 全文搜索</strong></p><p>　侧边栏（目录按钮）→「搜索」选项卡，输入关键词后按 Enter</p><p>　点击结果即可跳转至该章（同时记录于跳转历史）</p><br><p><strong>🎨 显示设置（⚙图标）</strong></p><p>　字体：22 种（明朝体・黑体・Google Fonts 等）</p><p>　主题：8 色（标准・棕褐・白纸・深色・樱花・星空・抹茶・月夜）</p><p>　字体大小・行距・边距・书写方向</p><br><p><strong>🔖 书签・跳转历史</strong></p><p>　阅读位置自动记录。侧边栏目录选项卡可查看跳转历史</p><p>　📥 本地导入　📤 本地导出　☁↓ Drive 加载　☁↑ Drive 保存</p><p style="font-size:12px;opacity:.6;">　※ Drive 功能需通过 HTTP/HTTPS 服务器启动并配置 Google Client ID</p><br><p><strong>支持格式</strong></p><p>　.epub / .kepub（Kobo）</p>',
+    'toast.webFontFile':    '☁ 离线或 file:// 环境下，网络字体可能无法显示',
     'toast.resume':         '📖 从第 {n} 章（共 {total} 章）继续阅读',
     'toast.fileMissing':    '⚠️ 找不到文件：{path}',
     'toast.noBookmarks':    '没有可导出的书签',
@@ -904,7 +1031,14 @@ function applyI18n() {
   document.querySelectorAll('[data-i18n-title]').forEach(el => {
     el.title = t(el.dataset.i18nTitle);
   });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+    el.placeholder = t(el.dataset.i18nPlaceholder);
+  });
   document.querySelectorAll('.lang-select').forEach(s => { s.value = _lang; });
+  updateFontPickerUI();
+  if (document.getElementById('font-picker-list').classList.contains('open')) {
+    buildFontPickerList();
+  }
 }
 
 // ══════════════════════════════════════════
@@ -932,15 +1066,127 @@ const THEME_CONTENT = {
   sepia:   { paper: '#dfc89a', text: '#2e1a06' },
   white:   { paper: '#ffffff', text: '#111111' },
   dark:    { paper: '#111111', text: '#e8e8e8' },
+  sakura:  { paper: '#fff5f7', text: '#3d1020' },
+  hoshi:   { paper: '#0e1a2e', text: '#c8daf0' },
+  matcha:  { paper: '#f0f5e8', text: '#1e301a' },
+  tsuki:   { paper: '#f0f0fa', text: '#1a1840' },
 };
 
 const FONTS = {
-  publisher: null,
-  mincho:  '"游明朝","YuMincho","ヒラギノ明朝 ProN","HiraMinProN-W3","Noto Serif CJK JP",serif',
-  gothic:  '"游ゴシック","YuGothic","ヒラギノ角ゴ ProN","HiraKakuProN-W3","Noto Sans CJK JP",sans-serif',
-  meiryo:  '"メイリオ","Meiryo","MS Gothic",sans-serif',
-  serif:   'serif',
-  sans:    'sans-serif',
+  publisher:        null,
+  mincho:           '"游明朝","YuMincho","ヒラギノ明朝 ProN","HiraMinProN-W3","Noto Serif CJK JP",serif',
+  gothic:           '"游ゴシック","YuGothic","ヒラギノ角ゴ ProN","HiraKakuProN-W3","Noto Sans CJK JP",sans-serif',
+  meiryo:           '"メイリオ","Meiryo","MS Gothic",sans-serif',  // 後方互換のため残存
+  serif:            'serif',
+  sans:             'sans-serif',
+  'noto-serif-jp':  '"Noto Serif JP",serif',
+  'noto-sans-jp':   '"Noto Sans JP",sans-serif',
+  'shippori-mincho':'"Shippori Mincho",serif',
+  'zen-mincho':     '"Zen Mincho",serif',
+  'biz-udp-mincho': '"BIZ UDPMincho",serif',
+  'biz-udp-gothic': '"BIZ UDPGothic",sans-serif',
+  'klee-one':       '"Klee One",cursive',
+  'zen-antique':    '"Zen Antique",serif',
+  'sawarabi-mincho':'"Sawarabi Mincho",serif',
+  'm-plus-1':       '"M PLUS 1",sans-serif',
+  'hina-mincho':    '"Hina Mincho",serif',
+  'noto-serif-tc':  '"Noto Serif TC",serif',
+  'noto-sans-tc':   '"Noto Sans TC",sans-serif',
+  'noto-serif-sc':  '"Noto Serif SC",serif',
+  'noto-sans-sc':   '"Noto Sans SC",sans-serif',
+  'literata':       '"Literata",serif',
+  'lora':           '"Lora",serif',
+  'eb-garamond':    '"EB Garamond",serif',
+  'merriweather':   '"Merriweather",serif',
+};
+
+// Google Fonts URL マップ（ウェブフォントのみ）
+const FONT_URLS = {
+  'noto-serif-jp':  'https://fonts.googleapis.com/css2?family=Noto+Serif+JP&display=swap',
+  'noto-sans-jp':   'https://fonts.googleapis.com/css2?family=Noto+Sans+JP&display=swap',
+  'shippori-mincho':'https://fonts.googleapis.com/css2?family=Shippori+Mincho&display=swap',
+  'zen-mincho':     'https://fonts.googleapis.com/css2?family=Zen+Mincho&display=swap',
+  'biz-udp-mincho': 'https://fonts.googleapis.com/css2?family=BIZ+UDPMincho&display=swap',
+  'biz-udp-gothic': 'https://fonts.googleapis.com/css2?family=BIZ+UDPGothic&display=swap',
+  'klee-one':       'https://fonts.googleapis.com/css2?family=Klee+One&display=swap',
+  'zen-antique':    'https://fonts.googleapis.com/css2?family=Zen+Antique&display=swap',
+  'sawarabi-mincho':'https://fonts.googleapis.com/css2?family=Sawarabi+Mincho&display=swap',
+  'm-plus-1':       'https://fonts.googleapis.com/css2?family=M+PLUS+1&display=swap',
+  'hina-mincho':    'https://fonts.googleapis.com/css2?family=Hina+Mincho&display=swap',
+  'noto-serif-tc':  'https://fonts.googleapis.com/css2?family=Noto+Serif+TC&display=swap',
+  'noto-sans-tc':   'https://fonts.googleapis.com/css2?family=Noto+Sans+TC&display=swap',
+  'noto-serif-sc':  'https://fonts.googleapis.com/css2?family=Noto+Serif+SC&display=swap',
+  'noto-sans-sc':   'https://fonts.googleapis.com/css2?family=Noto+Sans+SC&display=swap',
+  'literata':       'https://fonts.googleapis.com/css2?family=Literata:ital,opsz@0,7..72;1,7..72&display=swap',
+  'lora':           'https://fonts.googleapis.com/css2?family=Lora:ital@0;1&display=swap',
+  'eb-garamond':    'https://fonts.googleapis.com/css2?family=EB+Garamond:ital@0;1&display=swap',
+  'merriweather':   'https://fonts.googleapis.com/css2?family=Merriweather:ital,wght@0,400;1,400&display=swap',
+};
+
+// フォントピッカー グループ定義
+const FONT_GROUPS = [
+  { key: 'publisher', label: 'font.publisher', i18n: true },
+  {
+    groupLabel: { ja:'日本語・明朝系', en:'Japanese Serif', 'zh-TW':'日文・明朝', 'zh-CN':'日文・明朝' },
+    items: [
+      { key: 'mincho',           label: 'font.mincho',  i18n: true },
+      { key: 'noto-serif-jp',    label: 'Noto Serif JP' },
+      { key: 'shippori-mincho',  label: 'しっぽり明朝' },
+      { key: 'zen-mincho',       label: 'Zen 明朝' },
+      { key: 'biz-udp-mincho',   label: 'BIZ UDPMincho' },
+      { key: 'sawarabi-mincho',  label: 'Sawarabi Mincho' },
+      { key: 'hina-mincho',      label: 'Hina Mincho' },
+      { key: 'serif',            label: 'font.serif',   i18n: true },
+    ],
+  },
+  {
+    groupLabel: { ja:'日本語・ゴシック系', en:'Japanese Sans-serif', 'zh-TW':'日文・黑體', 'zh-CN':'日文・黑体' },
+    items: [
+      { key: 'gothic',           label: 'font.gothic',  i18n: true },
+      { key: 'noto-sans-jp',     label: 'Noto Sans JP' },
+      { key: 'biz-udp-gothic',   label: 'BIZ UDPGothic' },
+      { key: 'm-plus-1',         label: 'M PLUS 1' },
+      { key: 'sans',             label: 'font.sans',    i18n: true },
+    ],
+  },
+  {
+    groupLabel: { ja:'日本語・その他', en:'Japanese Other', 'zh-TW':'日文・其他', 'zh-CN':'日文・其他' },
+    items: [
+      { key: 'klee-one',         label: 'Klee One' },
+      { key: 'zen-antique',      label: 'Zen Antique' },
+    ],
+  },
+  {
+    groupLabel: { ja:'繁體中文', en:'Traditional Chinese', 'zh-TW':'繁體中文', 'zh-CN':'繁体中文' },
+    items: [
+      { key: 'noto-serif-tc',    label: 'Noto Serif TC' },
+      { key: 'noto-sans-tc',     label: 'Noto Sans TC' },
+    ],
+  },
+  {
+    groupLabel: { ja:'简体中文', en:'Simplified Chinese', 'zh-TW':'简体中文', 'zh-CN':'简体中文' },
+    items: [
+      { key: 'noto-serif-sc',    label: 'Noto Serif SC' },
+      { key: 'noto-sans-sc',     label: 'Noto Sans SC' },
+    ],
+  },
+  {
+    groupLabel: { ja:'欧文', en:'Latin', 'zh-TW':'歐文', 'zh-CN':'欧文' },
+    items: [
+      { key: 'literata',         label: 'Literata' },
+      { key: 'lora',             label: 'Lora' },
+      { key: 'eb-garamond',      label: 'EB Garamond' },
+      { key: 'merriweather',     label: 'Merriweather' },
+    ],
+  },
+];
+
+// フォントピッカー サンプル文字列（言語別）
+const FONT_SAMPLE = {
+  ja: '読みかけ',
+  en: 'middle of',
+  'zh-TW': '讀了一半的書',
+  'zh-CN': '读了一半的书',
 };
 
 // ══════════════════════════════════════════
@@ -1018,6 +1264,10 @@ async function loadEpub(file) {
     try { localStorage.setItem('epub_last_book', JSON.stringify({ title: titleText, bookKey: state.bookKey })); } catch(e) {}
     _originalBookmark = null;
     _jumpHistory = [];
+    resetSearch();
+    switchSidebarTab('toc');
+    document.getElementById('search-input').disabled = false;
+    document.getElementById('search-btn').disabled = false;
     const saved = loadSavedPos();
     if (saved && saved.spineIdx > 0 && saved.spineIdx < state.spine.length) {
       _originalBookmark = {spineIdx: saved.spineIdx, ratio: typeof saved.ratio === 'number' ? saved.ratio : 0};
@@ -1179,6 +1429,9 @@ async function buildSrcdoc(xhtmlText, xhtmlAbsPath, scrollTarget, readySeq) {
   const colors = THEME_CONTENT[state.theme] || THEME_CONTENT[''];
   const paper  = colors.paper;
   const text   = colors.text;
+  const fontImport = FONT_URLS[state.fontMode]
+    ? '@import url(\'' + FONT_URLS[state.fontMode] + '\');\n'
+    : '';
   const fontRule = font ? 'body,body *{font-family:' + font + '!important;}' : '';
   const wm = state.writingMode;
   const bodyWmCss = wm === 'vertical'
@@ -1196,7 +1449,7 @@ async function buildSrcdoc(xhtmlText, xhtmlAbsPath, scrollTarget, readySeq) {
         'overflow:visible!important;max-width:none!important;max-height:none!important;';
   const overrideStyle = doc.createElement('style');
   overrideStyle.id = 'epub-viewer-inject';
-  overrideStyle.textContent = [
+  overrideStyle.textContent = fontImport + [
     'html{height:100%!important;overflow:hidden!important;',
         'margin:0!important;padding:0!important;',
         'background:' + paper + '!important;}',
@@ -1577,6 +1830,10 @@ let _pendingScrollAfterRender = 0; // 描画中に受け取ったスクロール
 let _intraChapterRatio = 0;        // 章内スクロール比率（0–1）プログレスバー表示用
 let _originalBookmark  = null;     // {spineIdx, ratio} | null — 開いた時のしおり位置
 let _jumpHistory       = [];       // [{spineIdx, ratio}] 直近4件のジャンプ前位置（新しい順）
+let _sidebarTab        = 'toc';    // 'toc' | 'search' — サイドバーの現在タブ
+let _searching         = false;    // 検索実行中
+let _searchAbort       = false;    // 検索中止フラグ（後方互換のため残存、実質 _searchSeq で代替）
+let _searchSeq         = 0;        // 検索シーケンス番号（新検索開始でインクリメント）
 
 async function renderPage(idx, scrollTarget) {
   if (!state.epub || idx < 0 || idx >= state.spine.length) return;
@@ -1805,7 +2062,7 @@ function loadSettings() {
   try {
     const s = JSON.parse(localStorage.getItem(SETTINGS_KEY));
     if (!s) return;
-    if (s.fontMode)              { state.fontMode = s.fontMode;         const el = document.getElementById('font-select'); if(el) el.value = s.fontMode; }
+    if (s.fontMode)              { state.fontMode = s.fontMode;         updateFontPickerUI(); }
     if (s.fontSize)              { state.fontSize = s.fontSize;         const el = document.getElementById('font-size-display'); if(el) el.textContent = s.fontSize + '%'; }
     if (s.lineHeight)            { state.lineHeight = s.lineHeight;     const el = document.getElementById('lineh-select'); if(el) el.value = String(s.lineHeight); }
     if (s.theme !== undefined)   { state.theme = s.theme;               document.body.className = s.theme ? 'theme-' + s.theme : ''; if(typeof updateThemeBtnUI === 'function') updateThemeBtnUI(); }
@@ -1823,6 +2080,7 @@ function toggleSettings() {
     pop.classList.remove('show');
     overlay.classList.remove('show');
     document.getElementById('settings-btn').classList.remove('active');
+    closeFontPicker();
   } else {
     pop.classList.add('show');
     overlay.classList.add('show');
@@ -1859,10 +2117,297 @@ function toggleSidebar() {
   state.sidebarOpen = !state.sidebarOpen;
   document.getElementById('sidebar').classList.toggle('hidden', !state.sidebarOpen);
   document.getElementById('toc-btn').classList.toggle('active', state.sidebarOpen);
+  if (state.sidebarOpen && _sidebarTab === 'search') {
+    setTimeout(() => document.getElementById('search-input').focus(), 50);
+  }
 }
+// ══════════════════════════════════════════
+//  Sidebar tab
+// ══════════════════════════════════════════
+function switchSidebarTab(tab) {
+  _sidebarTab = tab;
+  document.getElementById('toc-panel').style.display    = tab === 'toc'    ? '' : 'none';
+  document.getElementById('search-panel').style.display = tab === 'search' ? '' : 'none';
+  document.getElementById('tab-toc').classList.toggle('active',    tab === 'toc');
+  document.getElementById('tab-search').classList.toggle('active', tab === 'search');
+  if (tab === 'search') {
+    const inp = document.getElementById('search-input');
+    inp.disabled = !state.epub;
+    document.getElementById('search-btn').disabled = !state.epub;
+    setTimeout(() => inp.focus(), 50);
+  }
+}
+// ══════════════════════════════════════════
+//  Full-text Search
+// ══════════════════════════════════════════
+function htmlToText(html) {
+  return html
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&amp;/g,  '&')
+    .replace(/&lt;/g,   '<')
+    .replace(/&gt;/g,   '>')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, h) => { try { return String.fromCodePoint(parseInt(h, 16)); } catch { return ''; } })
+    .replace(/&#([0-9]+);/g,        (_, d) => { try { return String.fromCodePoint(parseInt(d, 10)); } catch { return ''; } })
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function findMatchSnippets(text, query) {
+  const lower = text.toLowerCase();
+  const qLower = query.toLowerCase();
+  const snippets = [];
+  let pos = 0;
+  while (snippets.length < 3) {
+    const idx = lower.indexOf(qLower, pos);
+    if (idx === -1) break;
+    const start = Math.max(0, idx - 40);
+    const end   = Math.min(text.length, idx + query.length + 40);
+    snippets.push({
+      before: (start > 0 ? '…' : '') + text.slice(start, idx),
+      match:  text.slice(idx, idx + query.length),
+      after:  text.slice(idx + query.length, end) + (end < text.length ? '…' : ''),
+    });
+    pos = idx + query.length;
+  }
+  let extra = 0;
+  while (true) {
+    const idx = lower.indexOf(qLower, pos);
+    if (idx === -1) break;
+    extra++;
+    pos = idx + query.length;
+  }
+  return { snippets, extra };
+}
+
+function chapterLabelForSpine(spineIdx) {
+  const item = state.spine[spineIdx];
+  if (!item) return t('sidebar.chapter', { n: spineIdx + 1 });
+  const baseHref = (state.opfDir + item.href).split('#')[0];
+  const found = state.toc.find(e => {
+    const h = e.href.includes('#') ? e.href.split('#')[0] : e.href;
+    const abs = (state.opfDir + h).split('#')[0];
+    return abs === baseHref;
+  });
+  return found ? found.label : t('sidebar.chapter', { n: spineIdx + 1 });
+}
+
+function appendSearchResult(spineIdx, snippets, extra) {
+  const container = document.getElementById('search-results');
+  const label = chapterLabelForSpine(spineIdx);
+  const total = snippets.length + extra;
+
+  const div = document.createElement('div');
+  div.className = 'sr-item';
+  div.onclick = () => navigateFromSearch(spineIdx);
+
+  const ch = document.createElement('div');
+  ch.className = 'sr-chapter';
+  const title = document.createElement('span');
+  title.className = 'sr-chapter-title';
+  title.textContent = label;
+  const badge = document.createElement('span');
+  badge.className = 'sr-badge';
+  badge.textContent = total;
+  ch.appendChild(title);
+  ch.appendChild(badge);
+  div.appendChild(ch);
+
+  if (snippets.length > 0) {
+    const snip = document.createElement('div');
+    snip.className = 'sr-snippet';
+    snip.innerHTML = esc(snippets[0].before) +
+      '<mark>' + esc(snippets[0].match) + '</mark>' +
+      esc(snippets[0].after);
+    div.appendChild(snip);
+  }
+  if (extra > 0) {
+    const more = document.createElement('div');
+    more.className = 'sr-more';
+    more.textContent = t('search.more', { n: extra + snippets.length - 1 });
+    div.appendChild(more);
+  }
+  container.appendChild(div);
+}
+
+function navigateFromSearch(spineIdx) {
+  pushJumpHistory();
+  renderPage(spineIdx, 'start');
+}
+
+function updateSearchProgress(current, total) {
+  document.getElementById('search-progress-fill').style.width =
+    (current / total * 100) + '%';
+  document.getElementById('search-status').innerHTML =
+    '<span>' + t('search.progress', { n: current, total }) + '</span>' +
+    '<button id="search-cancel-btn" onclick="_searchSeq++">' +
+    t('search.cancel') + '</button>';
+}
+
+async function runSearch(query, seq) {
+  const total = state.spine.length;
+  let hitCount = 0;
+
+  for (let i = 0; i < total; i++) {
+    if (seq !== _searchSeq) return;   // 新しい検索が始まったら即中断
+    if (i % 5 === 0) await new Promise(r => setTimeout(r, 0));
+    updateSearchProgress(i + 1, total);
+
+    const item = state.spine[i];
+    const absPath = state.opfDir + item.href.split('#')[0];
+    const file = state.epub.file(absPath);
+    if (!file) continue;
+
+    let html;
+    try { html = await file.async('string'); } catch(e) { continue; }
+
+    const text = htmlToText(html);
+    const { snippets, extra } = findMatchSnippets(text, query);
+    if (snippets.length > 0) {
+      appendSearchResult(i, snippets, extra);
+      hitCount++;
+    }
+  }
+
+  if (seq !== _searchSeq) return;   // 完了時も自分が最新かを確認
+  _searching = false;
+  document.getElementById('search-progress-fill').style.width = '100%';
+  const statusText = hitCount > 0
+    ? t('search.done', { count: hitCount, total })
+    : t('search.none');
+  document.getElementById('search-status').textContent = statusText;
+  setTimeout(() => {
+    if (seq !== _searchSeq) return;
+    document.getElementById('search-progress-fill').style.width = '0%';
+  }, 800);
+}
+
+function startSearch() {
+  if (!state.epub) { showToast(t('search.noEpub')); return; }
+  const query = document.getElementById('search-input').value.trim();
+  if (!query) return;
+
+  _searchSeq++;              // インクリメントだけで旧 runSearch を無効化
+  const seq = _searchSeq;
+  document.getElementById('search-results').innerHTML = '';
+  document.getElementById('search-progress-fill').style.width = '0%';
+  document.getElementById('search-status').textContent = '';
+  _searching = true;
+  runSearch(query, seq);
+}
+
+function resetSearch() {
+  _searchSeq++;              // 実行中の runSearch を無効化
+  _searching = false;
+  document.getElementById('search-input').value = '';
+  document.getElementById('search-results').innerHTML = '';
+  document.getElementById('search-progress-fill').style.width = '0%';
+  document.getElementById('search-status').textContent = '';
+}
+// ══════════════════════════════════════════
+//  Font Picker
+// ══════════════════════════════════════════
+function loadPreviewFonts() {
+  const families = Object.keys(FONT_URLS).map(k => {
+    if (k === 'literata')     return 'Literata:ital,opsz@0,7..72;1,7..72';
+    if (k === 'lora')         return 'Lora:ital@0;1';
+    if (k === 'eb-garamond')  return 'EB+Garamond:ital@0;1';
+    if (k === 'merriweather') return 'Merriweather:ital,wght@0,400;1,400';
+    return FONTS[k].split(',')[0].replace(/"/g,'').trim().replace(/ /g,'+');
+  });
+  const link = document.createElement('link');
+  link.rel = 'stylesheet';
+  link.href = 'https://fonts.googleapis.com/css2?' +
+    families.map(f => 'family=' + f).join('&') + '&display=swap';
+  document.head.appendChild(link);
+}
+
+function buildFontPickerList() {
+  const list = document.getElementById('font-picker-list');
+  if (!list) return;
+  const sample = FONT_SAMPLE[_lang] || FONT_SAMPLE['ja'];
+  let html = '';
+
+  for (const group of FONT_GROUPS) {
+    if (group.key) {
+      const label = group.i18n ? t(group.label) : group.label;
+      const sel   = state.fontMode === group.key ? ' fp-selected' : '';
+      html += '<div class="fp-item' + sel + '" onclick="selectFont(\'' + group.key + '\')">' +
+        '<span class="fp-name">' + esc(label) + '</span>' +
+        '</div>';
+    } else {
+      const glabel = group.groupLabel[_lang] || group.groupLabel['ja'];
+      html += '<div class="fp-group-header">' + esc(glabel) + '</div>';
+      for (const item of group.items) {
+        const label   = item.i18n ? t(item.label) : item.label;
+        const ff      = FONTS[item.key];
+        const style   = ff ? " style='font-family:" + ff + "'" : '';
+        const sel     = state.fontMode === item.key ? ' fp-selected' : '';
+        const isWeb   = !!FONT_URLS[item.key];
+        const nameStr = esc(label) + (isWeb ? ' <span style="font-size:10px;opacity:.5">☁</span>' : '');
+        html += '<div class="fp-item' + sel + '" onclick="selectFont(\'' + item.key + '\')">' +
+          '<span class="fp-name">' + nameStr + '</span>' +
+          '<span class="fp-sample"' + style + '>' + esc(sample) + '</span>' +
+          '</div>';
+      }
+    }
+  }
+
+  list.innerHTML = html;
+}
+
+function toggleFontPicker() {
+  const list = document.getElementById('font-picker-list');
+  const btn  = document.getElementById('font-picker-btn');
+  const open = list.classList.toggle('open');
+  btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  if (open) buildFontPickerList();
+}
+
+function closeFontPicker() {
+  const list = document.getElementById('font-picker-list');
+  const btn  = document.getElementById('font-picker-btn');
+  if (!list) return;
+  list.classList.remove('open');
+  btn.setAttribute('aria-expanded', 'false');
+}
+
+function selectFont(key) {
+  if (FONT_URLS[key] && location.protocol === 'file:') {
+    showToast(t('toast.webFontFile'));
+  }
+  closeFontPicker();
+  changeFont(key);
+}
+
+function updateFontPickerUI() {
+  const label = document.getElementById('font-picker-label');
+  if (!label) return;
+  let name = state.fontMode;
+  for (const group of FONT_GROUPS) {
+    if (group.key === state.fontMode) {
+      name = group.i18n ? t(group.label) : group.label;
+      break;
+    }
+    if (group.items) {
+      const found = group.items.find(it => it.key === state.fontMode);
+      if (found) { name = found.i18n ? t(found.label) : found.label; break; }
+    }
+  }
+  const ff = FONTS[state.fontMode];
+  label.style.fontFamily = ff || '';
+  label.textContent = name;
+  if (document.getElementById('font-picker-list').classList.contains('open')) {
+    buildFontPickerList();
+  }
+}
+
 function changeFont(v) {
   state.fontMode = v;
   saveSettings();
+  updateFontPickerUI();
   if (state.spine.length) renderPage(state.currentSpineIdx);
 }
 function changeFontSize(d) {
@@ -2473,6 +3018,13 @@ applyI18n();
 loadSettings();
 showResumeBanner();
 updateThemeBtnUI();
+loadPreviewFonts();
+
+document.getElementById('search-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); startSearch(); }
+});
+document.getElementById('search-input').disabled = true;
+document.getElementById('search-btn').disabled = true;
 
 // file:// で開いた場合は Drive ボタンと自動保存グループを非表示（Google OAuth は file:// 非対応）
 if (location.protocol !== 'http:' && location.protocol !== 'https:') {

@@ -57,21 +57,21 @@ Each viewer is a single self-contained HTML file (epub_viewer.html ~2320 lines, 
 
 | Symbol | `epub_viewer.html` | `epub_viewer_ios.html` |
 |--------|-------------------|----------------------|
-| `GOOGLE_CLIENT_ID` | ~462 | ~449 |
-| `I18N` translations | ~479 | ~466 |
-| `state` object | ~906 | ~893 |
-| `FONTS` constant | ~930 | ~917 |
-| `loadEpub()` | ~960 | ~934 |
-| `navigateToToc()` | ~1064 | ~1030 |
-| `buildSrcdoc()` | ~1134 | ~1098 |
-| `buildScrollScript()` | ~1232 | ~1200 |
-| `SHARED_TAIL` (epub_viewer.html only) | ~1239 | — |
-| `CLICK_HANDLER` / `INIT_FN` (ios only) | — | ~1216 / ~1230 |
-| `_intraChapterRatio` | ~1526 | ~1551 |
-| `renderPage()` | ~1528 | ~1553 |
-| `handleIframeLink()` | ~1623 | ~1648 |
-| `savePos()` | ~1902 | ~1925 |
-| `driveAuth()` | ~1974 | ~1997 |
+| `GOOGLE_CLIENT_ID` | ~470 | ~457 |
+| `I18N` translations | ~487 | ~474 |
+| `state` object | ~926 | ~913 |
+| `FONTS` constant | ~950 | ~937 |
+| `loadEpub()` | ~980 | ~954 |
+| `navigateToToc()` | ~1090 | ~1056 |
+| `buildSrcdoc()` | ~1160 | ~1124 |
+| `buildScrollScript()` | ~1258 | ~1226 |
+| `SHARED_TAIL` (epub_viewer.html only) | ~1265 | — |
+| `CLICK_HANDLER` / `INIT_FN` (ios only) | — | ~1242 / ~1256 |
+| `_intraChapterRatio` | ~1552 | ~1577 |
+| `renderPage()` | ~1556 | ~1581 |
+| `handleIframeLink()` | ~1651 | ~1676 |
+| `savePos()` | ~1931 | ~1954 |
+| `driveAuth()` | ~2078 | ~2101 |
 
 ### State
 
