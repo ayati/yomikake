@@ -1,4 +1,4 @@
-# 縦書きePubビューア yomikake
+# ePub viewer yomikake
 
 ブラウザで動作する、日本語縦書き対応のePubリーダーです。インストール不要で、HTMLファイルを開くだけで使用できます。
 
