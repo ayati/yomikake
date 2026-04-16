@@ -1376,6 +1376,13 @@ async function buildSrcdoc(xhtmlText, xhtmlAbsPath, scrollTarget, readySeq) {
     ? xhtmlAbsPath.slice(0, xhtmlAbsPath.lastIndexOf('/')+1)
     : '';
 
+  // Fix XHTML self-closing non-void elements before HTML5 parsing.
+  // XHTML allows self-closing <script/> but HTML5 treats it as an unclosed tag,
+  // consuming all subsequent markup as raw text → empty body → blank page.
+  // Expand self-closing script/style tags to their open+close form first.
+  xhtmlText = xhtmlText.replace(/<(script|style)(\s[^>]*)?\s*\/>/gi,
+    (_, tag, attrs) => '<' + tag + (attrs || '') + '></' + tag + '>');
+
   const doc = new DOMParser().parseFromString(xhtmlText, 'text/html');
 
   // ePub 内の <script> を除去（XSS 対策）
@@ -1415,6 +1422,19 @@ async function buildSrcdoc(xhtmlText, xhtmlAbsPath, scrollTarget, readySeq) {
     if (uri) img.setAttribute('src', uri);
   }
 
+  // SVG <image xlink:href> / <image href> (manga / image ePub)
+  for (const svgImg of [...doc.querySelectorAll('image')]) {
+    const xlinkNS = 'http://www.w3.org/1999/xlink';
+    const xhref = svgImg.getAttributeNS(xlinkNS, 'href') || svgImg.getAttribute('xlink:href') || '';
+    const href  = svgImg.getAttribute('href') || '';
+    const src   = xhref || href;
+    if (!src || src.startsWith('data:') || src.startsWith('http')) continue;
+    const uri = await toDataUri(resolvePath(dir, src));
+    if (!uri) continue;
+    if (xhref) svgImg.setAttributeNS(xlinkNS, 'xlink:href', uri);
+    svgImg.setAttribute('href', uri);
+  }
+
   // inline style url()
   for (const el of [...doc.querySelectorAll('[style]')]) {
     const s = el.getAttribute('style') || '';
@@ -1446,7 +1466,9 @@ async function buildSrcdoc(xhtmlText, xhtmlAbsPath, scrollTarget, readySeq) {
         'writing-mode:horizontal-tb!important;-webkit-writing-mode:horizontal-tb!important;'
       : /* publisher */
         'position:fixed!important;top:0!important;left:0!important;' +
-        'overflow:visible!important;max-width:none!important;max-height:none!important;';
+        'overflow:visible!important;' +
+        'width:max-content!important;min-width:100vw!important;max-width:none!important;' +
+        'height:max-content!important;min-height:100vh!important;max-height:none!important;';
   const overrideStyle = doc.createElement('style');
   overrideStyle.id = 'epub-viewer-inject';
   overrideStyle.textContent = fontImport + [
@@ -1462,6 +1484,7 @@ async function buildSrcdoc(xhtmlText, xhtmlAbsPath, scrollTarget, readySeq) {
         'line-height:' + state.lineHeight + '!important;',
         'opacity:0!important;}',
     'img{max-width:100%!important;max-height:95vh!important;object-fit:contain!important;}',
+    'svg{max-width:100%!important;max-height:95vh!important;}',  // scale down full-page SVG in manga/image ePub
     fontRule,
   ].join('');
   doc.head.appendChild(overrideStyle);

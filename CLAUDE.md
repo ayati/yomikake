@@ -45,33 +45,34 @@ There are no automated tests. Manual testing requires a `.epub` or `.kepub` file
 Most features exist in both files. As a rule:
 - **`epub_viewer.html` only**: drag-and-drop, toolbar mouse-wheel scroll, `SHARED_TAIL` (Chrome `text-combine-upright` fix), `isNeg()` sign detection in horizontal/publisher scroll.
 - **`epub_viewer_ios.html` only**: CSS-transform scroll mechanism, touch swipe inside iframe, `CLICK_HANDLER` / `INIT_FN` template variables, double-rAF + 500ms `INIT_FN` timing, `will-change:transform` on body.
-- **Both files**: all other features — rendering pipeline, postMessage protocol, i18n, settings, bookmarks, Drive sync, fullscreen, progress bar, `_renderSeq`, `_isRendering` / `_pendingScrollAfterRender`, chapter-end blank page, `flashOverlay()`, `flashNavButtons()`, `showResumeBanner()`, `showToast()`, `toggleSidebar()`.
+- **Both files**: all other features — rendering pipeline, postMessage protocol, i18n, settings, bookmarks, Drive sync, fullscreen, progress bar, full-text search, sidebar tabs, `_renderSeq`, `_isRendering` / `_pendingScrollAfterRender`, chapter-end blank page, `flashOverlay()`, `flashNavButtons()`, `showResumeBanner()`, `showToast()`, `toggleSidebar()`.
 
 When fixing a bug or adding a feature that is not in the "only" lists above, apply the change to **both files**.
 
 ## Architecture
 
-Each viewer is a single self-contained HTML file (epub_viewer.html ~2320 lines, epub_viewer_ios.html ~2340 lines). Both follow a modular functional style with a single central state object. The architecture below describes `epub_viewer.html`; `epub_viewer_ios.html` is identical except for the scroll mechanism (see iOS Viewer section below).
+Each viewer is a single self-contained HTML file (both ~3039 lines as of v1.7.0). Both follow a modular functional style with a single central state object. The architecture below describes `epub_viewer.html`; `epub_viewer_ios.html` is identical except for the scroll mechanism (see iOS Viewer section below).
 
 **Key locations in both files** (approximate — shift as code grows):
 
 | Symbol | `epub_viewer.html` | `epub_viewer_ios.html` |
 |--------|-------------------|----------------------|
-| `GOOGLE_CLIENT_ID` | ~470 | ~457 |
-| `I18N` translations | ~487 | ~474 |
-| `state` object | ~926 | ~913 |
-| `FONTS` constant | ~950 | ~937 |
-| `loadEpub()` | ~980 | ~954 |
-| `navigateToToc()` | ~1090 | ~1056 |
-| `buildSrcdoc()` | ~1160 | ~1124 |
-| `buildScrollScript()` | ~1258 | ~1226 |
-| `SHARED_TAIL` (epub_viewer.html only) | ~1265 | — |
-| `CLICK_HANDLER` / `INIT_FN` (ios only) | — | ~1242 / ~1256 |
-| `_intraChapterRatio` | ~1552 | ~1577 |
-| `renderPage()` | ~1556 | ~1581 |
-| `handleIframeLink()` | ~1651 | ~1676 |
-| `savePos()` | ~1931 | ~1954 |
-| `driveAuth()` | ~2078 | ~2101 |
+| `GOOGLE_CLIENT_ID` | ~541 | ~528 |
+| `I18N` translations | ~558 | ~545 |
+| `state` object | ~1060 | ~1047 |
+| `FONTS` / `FONT_URLS` / `FONT_GROUPS` | ~1088 | ~1075 |
+| `loadEpub()` | ~1227 | ~1200 |
+| `navigateToToc()` | ~1341 | ~1306 |
+| `buildSrcdoc()` | ~1411 | ~1374 |
+| `buildScrollScript()` | ~1512 | ~1479 |
+| `SHARED_TAIL` (epub_viewer.html only) | ~1519 | — |
+| `CLICK_HANDLER` / `INIT_FN` (ios only) | — | ~1486 / ~1500 |
+| `_intraChapterRatio` | ~1806 | ~1830 |
+| `renderPage()` | ~1814 | ~1838 |
+| `handleIframeLink()` | ~1909 | ~1933 |
+| `runSearch()` / `startSearch()` | ~2228 | ~2249 |
+| `savePos()` | ~2486 | ~2499 |
+| `driveAuth()` | ~2633 | ~2646 |
 
 ### State
 
@@ -92,10 +93,10 @@ const state = {
   driveFileId,      // cached Drive file ID for epub_bookmarks.json (session only)
   publisherAxis,    // 'h' (vertical-rl) | 'v' (horizontal-tb) | null — detected by EPUB_AXIS from iframe in publisher mode
   // UI preferences (persisted in epub_settings):
-  fontMode,         // 'publisher' | 'mincho' | 'gothic' | 'meiryo' | 'serif' | 'sans' — all 6 exposed in settings UI
+  fontMode,         // key into FONTS map — 'publisher' | 'mincho' | 'gothic' | 'meiryo' | 'serif' | 'sans' | 22 Google Fonts keys (e.g. 'noto-serif-jp', 'klee-one', 'lora' …)
   fontSize,         // 60–400 (percent, default 100)
   lineHeight,       // 1.6 | 2.0 | 2.4 | 2.8 (default 2.0)
-  theme,            // '' | 'sepia' | 'white' | 'dark' (default '' = warm white)
+  theme,            // '' | 'sepia' | 'white' | 'dark' | 'sakura' | 'hoshi' | 'matcha' | 'tsuki' (default '' = warm white)
   margin,           // 'full' | 'medium' | 'narrow' | 'none' (default 'full')
   driveAutoSave,    // boolean (default false) — auto-upload bookmarks on EPUB_POS events
   sidebarOpen,      // boolean (default false)
@@ -136,10 +137,14 @@ const state = {
 - **`EPUB_POS` guard during rendering** — the `EPUB_POS` message handler ignores messages while `_isRendering` is `true`. This prevents a stale debounced `reportPos()` from the OLD iframe (which may fire up to 500 ms after the last scroll in the old chapter) from overwriting the newly-saved chapter-start position with an incorrect ratio using the already-updated `state.currentSpineIdx`.
 - **`_renderSeq` (render sequence counter)** guards against race conditions when `renderPage` is called rapidly. Each call captures the current sequence number; after each `await`, the function checks if a newer call has started and returns early if so. This ensures only the last-requested chapter is rendered.
 - **`_isRendering` / `_pendingScrollAfterRender` (double-tap chapter-end fix)** — `_isRendering` is set to `true` at the start of `renderPage` and stays `true` until the new iframe's `applyInit()` fires. While `_isRendering` is true, `EPUB_EDGE` is queued in `_pendingScrollAfterRender` instead of advancing the chapter. After `iframe.srcdoc` is committed, the iframe sends `EPUB_READY {seq}` (from inside the 80ms setTimeout in `SHARED_TAIL` / `runApplyInit` in `INIT_FN`) once `applyInit()` completes. The parent's `EPUB_READY` handler verifies the seq matches `_renderSeq` (to ignore stale messages from superseded renders), then clears `_isRendering` and calls `scrollPage(pendingDir)` if needed. **Why not `load` event:** the old approach fired `scrollPage` on the iframe `load` event, before `applyInit()` ran. On iOS, `body.offsetWidth` is 0 at `load` time (layout not yet settled), so `maxS()=0` and `doScroll` immediately fired `EPUB_EDGE`, causing a chapter skip for any chapter. **Why not `_isRendering=false` after srcdoc:** the race window between srcdoc assignment and `applyInit()` completion is where stray `EPUB_EDGE` messages from old-iframe postMessage backlog or premature new-iframe `doScroll` could cause a second chapter advance.
+- **XHTML self-closing `<script>` preprocessing** — `buildSrcdoc()` preprocesses `xhtmlText` before passing to `DOMParser('text/html')`. XHTML uses self-closing syntax `<script src="..."/>` which is valid XML. The HTML5 parser ignores the `/>` and treats `<script>` as an unclosed element, consuming everything up to `</script>` (including `</head>`, `<body>`, and all page content) as raw text — producing an empty `<body>` (blank page). Fix: `xhtmlText.replace(/<(script|style)(\s[^>]*)?\s*\/>/gi, ...)` converts to `<script ...></script>` before parsing. This is the root cause of blank pages in manga/fixed-layout ePub files that include `<script src="..."/>` (e.g., Kobo ePub with kobo.js).
+- **SVG `<image>` resolution** — `buildSrcdoc()` resolves not only `<img src>` but also SVG `<image xlink:href>` and `<image href>` elements (used by manga/image-only ePub). `getAttributeNS('http://www.w3.org/1999/xlink', 'href')` is tried first (namespace-aware HTML5 parsing of inline SVG), with `getAttribute('xlink:href')` as fallback. Both `xlink:href` and `href` attributes are set on the resolved element for ePub2/ePub3 compatibility. The override CSS includes `svg{max-width:100%!important;max-height:95vh!important;}` to scale down full-page SVG containers.
+- **Publisher mode height reset** — In `publisher` mode, `wmHtml` and `wmBody` add `height:100%!important` to both `html` and `body`. This prevents ePub-specific fixed em-height constraints (intended for dedicated reader viewports) from collapsing column height to 1 character in vertical-rl layout.
 - **`zip.file()` null checks** — `state.epub.file(absPath)` can return null if the ePub ZIP is missing a declared file. `renderPage` shows a toast and aborts; `loadEpub` skips TOC parsing (the book still opens without a table of contents).
 - **Progress bar (`#progress-bar` / `#progress-fill`)** — lives in `#statusbar`. `updatePageInfo()` sets `#progress-fill` width using `_intraChapterRatio` for smooth intra-chapter progress: `pct = Math.min(100, (cur-1 + _intraChapterRatio) / (total-1) * 100)`. `_intraChapterRatio` (module-level, 0–1) is updated from each `EPUB_POS` message and reset to `0` at the start of `renderPage()`. For vertical mode, `marginLeft:auto` makes the bar fill from the right (RTL reading direction). An IIFE after `updatePageInfo()` wires click-to-jump and mousemove-tooltip: `ratioFromEvent()` converts `clientX` to a spine ratio (inverted for vertical), `idxFromRatio()` maps ratio to spine index. Tooltip text uses i18n key `progress.tooltip`; `#progress-tooltip` is `position:fixed` so it is not clipped by `overflow:hidden` on `#progress-bar`.
 - **Anchor/fragment navigation** — `renderPage(idx, scrollTarget)` accepts `scrollTarget` as `'start'`, `'end'`, a numeric ratio, or a `'#anchorId'` string. `navigateToToc()` and `handleIframeLink()` extract the `#fragment` from href and pass it as `scrollTarget`. Inside `buildScrollScript()`, `applyInit()` detects `initTarget.charAt(0)==='#'`, looks up the element via `getElementById` then `getElementsByName`, and scrolls to it. In `epub_viewer.html`: `el.scrollIntoView({behavior:"instant",block:"start",inline:"nearest"})` works for all writing modes. In `epub_viewer_ios.html` (CSS transform): vertical uses `setTx(max(-ms, min(0, vw()-el.getBoundingClientRect().left)))`, horizontal uses `setTy(max(0, min(ms, el.getBoundingClientRect().top)))` — both read `getBoundingClientRect()` before any transform is applied (when `tx=0`/`ty=0`).
-- **Font settings UI** — all 6 `FONTS` entries are now exposed in `<select id="font-select">`: publisher / mincho / gothic / meiryo / serif / sans. i18n keys `font.serif` and `font.sans` added in all 4 languages.
+- **Font settings UI** — `#font-picker` is a grouped custom dropdown (not a `<select>`). `FONT_GROUPS` defines the display hierarchy; `FONT_URLS` maps web-font keys to Google Fonts `@import` URLs; `FONT_SAMPLE` holds per-language preview text. `toggleFontPicker()` opens/closes the dropdown; `buildFontPickerList()` renders the grouped HTML on open; `selectFont(key)` applies the choice and triggers re-render. `loadPreviewFonts()` injects a combined Google Fonts `<link>` for all web-font entries so the picker previews render in the correct typeface. `updateFontPickerUI()` syncs the button label to the current `state.fontMode`.
+- **Full-text search** — `#sidebar` has two tabs (`#tab-toc` / `#tab-search`) toggled by `switchSidebarTab(tab)` (module-level `_sidebarTab` tracks current tab). The search tab contains `#search-input` and `#search-results`. `startSearch()` reads the input, increments `_searchSeq`, and calls `runSearch(query, seq)`; `runSearch()` iterates spine items, strips HTML tags, matches the query string, calls `appendSearchResult(spineIdx, snippets, extra)` for each hit, and checks `seq !== _searchSeq` after each item to abort superseded searches. `resetSearch()` increments `_searchSeq` (cancels in-progress search) and clears results. `navigateFromSearch(spineIdx)` calls `pushJumpHistory()` then `renderPage()` and closes the sidebar. `updateSearchProgress(current, total)` updates the progress indicator and cancel button. `_searchAbort` is kept for backward compatibility but `_searchSeq` is the active cancellation mechanism.
 
 ### iOS Viewer (`epub_viewer_ios.html`)
 

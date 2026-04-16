@@ -1413,6 +1413,13 @@ async function buildSrcdoc(xhtmlText, xhtmlAbsPath, scrollTarget, readySeq) {
     ? xhtmlAbsPath.slice(0, xhtmlAbsPath.lastIndexOf('/')+1)
     : '';
 
+  // Fix XHTML self-closing non-void elements before HTML5 parsing.
+  // XHTML allows <script src="..."/> but HTML5 treats it as an unclosed tag,
+  // consuming all subsequent markup as raw text → empty body → blank page.
+  // Expand self-closing script/style tags to their open+close form first.
+  xhtmlText = xhtmlText.replace(/<(script|style)(\s[^>]*)?\s*\/>/gi,
+    (_, tag, attrs) => '<' + tag + (attrs || '') + '></' + tag + '>');
+
   // Always parse as text/html – avoids XML strict errors entirely
   const doc = new DOMParser().parseFromString(xhtmlText, 'text/html');
 
@@ -1457,6 +1464,21 @@ async function buildSrcdoc(xhtmlText, xhtmlAbsPath, scrollTarget, readySeq) {
     if (uri) img.setAttribute('src', uri);
   }
 
+  // ── Resolve SVG <image xlink:href> / <image href> (manga / image ePub)
+  //    DOMParser('text/html') recognises inline SVG, so querySelectorAll('image')
+  //    finds SVG image elements. xlink:href needs getAttributeNS; href is SVG 2.0.
+  for (const svgImg of [...doc.querySelectorAll('image')]) {
+    const xlinkNS = 'http://www.w3.org/1999/xlink';
+    const xhref = svgImg.getAttributeNS(xlinkNS, 'href') || svgImg.getAttribute('xlink:href') || '';
+    const href  = svgImg.getAttribute('href') || '';
+    const src   = xhref || href;
+    if (!src || src.startsWith('data:') || src.startsWith('http')) continue;
+    const uri = await toDataUri(resolvePath(dir, src));
+    if (!uri) continue;
+    if (xhref) svgImg.setAttributeNS(xlinkNS, 'xlink:href', uri);
+    svgImg.setAttribute('href', uri);  // SVG 2.0 href (set regardless of xlink presence)
+  }
+
   // ── Resolve inline style url()
   for (const el of [...doc.querySelectorAll('[style]')]) {
     const s = el.getAttribute('style') || '';
@@ -1485,17 +1507,18 @@ async function buildSrcdoc(xhtmlText, xhtmlAbsPath, scrollTarget, readySeq) {
     ? 'writing-mode:vertical-rl!important;-webkit-writing-mode:vertical-rl!important;padding-left:100vw!important;'
     : wm === 'horizontal'
       ? 'writing-mode:horizontal-tb!important;-webkit-writing-mode:horizontal-tb!important;padding-bottom:100vh!important;'
-      : '';
+      : 'height:100%!important;';  // publisher: full-height prevents ePub-fixed column-height collapse
   const wmBody = wm === 'vertical'
     ? 'writing-mode:vertical-rl!important;-webkit-writing-mode:vertical-rl!important;'
     : wm === 'horizontal'
       ? 'writing-mode:horizontal-tb!important;-webkit-writing-mode:horizontal-tb!important;'
-      : '';
+      : 'height:100%!important;';  // publisher: match html full-height
   overrideStyle.textContent = fontImport + [
     'html,body{background:' + paper + '!important;color:' + text + '!important;}',
     'html{font-size:' + state.fontSize + '%!important;line-height:' + state.lineHeight + '!important;' + wmHtml + '}',
     'body{' + wmBody + 'line-height:' + state.lineHeight + '!important;}',
     'img{max-width:100%!important;max-height:95vh!important;object-fit:contain!important;}',
+    'svg{max-width:100%!important;max-height:95vh!important;}',  // scale down full-page SVG in manga/image ePub
     fontRule,
   ].join('');
   doc.head.appendChild(overrideStyle);
