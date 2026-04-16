@@ -1430,7 +1430,7 @@ async function buildSrcdoc(xhtmlText, xhtmlAbsPath, scrollTarget, readySeq) {
 
   // ── <base href="about:blank"> を先頭に挿入
   //    srcdoc の base URL は親ページ(file://)を継承するため、
-  //    ePub内の未解決の相対URLが file://epub_viewer.html に解決されないよう上書きする
+  //    ePub内の未解決の相対URLが file://yomikake.html に解決されないよう上書きする
   doc.querySelectorAll('base').forEach(b => b.remove());
   const safeBase = doc.createElement('base');
   safeBase.setAttribute('href', 'about:blank');
