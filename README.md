@@ -6,8 +6,8 @@
 
 | ファイル | 対応環境 | 動作サンプル |
 |---------|---------|------------|
-| `epub_viewer.html` | Windows/Android/macOS の Chrome・Edge・Firefox・Safari | https://www.ayati.com/book/epub_viewer.html |
-| `epub_viewer_ios.html` | iPhone・iPad の Safari 専用 | https://www.ayati.com/book/epub_viewer_ios.html |
+| `epub_viewer.html` | Windows/Android/macOS の Chrome・Edge・Firefox・Safari | https://www.ayati.com/book/yomikake.html |
+| `epub_viewer_ios.html` | iPhone・iPad の Safari 専用 | https://www.ayati.com/book/yomikake_ios.html |
 
 > **iOS（iPhone・iPad）をお使いの方は `epub_viewer_ios.html` をご使用ください。**
 > iOS Safari のスクロール挙動の制約により、通常版では正しく動作しません。
