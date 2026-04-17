@@ -179,6 +179,8 @@
   .rl-date { font-size:12px; opacity:.5; white-space:nowrap; }
   .rl-open-btn { font-size:13px; font-weight:600; color:var(--accent); background:transparent; border:1.5px solid var(--accent); border-radius:9px; padding:6px 14px; cursor:pointer; white-space:nowrap; transition:all .15s; flex-shrink:0; }
   .rl-open-btn:hover { background:var(--accent); color:#fff; }
+  .rl-open-direct { background:var(--accent); color:#fff; }
+  .rl-open-direct:hover { filter:brightness(1.1); }
   #reading-list-footer { margin-top:18px; text-align:center; padding-bottom:8px; }
   #reading-list-new-btn { font-size:13px; font-weight:600; color:var(--ui-text); background:var(--ui-bg); border:1px solid var(--ui-border); border-radius:10px; padding:10px 24px; cursor:pointer; transition:all .15s; }
   #reading-list-new-btn:hover { border-color:var(--accent); color:var(--accent); }
@@ -714,6 +716,7 @@ const I18N = {
     'readingList.count':    '{n}冊',
     'readingList.chapter':  '第{n}章 / 全{total}章',
     'readingList.openThis': 'このファイルを開く',
+    'readingList.openDirect': '▶ そのまま開く',
     'readingList.openNew':  '別の ePub を開く',
     'readingList.today':    '今日',
     'readingList.yesterday':'昨日',
@@ -838,6 +841,7 @@ const I18N = {
     'readingList.count':    '{n} book(s)',
     'readingList.chapter':  'Ch.{n} / {total}',
     'readingList.openThis': 'Open this file',
+    'readingList.openDirect': '▶ Open directly',
     'readingList.openNew':  'Open another ePub',
     'readingList.today':    'Today',
     'readingList.yesterday':'Yesterday',
@@ -962,6 +966,7 @@ const I18N = {
     'readingList.count':    '{n}本',
     'readingList.chapter':  '第{n}章 / 共{total}章',
     'readingList.openThis': '開啟此檔案',
+    'readingList.openDirect': '▶ 直接開啟',
     'readingList.openNew':  '開啟其他 ePub',
     'readingList.today':    '今天',
     'readingList.yesterday':'昨天',
@@ -1086,6 +1091,7 @@ const I18N = {
     'readingList.count':    '{n}本',
     'readingList.chapter':  '第{n}章 / 共{total}章',
     'readingList.openThis': '打开此文件',
+    'readingList.openDirect': '▶ 直接打开',
     'readingList.openNew':  '打开其他 ePub',
     'readingList.today':    '今天',
     'readingList.yesterday':'昨天',
@@ -1313,14 +1319,23 @@ document.body.addEventListener('dragover', e => {
 document.body.addEventListener('dragleave', () => {
   document.getElementById('drop-zone').classList.remove('dragover');
 });
-document.body.addEventListener('drop', e => {
+document.body.addEventListener('drop', async e => {
   e.preventDefault();
   document.getElementById('drop-zone').classList.remove('dragover');
-  const f = e.dataTransfer.files[0];
-  if (f && (f.name.endsWith('.epub') || f.name.endsWith('.kepub'))) loadEpub(f);
+  let fileHandle = null;
+  let f = null;
+  // File System Access API が使える場合はハンドルも取得する
+  if (window.showOpenFilePicker && e.dataTransfer.items?.[0]) {
+    try {
+      const h = await e.dataTransfer.items[0].getAsFileSystemHandle();
+      if (h?.kind === 'file') { fileHandle = h; f = await fileHandle.getFile(); }
+    } catch(_) {}
+  }
+  if (!f) f = e.dataTransfer.files[0];
+  if (f && (f.name.endsWith('.epub') || f.name.endsWith('.kepub'))) loadEpub(f, fileHandle);
 });
 
-async function loadEpub(file) {
+async function loadEpub(file, fileHandle = null) {
   try {
     const zip = await JSZip.loadAsync(file);
     state.epub = zip;
@@ -1393,6 +1408,13 @@ async function loadEpub(file) {
     state.bookCoverDataUri = '';
     try { state.bookCoverDataUri = await extractCoverThumb(opfDoc) || ''; } catch(e) {}
     saveBookMeta();
+
+    // File System Access API: ハンドルを IDB に保存（Chrome/Edge のみ）
+    if (fileHandle && window.showOpenFilePicker) {
+      fshPut(state.bookKey, fileHandle).then(() => {
+        _handleKeys.add(state.bookKey);
+      }).catch(() => {});
+    }
 
     document.getElementById('welcome').style.display = 'none';
     document.getElementById('page-container').classList.add('visible');
@@ -1934,6 +1956,7 @@ let _intraChapterRatio = 0;        // 章内スクロール比率（0–1）プ�
 let _originalBookmark  = null;     // {spineIdx, ratio} | null — 開いた時のしおり位置
 let _jumpHistory       = [];       // [{spineIdx, ratio}] 直近4件のジャンプ前位置（新しい順）
 let _bookFinished      = false;    // 最終章末尾到達フラグ（closeBook で ratio=0 上書き防止）
+let _handleKeys        = new Set();// File System Access API: handle を持つ bookKey の集合
 let _sidebarTab        = 'toc';    // 'toc' | 'search' — サイドバーの現在タブ
 let _searching         = false;    // 検索実行中
 let _searchAbort       = false;    // 検索中止フラグ（後方互換のため残存、実質 _searchSeq で代替）
@@ -2590,10 +2613,78 @@ function changeFwdBtnSize(v) {
 }
 
 // ══════════════════════════════════════════
+//  File System Handle — IndexedDB helpers
+//  Chrome/Edge の File System Access API でハンドルを永続化する。
+//  非対応ブラウザでは関数が呼ばれないため副作用なし。
+// ══════════════════════════════════════════
+const FSH_DB_NAME = 'epub_viewer_fsh';
+let _fshDB = null;
+function _openFshDB() {
+  if (_fshDB) return Promise.resolve(_fshDB);
+  return new Promise((res, rej) => {
+    const req = indexedDB.open(FSH_DB_NAME, 1);
+    req.onupgradeneeded = e => e.target.result.createObjectStore('handles');
+    req.onsuccess = e => { _fshDB = e.target.result; res(_fshDB); };
+    req.onerror = () => rej(req.error);
+  });
+}
+async function fshGet(key) {
+  const db = await _openFshDB();
+  return new Promise((res, rej) => {
+    const req = db.transaction('handles', 'readonly').objectStore('handles').get(key);
+    req.onsuccess = () => res(req.result || null);
+    req.onerror = () => rej(req.error);
+  });
+}
+async function fshPut(key, handle) {
+  const db = await _openFshDB();
+  return new Promise((res, rej) => {
+    const req = db.transaction('handles', 'readwrite').objectStore('handles').put(handle, key);
+    req.onsuccess = () => res();
+    req.onerror = () => rej(req.error);
+  });
+}
+async function fshDelete(key) {
+  const db = await _openFshDB();
+  return new Promise((res, rej) => {
+    const req = db.transaction('handles', 'readwrite').objectStore('handles').delete(key);
+    req.onsuccess = () => res();
+    req.onerror = () => rej(req.error);
+  });
+}
+async function fshGetAllKeys() {
+  const db = await _openFshDB();
+  return new Promise((res, rej) => {
+    const req = db.transaction('handles', 'readonly').objectStore('handles').getAllKeys();
+    req.onsuccess = () => res(req.result || []);
+    req.onerror = () => rej(req.error);
+  });
+}
+// ページ起動時にハンドルキー一覧をロードしてリストのボタン表示に使う
+if (window.showOpenFilePicker) {
+  fshGetAllKeys().then(keys => {
+    _handleKeys = new Set(keys);
+    buildReadingList();
+  }).catch(() => {});
+}
+
+// ══════════════════════════════════════════
 //  File Picker
 // ══════════════════════════════════════════
-function openFilePicker() {
-  document.getElementById('file-input').click();
+async function openFilePicker() {
+  if (window.showOpenFilePicker) {
+    try {
+      const [handle] = await window.showOpenFilePicker({
+        types: [{ description: 'ePub / Kobo', accept: { 'application/epub+zip': ['.epub', '.kepub'] } }],
+        multiple: false,
+      });
+      await loadEpub(await handle.getFile(), handle);
+    } catch (e) {
+      if (e.name !== 'AbortError') console.error(e);
+    }
+  } else {
+    document.getElementById('file-input').click();
+  }
 }
 
 // ══════════════════════════════════════════
@@ -2692,14 +2783,31 @@ function buildReadingList() {
     </div>
     <div class="rl-meta">
       <span class="rl-date">${formatRelativeDate(item.lastOpenedAt)}</span>
-      <button class="rl-open-btn" data-key="${esc(item.key)}" onclick="openFilePickerForBook(this.dataset.key)">${t('readingList.openThis')}</button>
+      <button class="rl-open-btn${_handleKeys.has(item.key) ? ' rl-open-direct' : ''}" data-key="${esc(item.key)}" onclick="openFilePickerForBook(this.dataset.key)">${_handleKeys.has(item.key) ? t('readingList.openDirect') : t('readingList.openThis')}</button>
     </div>
   </div>
 </div>`;
   }).join('');
 }
 
-function openFilePickerForBook(bookKey) {
+async function openFilePickerForBook(bookKey) {
+  if (window.showOpenFilePicker && _handleKeys.has(bookKey)) {
+    try {
+      const handle = await fshGet(bookKey);
+      if (handle) {
+        let perm = await handle.queryPermission({ mode: 'read' });
+        if (perm === 'prompt') perm = await handle.requestPermission({ mode: 'read' });
+        if (perm === 'granted') {
+          await loadEpub(await handle.getFile(), handle);
+          return;
+        }
+      }
+    } catch (_) {
+      // ハンドルが無効（ファイル削除・移動等）→ IDB から削除してダイアログへ
+      fshDelete(bookKey).catch(() => {});
+      _handleKeys.delete(bookKey);
+    }
+  }
   openFilePicker();
 }
 
