@@ -51,7 +51,7 @@ When fixing a bug or adding a feature that is not in the "only" lists above, app
 
 ## Architecture
 
-Each viewer is a single self-contained HTML file (both ~3039 lines as of v1.7.0). Both follow a modular functional style with a single central state object. The architecture below describes `yomikake.html`; `yomikake_ios.html` is identical except for the scroll mechanism (see iOS Viewer section below).
+Each viewer is a single self-contained HTML file (both ~3062 lines). Both follow a modular functional style with a single central state object. The architecture below describes `yomikake.html`; `yomikake_ios.html` is identical except for the scroll mechanism (see iOS Viewer section below).
 
 **Key locations in both files** (approximate — shift as code grows):
 
@@ -64,15 +64,15 @@ Each viewer is a single self-contained HTML file (both ~3039 lines as of v1.7.0)
 | `loadEpub()` | ~1227 | ~1200 |
 | `navigateToToc()` | ~1341 | ~1306 |
 | `buildSrcdoc()` | ~1411 | ~1374 |
-| `buildScrollScript()` | ~1512 | ~1479 |
-| `SHARED_TAIL` (yomikake.html only) | ~1519 | — |
-| `CLICK_HANDLER` / `INIT_FN` (ios only) | — | ~1486 / ~1500 |
-| `_intraChapterRatio` | ~1806 | ~1830 |
-| `renderPage()` | ~1814 | ~1838 |
-| `handleIframeLink()` | ~1909 | ~1933 |
-| `runSearch()` / `startSearch()` | ~2228 | ~2249 |
-| `savePos()` | ~2486 | ~2499 |
-| `driveAuth()` | ~2633 | ~2646 |
+| `buildScrollScript()` | ~1535 | ~1502 |
+| `SHARED_TAIL` (yomikake.html only) | ~1542 | — |
+| `CLICK_HANDLER` / `INIT_FN` (ios only) | — | ~1518 / ~1532 |
+| `_intraChapterRatio` | ~1829 | ~1853 |
+| `renderPage()` | ~1837 | ~1861 |
+| `handleIframeLink()` | ~1932 | ~1956 |
+| `runSearch()` / `startSearch()` | ~2251 / ~2289 | ~2272 / ~2310 |
+| `savePos()` | ~2509 | ~2522 |
+| `driveAuth()` | ~2656 | ~2669 |
 
 ### State
 

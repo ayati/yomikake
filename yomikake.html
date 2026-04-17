@@ -143,7 +143,8 @@
 
   #reading-area { flex:1; display:flex; align-items:center; justify-content:center; overflow:hidden; position:relative; padding:var(--page-padding,16px); background:var(--bg); transition:padding .3s; }
 
-  #welcome { width:100%; height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:32px; color:var(--text); opacity:.8; animation:fadeIn .5s ease; }
+  #welcome { width:100%; height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:32px; color:var(--text); opacity:.8; animation:fadeIn .5s ease; overflow-y:auto; }
+  #welcome.has-list { justify-content:flex-start; padding:28px 16px 32px; }
   @keyframes fadeIn { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
   
   #drop-zone { border:2px dashed var(--ui-border); border-radius:24px; padding:48px 64px; text-align:center; cursor:pointer; transition:all .2s; max-width:480px; background:var(--paper); box-shadow:0 4px 16px var(--page-shadow); }
@@ -152,12 +153,49 @@
   #drop-zone h2 { font-size:24px; font-weight:600; margin-bottom:12px; }
   #drop-zone p { font-size:14px; opacity:.7; line-height:1.6; }
 
-  #resume-banner { display:none; text-align:left; width:100%; max-width:480px; background:var(--ui-bg); border:1px solid var(--accent); border-radius:16px; padding:20px 24px; line-height:1.6; box-shadow:0 8px 24px var(--shadow), inset 0 0 0 1px rgba(181,86,50,0.2); position:relative; overflow:hidden; cursor:pointer; transition:transform .2s; }
-  #resume-banner:hover { transform:translateY(-2px); }
-  #resume-banner::before { content:''; position:absolute; left:0; top:0; bottom:0; width:4px; background:var(--accent); }
-  #resume-banner .resume-label { font-size:12px; color:var(--accent); font-weight:600; text-transform:uppercase; letter-spacing:0.5px; }
-  #resume-banner .resume-title { display:block; font-size:16px; margin:6px 0 4px; font-family:"游明朝","YuMincho",serif; }
-  #resume-banner .resume-hint { font-size:13px; opacity:.6; }
+  #resume-banner { display:none; }
+
+  /* ── 読みかけリスト ── */
+  #reading-list { display:none; width:100%; max-width:580px; flex-direction:column; gap:0; }
+  #reading-list-header { display:flex; align-items:baseline; gap:8px; margin-bottom:16px; }
+  #reading-list-header h2 { font-size:17px; font-weight:700; margin:0; }
+  #reading-list-count { font-size:12px; opacity:.55; }
+  #reading-list-items { display:flex; flex-direction:column; gap:12px; }
+  .rl-card { display:flex; gap:16px; align-items:stretch; background:var(--ui-bg); border:1px solid var(--ui-border); border-radius:14px; padding:18px 18px; transition:transform .15s, box-shadow .15s; position:relative; overflow:hidden; min-height:96px; }
+  .rl-card:hover { transform:translateY(-1px); box-shadow:0 6px 20px var(--shadow); }
+  .rl-card.rl-last::before { content:''; position:absolute; left:0; top:0; bottom:0; width:4px; background:var(--accent); border-radius:14px 0 0 14px; }
+  .rl-thumb { flex-shrink:0; width:54px; height:76px; border-radius:5px; overflow:hidden; background:var(--hover-bg); display:flex; align-items:center; justify-content:center; align-self:flex-start; }
+  .rl-thumb img { width:100%; height:100%; object-fit:cover; display:block; }
+  .rl-thumb svg { width:28px; height:28px; opacity:.35; stroke:var(--ui-text); }
+  .rl-info { flex:1; min-width:0; display:flex; flex-direction:column; gap:7px; }
+  .rl-title { font-size:14px; font-weight:600; line-height:1.5; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+  .rl-creator { font-size:12px; opacity:.65; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .rl-progress-row { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .rl-bar { flex:1; min-width:60px; height:6px; background:var(--ui-border); border-radius:3px; overflow:hidden; }
+  .rl-fill { height:100%; background:var(--accent); border-radius:3px; transition:width .3s; }
+  .rl-chapter { font-size:12px; opacity:.65; white-space:nowrap; flex-shrink:0; }
+  .rl-pct { font-size:12px; font-weight:600; opacity:.8; flex-shrink:0; min-width:2.8em; text-align:right; }
+  .rl-meta { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:2px; }
+  .rl-date { font-size:12px; opacity:.5; white-space:nowrap; }
+  .rl-open-btn { font-size:13px; font-weight:600; color:var(--accent); background:transparent; border:1.5px solid var(--accent); border-radius:9px; padding:6px 14px; cursor:pointer; white-space:nowrap; transition:all .15s; flex-shrink:0; }
+  .rl-open-btn:hover { background:var(--accent); color:#fff; }
+  #reading-list-footer { margin-top:18px; text-align:center; padding-bottom:8px; }
+  #reading-list-new-btn { font-size:13px; font-weight:600; color:var(--ui-text); background:var(--ui-bg); border:1px solid var(--ui-border); border-radius:10px; padding:10px 24px; cursor:pointer; transition:all .15s; }
+  #reading-list-new-btn:hover { border-color:var(--accent); color:var(--accent); }
+
+  /* ── 読了バナー ── */
+  #finished-banner { display:none; position:absolute; bottom:20px; left:50%; transform:translateX(-50%); z-index:50; background:var(--backdrop); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); border:1px solid var(--glass-border); border-radius:16px; padding:14px 20px; box-shadow:0 8px 32px var(--shadow); white-space:nowrap; align-items:center; gap:12px; animation:fadeIn .3s ease; }
+  #finished-banner.show { display:flex; }
+  #finished-banner-msg { font-size:14px; font-weight:600; }
+  #finished-banner-close-btn { font-size:13px; font-weight:700; color:var(--accent); background:transparent; border:1.5px solid var(--accent); border-radius:10px; padding:5px 14px; cursor:pointer; transition:all .15s; }
+  #finished-banner-close-btn:hover { background:var(--accent); color:#fff; }
+  #finished-banner-dismiss-btn { font-size:12px; opacity:.55; background:transparent; border:none; cursor:pointer; color:var(--ui-text); padding:4px 6px; }
+  #finished-banner-dismiss-btn:hover { opacity:1; }
+
+  /* ── 設定ポップオーバー内「閉じる」ボタン ── */
+  .set-close-group { border-top:1px solid var(--ui-border) !important; padding-top:12px !important; }
+  #close-book-btn { width:100%; font-size:13px; font-weight:600; color:var(--ui-text); opacity:.65; background:transparent; border:1px solid var(--ui-border); border-radius:10px; padding:9px 16px; cursor:pointer; transition:all .15s; text-align:left; }
+  #close-book-btn:hover { opacity:1; border-color:var(--accent); color:var(--accent); }
 
   #page-container { width:100%; height:100%; display:none; align-items:stretch; justify-content:center; position:relative; }
   #page-container.visible { display:flex; }
@@ -436,6 +474,9 @@
                 style="border:1px solid var(--ui-border);border-radius:8px;padding:6px 16px;min-width:60px;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;">OFF</button>
       </div>
     </div>
+    <div class="set-group set-close-group" id="close-book-group" style="display:none">
+      <button id="close-book-btn" onclick="closeBook()" data-i18n="btn.closeBook">📚 この本を閉じる</button>
+    </div>
   </div>
 </div>
 
@@ -467,10 +508,15 @@
   </div>
   <div id="reading-area">
     <div id="welcome">
-      <div id="resume-banner" onclick="resumeBook()">
-        <span class="resume-label" data-i18n="resume.label">前回の続きから読みますか？</span>
-        <strong class="resume-title" id="resume-title"></strong>
-        <span class="resume-hint" data-i18n="resume.hint">クリックして再開（または同じファイルを開いてください）</span>
+      <div id="reading-list">
+        <div id="reading-list-header">
+          <h2 data-i18n="readingList.title">読みかけの本</h2>
+          <span id="reading-list-count"></span>
+        </div>
+        <div id="reading-list-items"></div>
+        <div id="reading-list-footer">
+          <button id="reading-list-new-btn" onclick="openFilePicker()" data-i18n="readingList.openNew">別の ePub を開く</button>
+        </div>
       </div>
       <div id="drop-zone" onclick="openFilePicker()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 22h14a2 2 0 0 0 2-2V7.5L14.5 2H6a2 2 0 0 0-2 2v4"/><polyline points="14 2 14 8 20 8"/><path d="M12 11v6"/><polyline points="9 14 12 17 15 14"/></svg>
@@ -496,6 +542,11 @@
       <button class="scroll-btn" id="btn-scroll-fwd" onclick="scrollPage(1)" data-i18n-title="btn.scrollFwd">
         <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
       </button>
+    </div>
+    <div id="finished-banner">
+      <span id="finished-banner-msg" data-i18n="finished.msg">📖 最後まで読みました</span>
+      <button id="finished-banner-close-btn" onclick="closeBook()" data-i18n="finished.backToList">読みかけリストへ</button>
+      <button id="finished-banner-dismiss-btn" onclick="dismissFinishedBanner()" data-i18n="finished.dismiss">閉じない</button>
     </div>
   </div>
 </div>
@@ -666,6 +717,19 @@ const I18N = {
     'err.invalidFormat':    '形式が不正です',
     'err.importFailed':     'しおりファイルの読み込みに失敗しました:\n{msg}',
     'err.driveFailed':      'Drive操作に失敗しました:\n{msg}',
+    'readingList.title':    '読みかけの本',
+    'readingList.count':    '{n}冊',
+    'readingList.chapter':  '第{n}章 / 全{total}章',
+    'readingList.openThis': 'このファイルを開く',
+    'readingList.openNew':  '別の ePub を開く',
+    'readingList.today':    '今日',
+    'readingList.yesterday':'昨日',
+    'readingList.daysAgo':  '{n}日前',
+    'finished.msg':         '📖 最後まで読みました',
+    'finished.backToList':  '読みかけリストへ',
+    'finished.dismiss':     '閉じない',
+    'btn.closeBook':        '📚 この本を閉じる',
+    'btn.closeBook.title':  'この本を閉じて読みかけリストへ',
   },
   en: {
     'btn.open':             'Open',
@@ -777,6 +841,19 @@ const I18N = {
     'err.invalidFormat':    'Invalid format',
     'err.importFailed':     'Failed to import bookmarks:\n{msg}',
     'err.driveFailed':      'Drive operation failed:\n{msg}',
+    'readingList.title':    'Reading in progress',
+    'readingList.count':    '{n} book(s)',
+    'readingList.chapter':  'Ch.{n} / {total}',
+    'readingList.openThis': 'Open this file',
+    'readingList.openNew':  'Open another ePub',
+    'readingList.today':    'Today',
+    'readingList.yesterday':'Yesterday',
+    'readingList.daysAgo':  '{n} days ago',
+    'finished.msg':         '📖 Finished reading',
+    'finished.backToList':  'Back to reading list',
+    'finished.dismiss':     'Stay',
+    'btn.closeBook':        '📚 Close this book',
+    'btn.closeBook.title':  'Close book and return to reading list',
   },
   'zh-TW': {
     'btn.open':             '開啟',
@@ -888,6 +965,19 @@ const I18N = {
     'err.invalidFormat':    '格式無效',
     'err.importFailed':     '匯入書籤失敗：\n{msg}',
     'err.driveFailed':      'Drive 操作失敗：\n{msg}',
+    'readingList.title':    '閱讀中的書',
+    'readingList.count':    '{n}本',
+    'readingList.chapter':  '第{n}章 / 共{total}章',
+    'readingList.openThis': '開啟此檔案',
+    'readingList.openNew':  '開啟其他 ePub',
+    'readingList.today':    '今天',
+    'readingList.yesterday':'昨天',
+    'readingList.daysAgo':  '{n}天前',
+    'finished.msg':         '📖 已讀完全書',
+    'finished.backToList':  '回到閱讀清單',
+    'finished.dismiss':     '繼續閱讀',
+    'btn.closeBook':        '📚 關閉此書',
+    'btn.closeBook.title':  '關閉此書並回到閱讀清單',
   },
   'zh-CN': {
     'btn.open':             '打开',
@@ -999,6 +1089,19 @@ const I18N = {
     'err.invalidFormat':    '格式无效',
     'err.importFailed':     '导入书签失败：\n{msg}',
     'err.driveFailed':      'Drive 操作失败：\n{msg}',
+    'readingList.title':    '阅读中的书',
+    'readingList.count':    '{n}本',
+    'readingList.chapter':  '第{n}章 / 共{total}章',
+    'readingList.openThis': '打开此文件',
+    'readingList.openNew':  '打开其他 ePub',
+    'readingList.today':    '今天',
+    'readingList.yesterday':'昨天',
+    'readingList.daysAgo':  '{n}天前',
+    'finished.msg':         '📖 已读完全书',
+    'finished.backToList':  '回到阅读列表',
+    'finished.dismiss':     '继续阅读',
+    'btn.closeBook':        '📚 关闭本书',
+    'btn.closeBook.title':  '关闭本书并回到阅读列表',
   },
 };
 
@@ -1061,7 +1164,7 @@ const state = {
   epub:null, opfPath:'', opfDir:'',
   spine:[], manifest:{}, toc:[],
   currentSpineIdx:0,
-  bookTitle:'', bookCreator:'',
+  bookTitle:'', bookCreator:'', bookCoverDataUri:'',
   fontMode:'publisher', fontSize:100, lineHeight:2.0, theme:'', margin:'full',
   writingMode:'vertical',  // 'vertical' | 'horizontal' | 'publisher'
   fwdBtnSize:'small',      // 'small' | 'medium' | 'large'
@@ -1292,8 +1395,15 @@ async function loadEpub(file) {
       .map(el => el.textContent.trim()).filter(Boolean).join('・');
     document.getElementById('book-title').textContent = titleText;
     state.bookKey = 'epub_pos_' + titleText + '_' + state.spine.length;
+
+    // 表紙サムネイル抽出（非同期、失敗しても続行）
+    state.bookCoverDataUri = '';
+    try { state.bookCoverDataUri = await extractCoverThumb(opfDoc) || ''; } catch(e) {}
+    saveBookMeta();
+
     document.getElementById('welcome').style.display = 'none';
     document.getElementById('page-container').classList.add('visible');
+    updateCloseBookBtnVisibility();
     buildTocList();
     // 最終書名をlocalStorageに保存（レジューム表示用）
     try { localStorage.setItem('epub_last_book', JSON.stringify({ title: titleText, bookKey: state.bookKey })); } catch(e) {}
@@ -1837,6 +1947,7 @@ let _searchSeq         = 0;        // 検索シーケンス番号（新検索開
 async function renderPage(idx, scrollTarget) {
   if (!state.epub || idx < 0 || idx >= state.spine.length) return;
   if (scrollTarget === undefined) scrollTarget = 'start';
+  dismissFinishedBanner();
   const seq = ++_renderSeq;
   _isRendering = true;
   _intraChapterRatio = 0;
@@ -1908,8 +2019,12 @@ window.addEventListener('message', e => {
       _pendingScrollAfterRender = dir;
       return;
     }
-    if (dir === 1  && state.currentSpineIdx < state.spine.length-1) renderPage(state.currentSpineIdx+1, 'start');
-    if (dir === -1 && state.currentSpineIdx > 0)                    renderPage(state.currentSpineIdx-1, 'end');
+    if (dir === 1 && state.currentSpineIdx < state.spine.length - 1) {
+      renderPage(state.currentSpineIdx + 1, 'start');
+    } else if (dir === 1 && state.currentSpineIdx === state.spine.length - 1) {
+      showFinishedBanner();
+    }
+    if (dir === -1 && state.currentSpineIdx > 0) renderPage(state.currentSpineIdx - 1, 'end');
   }
   if (e.data.type === 'EPUB_POS') {
     // _isRendering 中は旧 iframe からの遅延 EPUB_POS を無視し、
@@ -2489,13 +2604,221 @@ function openFilePicker() {
 //  Resume (レジューム) — localStorage
 // ══════════════════════════════════════════
 function showResumeBanner() {
+  buildReadingList();
+}
+
+// ══════════════════════════════════════════
+//  読みかけリスト・閉じる・読了バナー
+// ══════════════════════════════════════════
+function formatRelativeDate(isoStr) {
+  if (!isoStr) return '—';
+  const d = new Date(isoStr);
+  if (isNaN(d)) return '—';
+  const now = new Date();
+  const diffMs = now - d;
+  const diffDays = Math.floor(diffMs / 86400000);
+  if (diffDays === 0) return t('readingList.today');
+  if (diffDays === 1) return t('readingList.yesterday');
+  if (diffDays < 30) return t('readingList.daysAgo', {n: diffDays});
+  const m = d.getMonth() + 1, day = d.getDate();
+  return m + '/' + day;
+}
+
+function buildReadingList() {
+  const items = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (!key || !key.startsWith('epub_pos_')) continue;
+    try {
+      const val = JSON.parse(localStorage.getItem(key));
+      if (!val) continue;
+      const withoutPrefix = key.slice('epub_pos_'.length);
+      const lastUnder = withoutPrefix.lastIndexOf('_');
+      if (lastUnder === -1) continue;
+      const title = withoutPrefix.slice(0, lastUnder);
+      const spineCount = parseInt(withoutPrefix.slice(lastUnder + 1), 10);
+      if (!title || isNaN(spineCount) || spineCount <= 0) continue;
+      // 完読済み除外: 最終章かつ ratio > 0.9
+      if (val.spineIdx >= spineCount - 1 && (val.ratio || 0) > 0.9) continue;
+      items.push({key, title, spineCount,
+        spineIdx: val.spineIdx || 0, ratio: val.ratio || 0,
+        lastOpenedAt: val.lastOpenedAt || null,
+        creator: val.creator || '',
+        cover: val.cover || '',
+      });
+    } catch(e) {}
+  }
+  items.sort((a, b) => {
+    if (!a.lastOpenedAt && !b.lastOpenedAt) return 0;
+    if (!a.lastOpenedAt) return 1;
+    if (!b.lastOpenedAt) return -1;
+    return new Date(b.lastOpenedAt) - new Date(a.lastOpenedAt);
+  });
+
+  let lastReadKey = '';
   try {
-    const data = JSON.parse(localStorage.getItem('epub_last_book'));
-    if (!data || !data.title) return;
-    const savedPos = data.bookKey ? JSON.parse(localStorage.getItem(data.bookKey)) : null;
-    if (!savedPos || (savedPos.spineIdx === 0 && savedPos.ratio <= 0.01)) return;
-    document.getElementById('resume-title').textContent = data.title;
-    document.getElementById('resume-banner').style.display = 'block';
+    const lb = JSON.parse(localStorage.getItem('epub_last_book'));
+    if (lb && lb.bookKey) lastReadKey = lb.bookKey;
+  } catch(e) {}
+
+  const listEl = document.getElementById('reading-list');
+  const dropEl = document.getElementById('drop-zone');
+  const welcomeEl = document.getElementById('welcome');
+  if (!items.length) {
+    listEl.style.display = 'none';
+    dropEl.style.display = '';
+    welcomeEl.classList.remove('has-list');
+    return;
+  }
+  listEl.style.display = 'flex';
+  dropEl.style.display = 'none';
+  welcomeEl.classList.add('has-list');
+  document.getElementById('reading-list-count').textContent = t('readingList.count', {n: items.length});
+
+  const BOOK_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>';
+  document.getElementById('reading-list-items').innerHTML = items.map(item => {
+    const isLast = item.key === lastReadKey;
+    const pct = Math.min(100, ((item.spineIdx + item.ratio) / item.spineCount * 100)).toFixed(0);
+    const thumbHtml = item.cover
+      ? `<img src="${esc(item.cover)}" width="48" height="68" alt="" loading="lazy">`
+      : BOOK_ICON;
+    const creatorHtml = item.creator
+      ? `<div class="rl-creator">${esc(item.creator)}</div>` : '';
+    return `<div class="rl-card${isLast ? ' rl-last' : ''}" data-key="${esc(item.key)}">
+  <div class="rl-thumb">${thumbHtml}</div>
+  <div class="rl-info">
+    <div class="rl-title">${esc(item.title)}</div>
+    ${creatorHtml}
+    <div class="rl-progress-row">
+      <div class="rl-bar"><div class="rl-fill" style="width:${pct}%"></div></div>
+      <span class="rl-chapter">${t('readingList.chapter', {n: item.spineIdx + 1, total: item.spineCount})}</span>
+      <span class="rl-pct">${pct}%</span>
+    </div>
+    <div class="rl-meta">
+      <span class="rl-date">${formatRelativeDate(item.lastOpenedAt)}</span>
+      <button class="rl-open-btn" data-key="${esc(item.key)}" onclick="openFilePickerForBook(this.dataset.key)">${t('readingList.openThis')}</button>
+    </div>
+  </div>
+</div>`;
+  }).join('');
+}
+
+function openFilePickerForBook(bookKey) {
+  openFilePicker();
+}
+
+function updateCloseBookBtnVisibility() {
+  const g = document.getElementById('close-book-group');
+  if (g) g.style.display = state.epub ? 'block' : 'none';
+}
+
+function closeBook() {
+  if (!state.epub) return;
+  savePos(_intraChapterRatio);
+  dismissFinishedBanner();
+  // フルスクリーン解除
+  if (state.fullscreen) toggleFullscreen();
+  // サイドバー・設定ポップオーバーを閉じる
+  if (!document.getElementById('sidebar').classList.contains('hidden')) toggleSidebar();
+  const pop = document.getElementById('settings-popover');
+  if (pop.classList.contains('show')) toggleSettings();
+  // レンダーをキャンセル
+  _renderSeq++;
+  _isRendering = false;
+  _pendingScrollAfterRender = 0;
+  // state リセット
+  state.epub = null; state.opfPath = ''; state.opfDir = '';
+  state.spine = []; state.manifest = {}; state.toc = [];
+  state.currentSpineIdx = 0;
+  state.bookTitle = ''; state.bookCreator = ''; state.bookCoverDataUri = '';
+  state.bookKey = ''; state.publisherAxis = null;
+  _intraChapterRatio = 0;
+  _originalBookmark = null; _jumpHistory = [];
+  // UI リセット
+  document.getElementById('content-iframe').src = 'about:blank';
+  document.getElementById('book-title').textContent = t('app.title');
+  document.getElementById('page-container').classList.remove('visible');
+  resetSearch();
+  document.getElementById('search-input').disabled = true;
+  document.getElementById('search-btn').disabled = true;
+  updateCloseBookBtnVisibility();
+  updateJumpHistoryUI();
+  updatePageInfo();
+  const wel = document.getElementById('welcome');
+  wel.style.display = '';
+  wel.classList.remove('has-list');
+  buildReadingList();
+}
+
+function showFinishedBanner() {
+  const b = document.getElementById('finished-banner');
+  b.classList.add('show');
+}
+
+function dismissFinishedBanner() {
+  const b = document.getElementById('finished-banner');
+  if (b) b.classList.remove('show');
+}
+
+// ── extractCoverThumb: OPFから表紙画像を抽出して48×68pxのJPEGサムネイルを返す ──
+async function extractCoverThumb(opfDoc) {
+  // ePub3: <item properties="cover-image">
+  let coverItem = [...opfDoc.querySelectorAll('manifest item')]
+    .find(i => (i.getAttribute('properties') || '').includes('cover-image'));
+  // ePub2: <meta name="cover" content="item-id">
+  if (!coverItem) {
+    const coverMeta = opfDoc.querySelector('metadata > meta[name="cover"]');
+    if (coverMeta) {
+      const coverId = coverMeta.getAttribute('content');
+      if (coverId) coverItem = opfDoc.querySelector(`manifest item[id="${CSS.escape(coverId)}"]`);
+    }
+  }
+  // フォールバック: id="cover" または id="cover-image"
+  if (!coverItem) {
+    coverItem = opfDoc.querySelector('manifest item[id="cover"]') ||
+                opfDoc.querySelector('manifest item[id="cover-image"]');
+  }
+  if (!coverItem) return null;
+  const href = coverItem.getAttribute('href');
+  if (!href) return null;
+  const absPath = state.opfDir + href;
+  const f = state.epub.file(absPath);
+  if (!f) return null;
+  const b64 = await f.async('base64');
+  const ext = absPath.split('.').pop().toLowerCase();
+  const mime = ext === 'png' ? 'image/png' : ext === 'gif' ? 'image/gif' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
+  const dataUri = `data:${mime};base64,${b64}`;
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const TW = 48, TH = 68;
+        const ir = img.width / img.height, tr = TW / TH;
+        let sw, sh, sx, sy;
+        if (ir > tr) { sh = img.height; sw = sh * tr; sx = (img.width - sw) / 2; sy = 0; }
+        else         { sw = img.width; sh = sw / tr; sx = 0; sy = (img.height - sh) / 2; }
+        const canvas = document.createElement('canvas');
+        canvas.width = TW; canvas.height = TH;
+        canvas.getContext('2d').drawImage(img, sx, sy, sw, sh, 0, 0, TW, TH);
+        resolve(canvas.toDataURL('image/jpeg', 0.65));
+      } catch(e) { resolve(null); }
+    };
+    img.onerror = () => resolve(null);
+    img.src = dataUri;
+  });
+}
+
+// ── saveBookMeta: 本を開いたときにメタデータをしおりエントリに保存 ──
+function saveBookMeta() {
+  if (!state.bookKey) return;
+  try {
+    const existing = JSON.parse(localStorage.getItem(state.bookKey)) || {};
+    localStorage.setItem(state.bookKey, JSON.stringify({
+      ...existing,
+      lastOpenedAt: new Date().toISOString(),
+      creator: state.bookCreator,
+      ...(state.bookCoverDataUri ? {cover: state.bookCoverDataUri} : {}),
+    }));
   } catch(e) {}
 }
 
@@ -2509,9 +2832,11 @@ function loadSavedPos() {
 function savePos(ratio) {
   if (!state.bookKey || !state.epub) return;
   try {
+    const existing = JSON.parse(localStorage.getItem(state.bookKey)) || {};
     localStorage.setItem(state.bookKey, JSON.stringify({
+      ...existing,
       spineIdx: state.currentSpineIdx,
-      ratio: ratio,
+      ratio,
     }));
   } catch(e) {
     notifyStorageError();
