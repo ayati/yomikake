@@ -1409,6 +1409,7 @@ async function loadEpub(file) {
     try { localStorage.setItem('epub_last_book', JSON.stringify({ title: titleText, bookKey: state.bookKey })); } catch(e) {}
     _originalBookmark = null;
     _jumpHistory = [];
+    _bookFinished = false;
     resetSearch();
     switchSidebarTab('toc');
     document.getElementById('search-input').disabled = false;
@@ -1939,6 +1940,7 @@ let _pendingScrollAfterRender = 0; // 描画中に受け取ったスクロール
 let _intraChapterRatio = 0;        // 章内スクロール比率（0–1）プログレスバー表示用
 let _originalBookmark  = null;     // {spineIdx, ratio} | null — 開いた時のしおり位置
 let _jumpHistory       = [];       // [{spineIdx, ratio}] 直近4件のジャンプ前位置（新しい順）
+let _bookFinished      = false;    // 最終章末尾到達フラグ（closeBook で ratio=0 上書き防止）
 let _sidebarTab        = 'toc';    // 'toc' | 'search' — サイドバーの現在タブ
 let _searching         = false;    // 検索実行中
 let _searchAbort       = false;    // 検索中止フラグ（後方互換のため残存、実質 _searchSeq で代替）
@@ -2022,6 +2024,7 @@ window.addEventListener('message', e => {
     if (dir === 1 && state.currentSpineIdx < state.spine.length - 1) {
       renderPage(state.currentSpineIdx + 1, 'start');
     } else if (dir === 1 && state.currentSpineIdx === state.spine.length - 1) {
+      savePos(1.0);
       showFinishedBanner();
     }
     if (dir === -1 && state.currentSpineIdx > 0) renderPage(state.currentSpineIdx - 1, 'end');
@@ -2714,7 +2717,7 @@ function updateCloseBookBtnVisibility() {
 
 function closeBook() {
   if (!state.epub) return;
-  savePos(_intraChapterRatio);
+  savePos(_bookFinished ? 1.0 : _intraChapterRatio);
   dismissFinishedBanner();
   // フルスクリーン解除
   if (state.fullscreen) toggleFullscreen();
@@ -2733,7 +2736,7 @@ function closeBook() {
   state.bookTitle = ''; state.bookCreator = ''; state.bookCoverDataUri = '';
   state.bookKey = ''; state.publisherAxis = null;
   _intraChapterRatio = 0;
-  _originalBookmark = null; _jumpHistory = [];
+  _originalBookmark = null; _jumpHistory = []; _bookFinished = false;
   // UI リセット
   document.getElementById('content-iframe').src = 'about:blank';
   document.getElementById('book-title').textContent = t('app.title');
@@ -2751,6 +2754,7 @@ function closeBook() {
 }
 
 function showFinishedBanner() {
+  _bookFinished = true;
   const b = document.getElementById('finished-banner');
   b.classList.add('show');
 }

@@ -45,7 +45,7 @@ There are no automated tests. Manual testing requires a `.epub` or `.kepub` file
 Most features exist in both files. As a rule:
 - **`yomikake.html` only**: drag-and-drop, toolbar mouse-wheel scroll, `SHARED_TAIL` (Chrome `text-combine-upright` fix), `isNeg()` sign detection in horizontal/publisher scroll.
 - **`yomikake_ios.html` only**: CSS-transform scroll mechanism, touch swipe inside iframe, `CLICK_HANDLER` / `INIT_FN` template variables, double-rAF + 500ms `INIT_FN` timing, `will-change:transform` on body.
-- **Both files**: all other features — rendering pipeline, postMessage protocol, i18n, settings, bookmarks, Drive sync, fullscreen, progress bar, full-text search, sidebar tabs, `_renderSeq`, `_isRendering` / `_pendingScrollAfterRender`, chapter-end blank page, `flashOverlay()`, `flashNavButtons()`, `showResumeBanner()`, `showToast()`, `toggleSidebar()`.
+- **Both files**: all other features — rendering pipeline, postMessage protocol, i18n, settings, bookmarks, Drive sync, fullscreen, progress bar, full-text search, sidebar tabs, `_renderSeq`, `_isRendering` / `_pendingScrollAfterRender`, `_bookFinished`, chapter-end blank page, `flashOverlay()`, `flashNavButtons()`, `showResumeBanner()`, `showFinishedBanner()`, `showToast()`, `toggleSidebar()`.
 
 When fixing a bug or adding a feature that is not in the "only" lists above, apply the change to **both files**.
 
@@ -202,6 +202,8 @@ Both files support **4 languages**: `ja` (Japanese), `en` (English), `zh-TW` (Tr
 | `epub_lang` | selected UI language (`ja` / `en` / `zh-TW` / `zh-CN`) |
 
 Bookmark key uses OPF title + spine count (not file path), so moving or renaming the file does not break saved positions. `exportBookmarks()` serialises all `epub_pos_*` and `epub_last_book` keys to a JSON file (`{ version, exportedAt, bookmarks: {} }`) for cross-device transfer. Import is handled by a `change` event listener on a hidden `<input type="file" id="bookmark-input">` (no named import function); it validates the JSON shape and writes matching keys back to `localStorage`. After writing, if the currently open book's key is present in the imported data and the new position is ahead of the current position but not on the last spine item, `renderPage()` is called with the new position and `toast.localJumped` is shown instead of `toast.imported`. `notifyStorageError()` shows a toast when any `localStorage.setItem` throws (quota exceeded). `resumeBook()` is invoked when the user clicks the welcome-screen resume banner; it calls `loadSavedPos()` then opens a file picker.
+
+**読みかけリスト完読済み除外** — `buildReadingList()` は `val.spineIdx >= spineCount - 1 && (val.ratio || 0) > 0.9` の条件を満たすエントリをリストから除外する。`ratio=1.0` は `closeBook()` または EPUB_EDGE ハンドラで保存される。短い最終章（コンテンツが1画面に収まる `sw <= 2*vw`）では `doScroll` が `reportPos()` を呼ばずに即 `EPUB_EDGE` を発火するため `_intraChapterRatio=0` のまま。この問題を防ぐため `_bookFinished` フラグを使用する: `showFinishedBanner()` で `true` にセット → `closeBook()` で `_bookFinished ? 1.0 : _intraChapterRatio` を `savePos()` に渡す → `_bookFinished` をリセット。`loadEpub()` でも新しい本を開く際にリセットする。
 
 ### Jump History (セッション内しおり履歴)
 
