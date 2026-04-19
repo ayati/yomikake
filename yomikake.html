@@ -1667,8 +1667,9 @@ async function buildSrcdoc(xhtmlText, xhtmlAbsPath, scrollTarget, readySeq) {
     : wm === 'horizontal'
       ? 'writing-mode:horizontal-tb!important;-webkit-writing-mode:horizontal-tb!important;padding-bottom:100vh!important;'
       : 'height:100%!important;';  // publisher: full-height prevents ePub-fixed column-height collapse
+  const vertPad = (state.margin === 'narrow' || state.margin === 'none') ? '0.25em' : '0.5em';
   const wmBody = wm === 'vertical'
-    ? 'writing-mode:vertical-rl!important;-webkit-writing-mode:vertical-rl!important;margin:0!important;height:100%!important;overflow-y:hidden!important;box-sizing:border-box!important;padding-bottom:1em!important;'
+    ? 'writing-mode:vertical-rl!important;-webkit-writing-mode:vertical-rl!important;margin:0!important;height:100%!important;overflow-y:hidden!important;box-sizing:border-box!important;padding-bottom:' + vertPad + '!important;'
     : wm === 'horizontal'
       ? 'writing-mode:horizontal-tb!important;-webkit-writing-mode:horizontal-tb!important;'
       : 'height:100%!important;';  // publisher: match html full-height
