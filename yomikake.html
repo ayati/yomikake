@@ -1663,7 +1663,7 @@ async function buildSrcdoc(xhtmlText, xhtmlAbsPath, scrollTarget, readySeq) {
   // 'horizontal': force horizontal-tb + padding-bottom:100vh (blank page at bottom)
   // 'publisher' : no CSS override — blank-end-page padding injected via JS in applyInit() after axis detection
   const wmHtml = wm === 'vertical'
-    ? 'writing-mode:vertical-rl!important;-webkit-writing-mode:vertical-rl!important;padding-left:100vw!important;height:100%!important;overflow-y:hidden!important;'
+    ? 'writing-mode:vertical-rl!important;-webkit-writing-mode:vertical-rl!important;padding-left:100vw!important;height:100%!important;overflow-y:hidden!important;scrollbar-width:none!important;'
     : wm === 'horizontal'
       ? 'writing-mode:horizontal-tb!important;-webkit-writing-mode:horizontal-tb!important;padding-bottom:100vh!important;'
       : 'height:100%!important;';  // publisher: full-height prevents ePub-fixed column-height collapse
@@ -1676,6 +1676,7 @@ async function buildSrcdoc(xhtmlText, xhtmlAbsPath, scrollTarget, readySeq) {
     'html,body{background:' + paper + '!important;color:' + text + '!important;}',
     'html{font-size:' + state.fontSize + '%!important;line-height:' + state.lineHeight + '!important;' + wmHtml + '}',
     'body{' + wmBody + 'line-height:' + state.lineHeight + '!important;}',
+    wm === 'vertical' ? 'html::-webkit-scrollbar{display:none!important;}' : '',
     'img{max-width:100%!important;max-height:95vh!important;object-fit:contain!important;}',
     'svg{max-width:100%!important;max-height:95vh!important;}',  // scale down full-page SVG in manga/image ePub
     fontRule,
