@@ -185,9 +185,12 @@
   .rl-delete-btn { display:none; position:absolute; top:10px; right:10px; width:28px; height:28px; border-radius:50%; background:#e53e3e; border:none; color:#fff; font-size:18px; line-height:1; cursor:pointer; align-items:center; justify-content:center; z-index:2; }
   #reading-list.edit-mode .rl-delete-btn { display:flex; }
   #reading-list.edit-mode .rl-open-btn { pointer-events:none; opacity:0.35; }
-  #reading-list-footer { margin-top:18px; text-align:center; padding-bottom:8px; }
+  #reading-list-footer { margin-top:18px; display:flex; justify-content:center; align-items:center; gap:12px; padding-bottom:8px; }
   #reading-list-new-btn { font-size:13px; font-weight:600; color:var(--ui-text); background:var(--ui-bg); border:1px solid var(--ui-border); border-radius:10px; padding:10px 24px; cursor:pointer; transition:all .15s; }
   #reading-list-new-btn:hover { border-color:var(--accent); color:var(--accent); }
+  #reading-list-done-btn { display:none; font-size:13px; font-weight:600; color:var(--accent); background:transparent; border:1.5px solid var(--accent); border-radius:10px; padding:10px 24px; cursor:pointer; transition:all .15s; }
+  #reading-list-done-btn:hover { background:var(--accent); color:#fff; }
+  #reading-list.edit-mode #reading-list-done-btn { display:inline-block; }
 
   /* ── 読了バナー ── */
   #finished-banner { display:none; position:absolute; bottom:20px; left:50%; transform:translateX(-50%); z-index:50; background:var(--backdrop); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); border:1px solid var(--glass-border); border-radius:16px; padding:14px 20px; box-shadow:0 8px 32px var(--shadow); white-space:nowrap; align-items:center; gap:12px; animation:fadeIn .3s ease; }
@@ -516,6 +519,7 @@
         <div id="reading-list-items"></div>
         <div id="reading-list-footer">
           <button id="reading-list-new-btn" onclick="openFilePicker()" data-i18n="readingList.openNew">別の ePub を開く</button>
+          <button id="reading-list-done-btn" onclick="toggleEditMode()">完了</button>
         </div>
       </div>
       <div id="drop-zone" onclick="openFilePicker()">
@@ -2796,6 +2800,8 @@ function buildReadingList() {
   document.getElementById('reading-list-count').textContent = t('readingList.count', {n: items.length});
   const editBtn = document.getElementById('reading-list-edit-btn');
   if (editBtn) editBtn.textContent = _editMode ? t('readingList.editDone') : t('readingList.edit');
+  const doneBtn = document.getElementById('reading-list-done-btn');
+  if (doneBtn) doneBtn.textContent = t('readingList.editDone');
 
   const BOOK_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>';
   document.getElementById('reading-list-items').innerHTML = items.map(item => {
