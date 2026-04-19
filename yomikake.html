@@ -1663,12 +1663,12 @@ async function buildSrcdoc(xhtmlText, xhtmlAbsPath, scrollTarget, readySeq) {
   // 'horizontal': force horizontal-tb + padding-bottom:100vh (blank page at bottom)
   // 'publisher' : no CSS override — blank-end-page padding injected via JS in applyInit() after axis detection
   const wmHtml = wm === 'vertical'
-    ? 'writing-mode:vertical-rl!important;-webkit-writing-mode:vertical-rl!important;padding-left:100vw!important;'
+    ? 'writing-mode:vertical-rl!important;-webkit-writing-mode:vertical-rl!important;padding-left:100vw!important;height:100%!important;overflow-y:hidden!important;'
     : wm === 'horizontal'
       ? 'writing-mode:horizontal-tb!important;-webkit-writing-mode:horizontal-tb!important;padding-bottom:100vh!important;'
       : 'height:100%!important;';  // publisher: full-height prevents ePub-fixed column-height collapse
   const wmBody = wm === 'vertical'
-    ? 'writing-mode:vertical-rl!important;-webkit-writing-mode:vertical-rl!important;'
+    ? 'writing-mode:vertical-rl!important;-webkit-writing-mode:vertical-rl!important;height:100%!important;'
     : wm === 'horizontal'
       ? 'writing-mode:horizontal-tb!important;-webkit-writing-mode:horizontal-tb!important;'
       : 'height:100%!important;';  // publisher: match html full-height
