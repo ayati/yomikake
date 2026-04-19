@@ -1663,11 +1663,14 @@ async function buildSrcdoc(xhtmlText, xhtmlAbsPath, scrollTarget, readySeq) {
   // 'horizontal': force horizontal-tb + padding-bottom:100vh (blank page at bottom)
   // 'publisher' : no CSS override — blank-end-page padding injected via JS in applyInit() after axis detection
   const wmHtml = wm === 'vertical'
-    ? 'writing-mode:vertical-rl!important;-webkit-writing-mode:vertical-rl!important;padding-left:100vw!important;height:100%!important;overflow-y:hidden!important;scrollbar-width:none!important;'
+    ? 'writing-mode:vertical-rl!important;-webkit-writing-mode:vertical-rl!important;padding-left:100vw!important;height:100%!important;overflow-y:hidden!important;'
     : wm === 'horizontal'
       ? 'writing-mode:horizontal-tb!important;-webkit-writing-mode:horizontal-tb!important;padding-bottom:100vh!important;'
       : 'height:100%!important;';  // publisher: full-height prevents ePub-fixed column-height collapse
-  const vertPad = (state.margin === 'narrow' || state.margin === 'none') ? '0.25em' : '0.5em';
+  // PC(hover:hover)ではスクロールバー(6px)分を確保するため max(0.25em,8px)、タッチは最小値
+  const isHoverDevice = !!(window.matchMedia && window.matchMedia('(hover:hover)').matches);
+  const tightPad = isHoverDevice ? 'max(0.25em,8px)' : '0.25em';
+  const vertPad = (state.margin === 'narrow' || state.margin === 'none') ? tightPad : '0.5em';
   const wmBody = wm === 'vertical'
     ? 'writing-mode:vertical-rl!important;-webkit-writing-mode:vertical-rl!important;margin:0!important;height:100%!important;overflow-y:hidden!important;box-sizing:border-box!important;padding-bottom:' + vertPad + '!important;'
     : wm === 'horizontal'
@@ -1677,7 +1680,16 @@ async function buildSrcdoc(xhtmlText, xhtmlAbsPath, scrollTarget, readySeq) {
     'html,body{background:' + paper + '!important;color:' + text + '!important;}',
     'html{font-size:' + state.fontSize + '%!important;line-height:' + state.lineHeight + '!important;' + wmHtml + '}',
     'body{' + wmBody + 'line-height:' + state.lineHeight + '!important;}',
-    wm === 'vertical' ? 'html::-webkit-scrollbar{display:none!important;}' : '',
+    wm === 'vertical' ? (
+      // PC: スクロールバートラック(6px)を常時確保しhover時のみサムを表示 / タッチ: 完全非表示
+      '@media (hover:hover){' +
+        'html::-webkit-scrollbar{height:6px!important;}' +
+        'html::-webkit-scrollbar-track{background:transparent!important;}' +
+        'html::-webkit-scrollbar-thumb{background:transparent!important;border-radius:3px!important;transition:background .2s!important;}' +
+        'html:hover::-webkit-scrollbar-thumb{background:rgba(128,128,128,.5)!important;}' +
+        'html{scrollbar-width:thin!important;scrollbar-color:rgba(128,128,128,.45) transparent!important;}' +
+      '}' +
+      '@media (hover:none){html::-webkit-scrollbar{display:none!important;}html{scrollbar-width:none!important;}}') : '',
     'img{max-width:100%!important;max-height:95vh!important;object-fit:contain!important;}',
     'svg{max-width:100%!important;max-height:95vh!important;}',  // scale down full-page SVG in manga/image ePub
     fontRule,
