@@ -232,6 +232,11 @@
   .nav-hint { opacity:0.8 !important; background:var(--accent) !important; color:#fff !important; box-shadow:0 8px 32px var(--shadow); }
   .nav-hint svg { stroke:#fff !important; }
 
+  #mobile-progress { position:absolute; bottom:14px; left:50%; transform:translateX(-50%); display:flex; align-items:center; gap:8px; background:rgba(0,0,0,.58); color:#fff; padding:5px 14px 5px 12px; border-radius:20px; font-size:13px; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,monospace; font-variant-numeric:tabular-nums; letter-spacing:.3px; pointer-events:none; z-index:25; white-space:nowrap; backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); opacity:0; transition:opacity .35s ease; }
+  #mobile-progress.show { opacity:1; }
+  #mobile-progress-bar { width:64px; height:3px; background:rgba(255,255,255,.28); border-radius:2px; overflow:hidden; flex-shrink:0; }
+  #mobile-progress-fill { height:100%; background:rgba(255,255,255,.9); border-radius:2px; width:0%; transition:width .3s ease-out; }
+
   #statusbar { height:36px; background:var(--ui-bg); border-top:1px solid var(--ui-border); display:flex; align-items:center; padding:0 16px; gap:16px; font-size:13px; color:var(--ui-text); flex-shrink:0; position:relative; z-index:30; }
   #page-info { flex:1; text-align:center; font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace; font-variant-numeric: tabular-nums; letter-spacing: 0.5px; opacity: 0.8; }
   #progress-bar { width:160px; height:6px; background:var(--ui-border); border-radius:3px; overflow:hidden; cursor:pointer; position:relative; }
@@ -546,6 +551,10 @@
       <button class="scroll-btn" id="btn-scroll-fwd" onclick="scrollPage(1)" data-i18n-title="btn.scrollFwd">
         <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
       </button>
+      <div id="mobile-progress" aria-hidden="true">
+        <span id="mobile-chapter-info"></span>
+        <div id="mobile-progress-bar"><div id="mobile-progress-fill"></div></div>
+      </div>
     </div>
     <div id="finished-banner">
       <span id="finished-banner-msg" data-i18n="finished.msg">📖 最後まで読みました</span>
@@ -2005,6 +2014,7 @@ let _jumpHistory       = [];       // [{spineIdx, ratio}] 直近4件のジャン
 let _bookFinished      = false;    // 最終章末尾到達フラグ（closeBook で ratio=0 上書き防止）
 let _handleKeys        = new Set();// File System Access API: handle を持つ bookKey の集合
 let _editMode          = false;    // 読みかけリスト編集モード
+let _mobileProgressTimer = null;  // モバイル進捗ピル 非表示タイマー
 let _sidebarTab        = 'toc';    // 'toc' | 'search' — サイドバーの現在タブ
 let _searching         = false;    // 検索実行中
 let _searchAbort       = false;    // 検索中止フラグ（後方互換のため残存、実質 _searchSeq で代替）
@@ -2133,9 +2143,17 @@ function flashOverlay() {
 function flashNavButtons() {
   const btns = document.querySelectorAll('.chapter-btn, .scroll-btn');
   btns.forEach(b => b.classList.add('nav-hint'));
-  setTimeout(() => {
-    btns.forEach(b => b.classList.remove('nav-hint'));
-  }, 3500);
+  setTimeout(() => btns.forEach(b => b.classList.remove('nav-hint')), 3500);
+  // モバイル（ステータスバー非表示）かつ本が開いている場合、進捗ピルを表示
+  if (state.spine.length && window.getComputedStyle(document.getElementById('statusbar')).display === 'none') {
+    const total = state.spine.length, cur = state.currentSpineIdx + 1;
+    document.getElementById('mobile-chapter-info').textContent = cur + ' / ' + total;
+    const pct = total <= 1 ? 0 : Math.min(100, (cur - 1 + _intraChapterRatio) / (total - 1) * 100);
+    document.getElementById('mobile-progress-fill').style.width = pct + '%';
+    document.getElementById('mobile-progress').classList.add('show');
+    clearTimeout(_mobileProgressTimer);
+    _mobileProgressTimer = setTimeout(() => document.getElementById('mobile-progress').classList.remove('show'), 3500);
+  }
 }
 // 縦書き（vertical-rl）軸かどうかを返す。
 // publisher モードは iframe から EPUB_AXIS メッセージで検出した軸を参照する。
