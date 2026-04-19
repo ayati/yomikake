@@ -232,10 +232,14 @@
   .nav-hint { opacity:0.8 !important; background:var(--accent) !important; color:#fff !important; box-shadow:0 8px 32px var(--shadow); }
   .nav-hint svg { stroke:#fff !important; }
 
-  #mobile-progress { position:absolute; bottom:14px; left:50%; transform:translateX(-50%); display:flex; align-items:center; gap:8px; background:rgba(0,0,0,.58); color:#fff; padding:5px 14px 5px 12px; border-radius:20px; font-size:13px; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,monospace; font-variant-numeric:tabular-nums; letter-spacing:.3px; pointer-events:none; z-index:25; white-space:nowrap; backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); opacity:0; transition:opacity .35s ease; }
+  #mobile-progress { position:absolute; bottom:14px; left:50%; transform:translateX(-50%); display:flex; align-items:center; gap:7px; background:rgba(0,0,0,.58); color:#fff; padding:6px 14px 6px 12px; border-radius:20px; font-size:13px; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,monospace; font-variant-numeric:tabular-nums; letter-spacing:.3px; pointer-events:none; z-index:25; white-space:nowrap; backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); opacity:0; transition:opacity .35s ease; }
   #mobile-progress.show { opacity:1; }
-  #mobile-progress-bar { width:64px; height:3px; background:rgba(255,255,255,.28); border-radius:2px; overflow:hidden; flex-shrink:0; }
-  #mobile-progress-fill { height:100%; background:rgba(255,255,255,.9); border-radius:2px; width:0%; transition:width .3s ease-out; }
+  /* 全体進捗バー（細・書籍全体） */
+  #mobile-overall-bar { width:36px; height:2px; background:rgba(255,255,255,.28); border-radius:1px; overflow:hidden; flex-shrink:0; }
+  #mobile-overall-fill { height:100%; background:rgba(255,255,255,.7); border-radius:1px; width:0%; transition:width .3s ease-out; }
+  /* 章内進捗バー（太・現在章内） */
+  #mobile-intra-bar { width:60px; height:4px; background:rgba(255,255,255,.28); border-radius:2px; overflow:hidden; flex-shrink:0; }
+  #mobile-intra-fill { height:100%; background:rgba(255,255,255,.95); border-radius:2px; width:0%; transition:width .3s ease-out; }
 
   #statusbar { height:36px; background:var(--ui-bg); border-top:1px solid var(--ui-border); display:flex; align-items:center; padding:0 16px; gap:16px; font-size:13px; color:var(--ui-text); flex-shrink:0; position:relative; z-index:30; }
   #page-info { flex:1; text-align:center; font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace; font-variant-numeric: tabular-nums; letter-spacing: 0.5px; opacity: 0.8; }
@@ -553,7 +557,8 @@
       </button>
       <div id="mobile-progress" aria-hidden="true">
         <span id="mobile-chapter-info"></span>
-        <div id="mobile-progress-bar"><div id="mobile-progress-fill"></div></div>
+        <div id="mobile-overall-bar"><div id="mobile-overall-fill"></div></div>
+        <div id="mobile-intra-bar"><div id="mobile-intra-fill"></div></div>
       </div>
     </div>
     <div id="finished-banner">
@@ -2148,8 +2153,9 @@ function flashNavButtons() {
   if (state.spine.length && window.getComputedStyle(document.getElementById('statusbar')).display === 'none') {
     const total = state.spine.length, cur = state.currentSpineIdx + 1;
     document.getElementById('mobile-chapter-info').textContent = cur + ' / ' + total;
-    const pct = total <= 1 ? 0 : Math.min(100, (cur - 1 + _intraChapterRatio) / (total - 1) * 100);
-    document.getElementById('mobile-progress-fill').style.width = pct + '%';
+    const pctOverall = total <= 1 ? 0 : Math.min(100, (cur - 1 + _intraChapterRatio) / (total - 1) * 100);
+    document.getElementById('mobile-overall-fill').style.width = pctOverall + '%';
+    document.getElementById('mobile-intra-fill').style.width = (_intraChapterRatio * 100) + '%';
     document.getElementById('mobile-progress').classList.add('show');
     clearTimeout(_mobileProgressTimer);
     _mobileProgressTimer = setTimeout(() => document.getElementById('mobile-progress').classList.remove('show'), 3500);
