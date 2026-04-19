@@ -19,6 +19,7 @@ Two-file ePub 3 vertical-text viewer for reading Japanese publications. No build
 
 **Feature differences between files:**
 - Drag-and-drop file open: `yomikake.html` only
+- File System Access API (direct file-reopen from reading list without new picker): `yomikake.html` only
 - Keyboard shortcuts (Space/arrows/Home/End): both files support Bluetooth keyboard; `yomikake_ios.html` also handles touch swipe inside the iframe
 - Toolbar mouse-wheel scroll: `yomikake.html` only
 - Google Drive bookmark sync: both files (requires HTTP server — Google Identity Services does not work on `file://`)
@@ -45,7 +46,7 @@ There are no automated tests. Manual testing requires a `.epub` or `.kepub` file
 Most features exist in both files. As a rule:
 - **`yomikake.html` only**: drag-and-drop, toolbar mouse-wheel scroll, `SHARED_TAIL` (Chrome `text-combine-upright` fix), `isNeg()` sign detection in horizontal/publisher scroll.
 - **`yomikake_ios.html` only**: CSS-transform scroll mechanism, touch swipe inside iframe, `CLICK_HANDLER` / `INIT_FN` template variables, double-rAF + 500ms `INIT_FN` timing, `will-change:transform` on body.
-- **Both files**: all other features — rendering pipeline, postMessage protocol, i18n, settings, bookmarks, Drive sync, fullscreen, progress bar, full-text search, sidebar tabs, `_renderSeq`, `_isRendering` / `_pendingScrollAfterRender`, `_bookFinished`, chapter-end blank page, `flashOverlay()`, `flashNavButtons()`, `showResumeBanner()`, `showFinishedBanner()`, `showToast()`, `toggleSidebar()`.
+- **Both files**: all other features — rendering pipeline, postMessage protocol, i18n, settings, bookmarks, Drive sync, fullscreen, progress bar, full-text search, sidebar tabs, `_renderSeq`, `_isRendering` / `_pendingScrollAfterRender`, `_bookFinished`, chapter-end blank page, `flashOverlay()`, `flashNavButtons()`, `showResumeBanner()`, `showFinishedBanner()`, `showToast()`, `toggleSidebar()`, `buildReadingList()`, `formatRelativeDate()`, `extractCoverThumb()`, `saveBookMeta()`, `closeBook()`, `openFilePickerForBook()`.
 
 When fixing a bug or adding a feature that is not in the "only" lists above, apply the change to **both files**.
 
@@ -87,6 +88,7 @@ const state = {
   currentSpineIdx,  // current chapter index
   bookTitle,        // from OPF dc:title
   bookCreator,      // from OPF dc:creator (multiple joined with ・)
+  bookCoverDataUri, // base64 JPEG thumbnail (48×68px) extracted from OPF cover; '' if unavailable
   bookKey,          // localStorage key prefix: 'epub_pos_{title}_{spineCount}'
   writingMode,      // 'vertical' | 'horizontal' | 'publisher'
   fwdBtnSize,       // 'small' | 'medium' | 'large' — size of #btn-scroll-fwd
@@ -120,6 +122,7 @@ const state = {
 - **`.kepub`** (Kobo ePub) is supported by treating it as a standard ZIP/ePub.
 - **Settings popover** — display settings (font, size, line height, theme, margin, writing mode, forward-button size) live in a floating `#settings-popover` panel toggled by `toggleSettings()`, not in inline toolbar controls. `updateThemeBtnUI()` syncs the visual theme button state after loading settings. `applyFwdBtnSize(v)` updates `#btn-scroll-fwd` dimensions when `fwdBtnSize` changes (`'small'` / `'medium'` / `'large'`).
 - **`THEME_CONTENT` map** holds iframe content colors separately from CSS variables (which only apply to the outer UI). Theme changes re-render the current chapter.
+- **Vertical mode height constraint** — `buildSrcdoc()` injects `height:100%!important; overflow-y:hidden!important;` on `html` and `height:100%!important; overflow-y:hidden!important; box-sizing:border-box!important; padding-bottom:0.5em!important;` on `body` for vertical mode. Without these, ePub CSS that leaves `height:auto` on html/body causes columns to grow beyond the viewport, producing a vertical scrollbar and clipping the last character. `padding-bottom:0.5em` ensures the last column line never sits exactly at the viewport boundary (which would clip it under `overflow-y:hidden`). `yomikake_ios.html` already injects `html { height:100%; overflow:hidden }` globally, so no change needed there.
 - **`buildScrollScript()`** returns a self-contained IIFE string baked into the iframe. The **vertical** mode uses `window.scrollX` / `window.scrollTo()` instead of `scrollLeft`, so no browser sign-convention detection (`isNeg`) is needed: `scrollX=0` at reading start (right edge) and increases in the reading direction on both Chrome and Firefox. `doScroll` checks at the **top** whether we are already in the blank zone (from a prior scroll) and fires `EPUB_EDGE` then; otherwise it scrolls one page and, if past `contentMax`, lands on the blank page (without firing `EPUB_EDGE` yet). The horizontal and publisher modes still use `scrollLeft` with `isNeg()` detection.
 - **iOS Safari scroll compatibility** — injected CSS sets `html { height:100%; overflow-y:hidden }`. Two constraints: (1) `height:100%` (not `100vh`) — iOS Safari resolves `100vh` to full screen height including address bar, making columns too tall; (2) `overflow-x` is NOT set — setting `overflow-x:auto` causes iOS to use an LTR CSS scroll container where the initial position is scrollLeft=0 (left edge = RTL content end = blank). Without it, iOS UIScrollView auto-positions at the RTL start (right edge = content beginning).
 - **`window.scrollTo()` instead of `scrollLeft` assignment** — `document.documentElement.scrollLeft = X` is silently ignored inside iOS Safari iframes (confirmed via diagnostics: probe=0 after setting 9999999). `window.scrollTo(x, 0)` works correctly. All scroll operations use `window.scrollTo`; `window.scrollX` is used for reading (falls back to `scrollLeft` for browsers that don't support `scrollX`).
@@ -196,7 +199,7 @@ Both files support **4 languages**: `ja` (Japanese), `en` (English), `zh-TW` (Tr
 
 | Key | Content |
 |-----|---------|
-| `epub_pos_{title}_{spineCount}` | `{spineIdx, ratio}` — per-book reading position |
+| `epub_pos_{title}_{spineCount}` | `{spineIdx, ratio, lastOpenedAt, creator, cover?}` — reading position + book metadata written by `saveBookMeta()` on open and `savePos()` on scroll/chapter change |
 | `epub_last_book` | `{title, bookKey}` — for the resume banner |
 | `epub_settings` | `{fontMode, fontSize, lineHeight, theme, margin, writingMode, fwdBtnSize, driveAutoSave}` |
 | `epub_lang` | selected UI language (`ja` / `en` / `zh-TW` / `zh-CN`) |
@@ -217,6 +220,15 @@ Two module-level variables track navigation history for the duration of the curr
 **`updateJumpHistoryUI()`** — rebuilds `#jump-history-section` (in the TOC sidebar, above `#toc-list`). Hidden when both `_originalBookmark` is null and `_jumpHistory` is empty. When visible: shows a `📌` row for `_originalBookmark` (if set) and `↩` rows for each `_jumpHistory` entry, followed by a `<hr class="history-divider">` separator. Clicking any row calls `pushJumpHistory()` then `renderPage()` so the return trip is also recordable.
 
 **`labelForPos(spineIdx, ratio)`** — returns an HTML string with the chapter label (from `state.toc` if a matching entry exists, else `sidebar.chapter` i18n key) and a `<span class="history-pct">· N%</span>` suffix. Uses `esc()` for the label text.
+
+### File System Access API (`yomikake.html` only)
+
+When `window.showOpenFilePicker` is available (Chrome/Edge), the viewer stores `FileSystemFileHandle` objects in IndexedDB (`epub_viewer_fsh` DB, `handles` object store) so the reading list can reopen a book without showing a new file picker.
+
+- **`fshPut(bookKey, handle)`** — stores the handle under `bookKey` after `loadEpub()` succeeds.
+- **`fshGetAllKeys()`** — returns all keys with stored handles; called at init to populate `_handleKeys` (module-level `Set`).
+- **`_handleKeys`** — tracks which bookKeys have a cached handle; used by `buildReadingList()` to render "このファイルを開く（直接）" instead of the normal picker button.
+- **`openFilePickerForBook(bookKey)`** — if `_handleKeys.has(bookKey)`, calls `handle.getFile()` directly and passes the result to `loadEpub()`; on `NotAllowedError` or `NotFoundError`, falls back to `showOpenFilePicker()` and removes the stale handle. In `yomikake_ios.html`, this function always falls back to `showOpenFilePicker()`.
 
 ### Google Drive Bookmark Sync
 
