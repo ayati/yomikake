@@ -1614,14 +1614,15 @@ async function buildSrcdoc(xhtmlText, xhtmlAbsPath, scrollTarget, readySeq) {
         'overflow:visible!important;' +
         'writing-mode:horizontal-tb!important;-webkit-writing-mode:horizontal-tb!important;'
       : /* publisher */
-        'position:fixed!important;top:0!important;left:0!important;' +
+        'position:fixed!important;top:0!important;bottom:0!important;left:0!important;right:0!important;' +
         'overflow:visible!important;' +
-        'width:max-content!important;min-width:100vw!important;max-width:none!important;' +
-        'height:max-content!important;min-height:100vh!important;max-height:none!important;';
+        'min-width:100vw!important;max-width:none!important;' +
+        'min-height:100vh!important;max-height:none!important;';
   const overrideStyle = doc.createElement('style');
   overrideStyle.id = 'epub-viewer-inject';
   overrideStyle.textContent = fontImport + [
     'html{height:100%!important;overflow:hidden!important;writing-mode:horizontal-tb!important;',
+        '-webkit-text-size-adjust:100%!important;text-size-adjust:100%!important;',
         'margin:0!important;padding:0!important;',
         'background:' + paper + '!important;}',
     'body{' + bodyWmCss,
@@ -1800,13 +1801,15 @@ ${INIT_FN}
     var wm = getComputedStyle(body).writingMode || '';
     _axis = wm.indexOf('vertical') >= 0 ? 'h' : 'v';
     if(_axis === 'h'){
-      body.style.setProperty('bottom','0','important');
-      body.style.setProperty('height','auto','important');  // top+bottom で 100vh に拘束 (stylesheet の height:max-content を上書き)
+      // right:0 を解除して body が水平方向へ max-content まで拡張できるようにする。
+      // height は top:0+bottom:0 の位置拘束で 100vh に自動決定される。
+      body.style.setProperty('right','auto','important');
       body.style.setProperty('width','max-content','important');
       body.style.setProperty('min-width','100vw','important');
     } else {
-      body.style.setProperty('right','0','important');
-      body.style.setProperty('width','auto','important');   // left+right で 100vw に拘束 (stylesheet の width:max-content を上書き)
+      // bottom:0 を解除して body が垂直方向へ max-content まで拡張できるようにする。
+      // width は left:0+right:0 の位置拘束で 100vw に自動決定される。
+      body.style.setProperty('bottom','auto','important');
       body.style.setProperty('height','max-content','important');
       body.style.setProperty('min-height','100vh','important');
     }
