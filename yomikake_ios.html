@@ -1621,7 +1621,7 @@ async function buildSrcdoc(xhtmlText, xhtmlAbsPath, scrollTarget, readySeq) {
   const overrideStyle = doc.createElement('style');
   overrideStyle.id = 'epub-viewer-inject';
   overrideStyle.textContent = fontImport + [
-    'html{height:100%!important;overflow:hidden!important;',
+    'html{height:100%!important;overflow:hidden!important;writing-mode:horizontal-tb!important;',
         'margin:0!important;padding:0!important;',
         'background:' + paper + '!important;}',
     'body{' + bodyWmCss,
