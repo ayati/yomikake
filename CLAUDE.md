@@ -52,28 +52,28 @@ When fixing a bug or adding a feature that is not in the "only" lists above, app
 
 ## Architecture
 
-Each viewer is a single self-contained HTML file (both ~3062 lines). Both follow a modular functional style with a single central state object. The architecture below describes `yomikake.html`; `yomikake_ios.html` is identical except for the scroll mechanism (see iOS Viewer section below).
+Each viewer is a single self-contained HTML file (`yomikake.html` ~3612 lines, `yomikake_ios.html` ~3476 lines). Both follow a modular functional style with a single central state object. The architecture below describes `yomikake.html`; `yomikake_ios.html` is identical except for the scroll mechanism (see iOS Viewer section below).
 
 **Key locations in both files** (approximate — shift as code grows):
 
 | Symbol | `yomikake.html` | `yomikake_ios.html` |
 |--------|-------------------|----------------------|
-| `GOOGLE_CLIENT_ID` | ~541 | ~528 |
-| `I18N` translations | ~558 | ~545 |
-| `state` object | ~1060 | ~1047 |
-| `FONTS` / `FONT_URLS` / `FONT_GROUPS` | ~1088 | ~1075 |
-| `loadEpub()` | ~1227 | ~1200 |
-| `navigateToToc()` | ~1341 | ~1306 |
-| `buildSrcdoc()` | ~1411 | ~1374 |
-| `buildScrollScript()` | ~1535 | ~1502 |
-| `SHARED_TAIL` (yomikake.html only) | ~1542 | — |
-| `CLICK_HANDLER` / `INIT_FN` (ios only) | — | ~1518 / ~1532 |
-| `_intraChapterRatio` | ~1829 | ~1853 |
-| `renderPage()` | ~1837 | ~1861 |
-| `handleIframeLink()` | ~1932 | ~1956 |
-| `runSearch()` / `startSearch()` | ~2251 / ~2289 | ~2272 / ~2310 |
-| `savePos()` | ~2509 | ~2522 |
-| `driveAuth()` | ~2656 | ~2669 |
+| `GOOGLE_CLIENT_ID` | ~610 | ~593 |
+| `I18N` translations | ~627 | ~610 |
+| `state` object | ~1209 | ~1188 |
+| `FONTS` / `FONT_URLS` / `FONT_GROUPS` | ~1237 | ~1216 |
+| `loadEpub()` | ~1385 | ~1341 |
+| `navigateToToc()` | ~1514 | ~1455 |
+| `buildSrcdoc()` | ~1584 | ~1523 |
+| `buildScrollScript()` | ~1728 | ~1651 |
+| `SHARED_TAIL` (yomikake.html only) | ~1735 | — |
+| `CLICK_HANDLER` / `INIT_FN` (ios only) | — | ~1667 / ~1681 |
+| `_intraChapterRatio` | ~2022 | ~2009 |
+| `renderPage()` | ~2034 | ~2020 |
+| `handleIframeLink()` | ~2135 | ~2121 |
+| `runSearch()` / `startSearch()` | ~2463 / ~2501 | ~2446 / ~2484 |
+| `savePos()` | ~3056 | ~2933 |
+| `driveAuth()` | ~3205 | ~3082 |
 
 ### State
 
@@ -122,7 +122,8 @@ const state = {
 - **`.kepub`** (Kobo ePub) is supported by treating it as a standard ZIP/ePub.
 - **Settings popover** — display settings (font, size, line height, theme, margin, writing mode, forward-button size) live in a floating `#settings-popover` panel toggled by `toggleSettings()`, not in inline toolbar controls. `updateThemeBtnUI()` syncs the visual theme button state after loading settings. `applyFwdBtnSize(v)` updates `#btn-scroll-fwd` dimensions when `fwdBtnSize` changes (`'small'` / `'medium'` / `'large'`).
 - **`THEME_CONTENT` map** holds iframe content colors separately from CSS variables (which only apply to the outer UI). Theme changes re-render the current chapter.
-- **Vertical mode height constraint** — `buildSrcdoc()` injects `height:100%!important; overflow-y:hidden!important;` on `html` and `height:100%!important; overflow-y:hidden!important; box-sizing:border-box!important; padding-bottom:0.5em!important;` on `body` for vertical mode. Without these, ePub CSS that leaves `height:auto` on html/body causes columns to grow beyond the viewport, producing a vertical scrollbar and clipping the last character. `padding-bottom:0.5em` ensures the last column line never sits exactly at the viewport boundary (which would clip it under `overflow-y:hidden`). `yomikake_ios.html` already injects `html { height:100%; overflow:hidden }` globally, so no change needed there.
+- **Vertical mode height constraint** — `buildSrcdoc()` injects `height:100%!important; overflow-y:hidden!important;` on `html` and `height:100%!important; overflow-y:hidden!important; box-sizing:border-box!important; padding-bottom:<vertPad>!important;` on `body` for vertical mode. Without these, ePub CSS that leaves `height:auto` on html/body causes columns to grow beyond the viewport, producing a vertical scrollbar and clipping the last character. `vertPad` scales with `state.margin`: `1em` for `full`/`medium` (one full character worth of buffer — proven safe in v1.7.13 and restored after the scrollbar regression below), `max(0.5em,10px)` / `0.5em` for `narrow`, `max(0.25em,8px)` / `0.25em` for `none` (tight layout for users who opt in). The hover-dependent `max(..,Npx)` variants ensure the padding covers the 6px horizontal scrollbar reserved on PC (see next bullet). `yomikake_ios.html` uses a different architecture (`body { position:fixed; top:0; bottom:0 }` + CSS transform scroll), so no iframe scrollbar ever appears and no padding-bottom is required.
+- **Vertical-mode horizontal scrollbar (PC-only)** — in vertical-rl, block direction is horizontal so the iframe overflows horizontally. On PC (`@media (hover:hover)`) `html::-webkit-scrollbar{height:6px}` reserves a 6px horizontal scrollbar track at the bottom (thumb is transparent at rest and fades in on hover via `html:hover::-webkit-scrollbar-thumb`) so the reader can see their chapter-internal position. On touch (`@media (hover:none)`) the scrollbar is hidden with `display:none` + `scrollbar-width:none`. Because the 6px track eats into `html.content_height` (and therefore into `body.height:100%`), `padding-bottom` must be large enough to cover both character overshoot AND the scrollbar; see the previous bullet. A historical regression appeared when PC scrollbar reservation was added while padding stayed at `0.5em` (=8px), leaving only ~2px of effective buffer — see v1.7.13 commit for the original fix.
 - **`buildScrollScript()`** returns a self-contained IIFE string baked into the iframe. The **vertical** mode uses `window.scrollX` / `window.scrollTo()` instead of `scrollLeft`, so no browser sign-convention detection (`isNeg`) is needed: `scrollX=0` at reading start (right edge) and increases in the reading direction on both Chrome and Firefox. `doScroll` checks at the **top** whether we are already in the blank zone (from a prior scroll) and fires `EPUB_EDGE` then; otherwise it scrolls one page and, if past `contentMax`, lands on the blank page (without firing `EPUB_EDGE` yet). The horizontal and publisher modes still use `scrollLeft` with `isNeg()` detection.
 - **iOS Safari scroll compatibility** — injected CSS sets `html { height:100%; overflow-y:hidden }`. Two constraints: (1) `height:100%` (not `100vh`) — iOS Safari resolves `100vh` to full screen height including address bar, making columns too tall; (2) `overflow-x` is NOT set — setting `overflow-x:auto` causes iOS to use an LTR CSS scroll container where the initial position is scrollLeft=0 (left edge = RTL content end = blank). Without it, iOS UIScrollView auto-positions at the RTL start (right edge = content beginning).
 - **`window.scrollTo()` instead of `scrollLeft` assignment** — `document.documentElement.scrollLeft = X` is silently ignored inside iOS Safari iframes (confirmed via diagnostics: probe=0 after setting 9999999). `window.scrollTo(x, 0)` works correctly. All scroll operations use `window.scrollTo`; `window.scrollX` is used for reading (falls back to `scrollLeft` for browsers that don't support `scrollX`).

@@ -1681,10 +1681,16 @@ async function buildSrcdoc(xhtmlText, xhtmlAbsPath, scrollTarget, readySeq) {
     : wm === 'horizontal'
       ? 'writing-mode:horizontal-tb!important;-webkit-writing-mode:horizontal-tb!important;padding-bottom:100vh!important;'
       : 'height:100%!important;';  // publisher: full-height prevents ePub-fixed column-height collapse
-  // PC(hover:hover)ではスクロールバー(6px)分を確保するため max(0.25em,8px)、タッチは最小値
+  // 縦書き最終行の文字が overflow-y:hidden 境界に当たるのを防ぐ下側バッファ。
+  // PC(hover:hover) では横スクロールバー(6px)分が html.content_height から差し引かれるため、
+  // 0.5em(=8px) では実質 2px しか残らず、フォント/サイズによっては一文字分がクリップされる。
+  // full/medium では 1em（一文字分）で v1.7.13 の実績値に戻して再発を防止する。
   const isHoverDevice = !!(window.matchMedia && window.matchMedia('(hover:hover)').matches);
-  const tightPad = isHoverDevice ? 'max(0.25em,8px)' : '0.25em';
-  const vertPad = (state.margin === 'narrow' || state.margin === 'none') ? tightPad : '0.5em';
+  const vertPad = state.margin === 'none'
+    ? (isHoverDevice ? 'max(0.25em,8px)' : '0.25em')
+    : state.margin === 'narrow'
+      ? (isHoverDevice ? 'max(0.5em,10px)' : '0.5em')
+      : '1em';  // full / medium: 一文字分の安全バッファ（v1.7.13 実証済み）
   const wmBody = wm === 'vertical'
     ? 'writing-mode:vertical-rl!important;-webkit-writing-mode:vertical-rl!important;margin:0!important;height:100%!important;overflow-y:hidden!important;box-sizing:border-box!important;padding-bottom:' + vertPad + '!important;'
     : wm === 'horizontal'
