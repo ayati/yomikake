@@ -1801,10 +1801,12 @@ ${INIT_FN}
     _axis = wm.indexOf('vertical') >= 0 ? 'h' : 'v';
     if(_axis === 'h'){
       body.style.setProperty('bottom','0','important');
+      body.style.setProperty('height','auto','important');  // top+bottom で 100vh に拘束 (stylesheet の height:max-content を上書き)
       body.style.setProperty('width','max-content','important');
       body.style.setProperty('min-width','100vw','important');
     } else {
       body.style.setProperty('right','0','important');
+      body.style.setProperty('width','auto','important');   // left+right で 100vw に拘束 (stylesheet の width:max-content を上書き)
       body.style.setProperty('height','max-content','important');
       body.style.setProperty('min-height','100vh','important');
     }
