@@ -1785,6 +1785,11 @@ ${INIT_FN}
   }
 
   if (writingMode === 'publisher') {
+    // publisher モード縦書き軸検出後に body へ注入する padding-bottom（縦書き最終行文字切れ防止）
+    // iOS にはPC横スクロールバーがないため isHoverDevice 分岐なし
+    const pubVertPad = state.margin === 'none' ? '0.25em'
+      : state.margin === 'narrow' ? '0.5em'
+      : '1em';
     return `(function(){
   var STEP = 0.92;
   var initTarget = ${t};
@@ -1806,6 +1811,9 @@ ${INIT_FN}
       body.style.setProperty('right','auto','important');
       body.style.setProperty('width','max-content','important');
       body.style.setProperty('min-width','100vw','important');
+      // 縦書き最終行の文字切れ防止（縦書きモードと同等の下側バッファ）
+      body.style.setProperty('box-sizing','border-box','important');
+      body.style.setProperty('padding-bottom','${pubVertPad}','important');
     } else {
       // bottom:0 を解除して body が垂直方向へ max-content まで拡張できるようにする。
       // width は left:0+right:0 の位置拘束で 100vw に自動決定される。

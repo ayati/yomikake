@@ -1824,6 +1824,13 @@ function buildScrollScript(scrollTarget, writingMode, readySeq) {
   // vertical-rl → padding-left:100vw（vertical モードと同じ）
   // horizontal-tb → padding-bottom:100vh（horizontal モードと同じ）
   if (writingMode === 'publisher') {
+    // publisher モード縦書き軸検出後に body へ注入する padding-bottom（縦書き最終行文字切れ防止）
+    const isHoverDev = !!(window.matchMedia && window.matchMedia('(hover:hover)').matches);
+    const pubVertPad = state.margin === 'none'
+      ? (isHoverDev ? 'max(0.25em,8px)' : '0.25em')
+      : state.margin === 'narrow'
+        ? (isHoverDev ? 'max(0.5em,10px)' : '0.5em')
+        : '1em';
     return [
       '(function(){',
       '  var STEP = 0.92;',
@@ -1850,7 +1857,7 @@ function buildScrollScript(scrollTarget, writingMode, readySeq) {
       '    var ax = axis();',
       '    // Inject blank-end-page padding (same pattern as dedicated vertical / horizontal modes).',
       '    var pad = document.createElement("style");',
-      '    pad.textContent = ax === "h" ? "html{padding-left:100vw!important}" : "html{padding-bottom:100vh!important}";',
+      '    pad.textContent = ax === "h" ? "html{padding-left:100vw!important}body{overflow-y:hidden!important;box-sizing:border-box!important;padding-bottom:' + pubVertPad + '!important;}" : "html{padding-bottom:100vh!important}";',
       '    document.head.appendChild(pad);',
       '    var _flush = e.scrollWidth; // force reflow so padding takes effect',
       '    _neg = null; // reset sign cache — scrollWidth changed after padding injection',
