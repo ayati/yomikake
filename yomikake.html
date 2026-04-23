@@ -2138,6 +2138,7 @@ function handleIframeLink(href) {
   if (!base) return; // anchor-only (#id) on same page — no-op
   if (/^javascript:/i.test(base)) return; // javascript: スキームは拒否
   const curItem = state.spine[state.currentSpineIdx];
+  if (!curItem) return;
   const curDir  = curItem.absPath.includes('/')
     ? curItem.absPath.slice(0, curItem.absPath.lastIndexOf('/') + 1)
     : '';
@@ -2758,7 +2759,7 @@ async function openFilePicker() {
       });
       await loadEpub(await handle.getFile(), handle);
     } catch (e) {
-      if (e.name !== 'AbortError') console.error(e);
+      if (e.name !== 'AbortError') showToast(t('err.loadFailed', {msg: e.message}));
     }
   } else {
     document.getElementById('file-input').click();
@@ -3159,6 +3160,11 @@ document.getElementById('bookmark-input').addEventListener('change', e => {
       let count = 0;
       for (const [key, val] of Object.entries(json.bookmarks)) {
         if (!key.startsWith('epub_pos_') && key !== 'epub_last_book') continue;
+        let obj;
+        try { obj = typeof val === 'string' ? JSON.parse(val) : val; } catch(e) { continue; }
+        if (!obj || typeof obj !== 'object') continue;
+        if (key === 'epub_last_book' && typeof obj.title !== 'string') continue;
+        if (key.startsWith('epub_pos_') && (typeof obj.spineIdx !== 'number' || typeof obj.ratio !== 'number')) continue;
         try {
           localStorage.setItem(key, typeof val === 'string' ? val : JSON.stringify(val));
           if (key.startsWith('epub_pos_')) count++;
