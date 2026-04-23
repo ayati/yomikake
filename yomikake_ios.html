@@ -107,6 +107,31 @@
   .sidebar-tab svg { width:14px; height:14px; stroke:currentColor; stroke-width:2; fill:none; }
   #toc-panel { flex:1; display:flex; flex-direction:column; overflow:hidden; }
   #toc-list { flex:1; overflow-y:auto; padding:8px 0; }
+
+  /* ── ジャンプパネル（TOCサイドバー最上部） ── */
+  #jump-panel { flex-shrink:0; padding:12px 12px 10px; border-bottom:1px solid var(--ui-border); background:var(--ui-bg); }
+  #jump-panel.hidden { display:none; }
+  .jump-section-title { font-size:11px; font-weight:700; color:var(--ui-text); opacity:.55; text-transform:uppercase; letter-spacing:.5px; margin-bottom:8px; }
+  .jump-slider-wrap { position:relative; padding-top:22px; margin-bottom:6px; }
+  #jump-slider-bubble { position:absolute; top:0; transform:translateX(-50%); background:var(--accent); color:#fff; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600; white-space:nowrap; pointer-events:none; opacity:0; transition:opacity .12s; }
+  #jump-slider-bubble.show { opacity:1; }
+  #jump-slider { width:100%; margin:0; -webkit-appearance:none; appearance:none; background:transparent; height:22px; cursor:pointer; }
+  #jump-slider::-webkit-slider-runnable-track { height:4px; background:var(--ui-border); border-radius:2px; }
+  #jump-slider::-moz-range-track { height:4px; background:var(--ui-border); border-radius:2px; }
+  #jump-slider::-webkit-slider-thumb { -webkit-appearance:none; appearance:none; width:20px; height:20px; border-radius:50%; background:var(--accent); border:2px solid var(--ui-bg); margin-top:-8px; box-shadow:0 1px 3px var(--shadow); cursor:pointer; }
+  #jump-slider::-moz-range-thumb { width:20px; height:20px; border-radius:50%; background:var(--accent); border:2px solid var(--ui-bg); box-shadow:0 1px 3px var(--shadow); cursor:pointer; }
+  .jump-current { font-size:12px; color:var(--ui-text); opacity:.75; text-align:center; margin-bottom:10px; }
+  .jump-btn-row { display:flex; gap:5px; margin-bottom:8px; }
+  .jump-btn-row button { flex:1; padding:8px 6px; min-height:36px; background:var(--ui-bg); color:var(--ui-text); border:1px solid var(--ui-border); border-radius:6px; font-size:12px; font-family:inherit; cursor:pointer; transition:background .1s; white-space:nowrap; }
+  .jump-btn-row button:hover:not(:disabled) { background:var(--hover-bg); }
+  .jump-btn-row button:disabled { opacity:.4; cursor:default; }
+  .jump-input-row { display:flex; gap:6px; align-items:center; }
+  .jump-input-label { font-size:11px; color:var(--ui-text); opacity:.7; flex-shrink:0; }
+  #jump-number-input { flex:1; min-width:0; padding:6px 8px; border:1px solid var(--ui-border); border-radius:6px; background:var(--ui-bg); color:var(--ui-text); font-family:inherit; font-size:13px; text-align:center; outline:none; -moz-appearance:textfield; }
+  #jump-number-input::-webkit-outer-spin-button, #jump-number-input::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
+  #jump-number-input:focus { border-color:var(--accent); }
+  #jump-go-btn { padding:6px 12px; background:var(--accent); color:#fff; border:none; border-radius:6px; font-size:12px; font-weight:600; cursor:pointer; flex-shrink:0; font-family:inherit; }
+  #jump-go-btn:hover { filter:brightness(1.08); }
   #search-panel { flex:1; display:flex; flex-direction:column; overflow:hidden; }
   #search-input-area { padding:10px 12px; display:flex; gap:6px; border-bottom:1px solid var(--ui-border); flex-shrink:0; }
   #search-input { flex:1; padding:7px 10px; border:1px solid var(--ui-border); border-radius:8px; background:var(--ui-bg); color:var(--ui-text); font-size:13px; font-family:inherit; outline:none; }
@@ -206,6 +231,40 @@
 
   #page-container { width:100%; height:100%; display:none; align-items:stretch; justify-content:center; position:relative; }
   #page-container.visible { display:flex; }
+
+  /* ── FXL (マンガ・雑誌) モード ──
+     body.mode-fxl 時は iframe の代わりに #fxl-container を表示し、
+     画像を親ウィンドウ直接配置する（iframe不要）。 */
+  #fxl-container { position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+                   background:var(--bg); overflow:hidden; user-select:none; -webkit-user-select:none;
+                   touch-action:manipulation; }
+  /* 明示的な 100%×100% サイズを与える（width:auto+max-width:100% の循環参照を防ぐ） */
+  #fxl-spread { width:100%; height:100%; display:flex; flex-direction:row; gap:0;
+                align-items:center; justify-content:center; }
+  #fxl-spread.rtl { flex-direction:row-reverse; }
+  /* object-fit:contain で画像内容をアスペクト比維持のまま box 内に fit。box は 100%/50% ×100% */
+  #fxl-spread img { display:block; width:100%; height:100%; object-fit:contain;
+                    -webkit-user-drag:none; user-drag:none; }
+  #fxl-spread.spread img { width:50%; }
+  #fxl-spread.single #fxl-page-b { display:none; }
+  /* 見開き時は2画像を中央側で隣接させる（外側に余白を逃がす） */
+  #fxl-spread.spread.rtl #fxl-page-a { object-position: left center; }
+  #fxl-spread.spread.rtl #fxl-page-b { object-position: right center; }
+  #fxl-spread.spread:not(.rtl) #fxl-page-a { object-position: right center; }
+  #fxl-spread.spread:not(.rtl) #fxl-page-b { object-position: left center; }
+  #fxl-placeholder { color:var(--ui-text); font-size:14px; opacity:.7; padding:20px 28px;
+                     border:1px dashed var(--ui-border); border-radius:8px; }
+  body.mode-fxl #epub-frame { display:none !important; }
+  body:not(.mode-fxl) #fxl-container { display:none !important; }
+  body.mode-fxl .chapter-btn { display:none !important; }
+  body.mode-fxl #search-input-area,
+  body.mode-fxl #search-progress-bar,
+  body.mode-fxl #search-status,
+  body.mode-fxl #search-results { display:none !important; }
+  body.mode-fxl #fxl-search-notice { display:block; }
+  body:not(.mode-fxl) #fxl-search-notice { display:none; }
+  /* FXL 時に不要な設定グループを非表示 */
+  body.mode-fxl .fxl-hide-group { display:none !important; }
 
   #epub-frame { background:var(--paper); box-shadow:0 12px 48px var(--page-shadow),0 2px 12px var(--shadow); border-radius:4px; overflow:hidden; position:relative; display:flex; flex-direction:column; width:100%; max-width:var(--frame-max-width,900px); transition:max-width .3s cubic-bezier(0.16,1,0.3,1); }
   #page-overlay { position:absolute; inset:0; background:var(--paper); opacity:0; pointer-events:none; z-index:10; transition:opacity .2s cubic-bezier(0.2,0,0,1); }
@@ -402,7 +461,7 @@
       </div>
     </div>
 
-    <div class="set-group">
+    <div class="set-group fxl-hide-group">
       <h4 data-i18n="settings.typography">タイポグラフィ</h4>
       <div class="set-row">
         <span class="set-label" data-i18n="settings.font">フォント</span>
@@ -432,7 +491,7 @@
       </div>
     </div>
 
-    <div class="set-group">
+    <div class="set-group fxl-hide-group">
       <h4 data-i18n="settings.layout">レイアウト</h4>
       <div class="set-row">
         <span class="set-label" data-i18n="settings.writingMode">組方向</span>
@@ -457,6 +516,18 @@
           <option value="small" data-i18n="fwdSize.small">小</option>
           <option value="medium" data-i18n="fwdSize.medium">中</option>
           <option value="large" data-i18n="fwdSize.large">大</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="set-group" id="fxl-settings-group" style="display:none">
+      <h4 data-i18n="settings.layout">レイアウト</h4>
+      <div class="set-row">
+        <span class="set-label" data-i18n="settings.spreadMode">見開き表示</span>
+        <select class="modern-select" id="spread-mode-select" onchange="changeSpreadMode(this.value)">
+          <option value="auto" data-i18n="spread.auto">自動</option>
+          <option value="single" data-i18n="spread.single">単ページ</option>
+          <option value="spread" data-i18n="spread.spread">見開き</option>
         </select>
       </div>
     </div>
@@ -488,10 +559,32 @@
       </button>
     </div>
     <div id="toc-panel">
+      <div id="jump-panel" class="hidden">
+        <div class="jump-section-title" data-i18n="jump.title">ジャンプ</div>
+        <div class="jump-slider-wrap">
+          <div id="jump-slider-bubble">1</div>
+          <input type="range" id="jump-slider" min="1" max="1" value="1" step="1"
+                 oninput="handleJumpSliderInput(this.value)"
+                 onchange="handleJumpSliderChange(this.value)">
+        </div>
+        <div id="jump-current-label" class="jump-current"></div>
+        <div class="jump-btn-row">
+          <button type="button" onclick="jumpToCover()" data-i18n="jump.cover">📖 表紙</button>
+          <button type="button" onclick="jumpRelative(-10)">-10</button>
+          <button type="button" onclick="jumpRelative(10)">+10</button>
+          <button type="button" onclick="jumpToEnd()" data-i18n="jump.end">🏁 末尾</button>
+        </div>
+        <div class="jump-input-row">
+          <span id="jump-input-label" class="jump-input-label" data-i18n="jump.pageInput">ページ番号</span>
+          <input type="number" id="jump-number-input" inputmode="numeric" pattern="[0-9]*" min="1" onkeydown="if(event.key==='Enter'){event.preventDefault();jumpToInput();}">
+          <button type="button" id="jump-go-btn" onclick="jumpToInput()" data-i18n="jump.go">Go</button>
+        </div>
+      </div>
       <div id="jump-history-section" style="display:none"></div>
       <div id="toc-list"></div>
     </div>
     <div id="search-panel" style="display:none">
+      <div id="fxl-search-notice" style="display:none;padding:20px 14px;color:var(--ui-text);opacity:.75;font-size:13px;line-height:1.6;" data-i18n="search.fxlUnsupported">この本は画像形式のため全文検索は利用できません</div>
       <div id="search-input-area">
         <input id="search-input" type="search" autocomplete="off" data-i18n-placeholder="search.placeholder" placeholder="キーワードを入力">
         <button id="search-btn" onclick="startSearch()" data-i18n="search.btn">検索</button>
@@ -526,6 +619,12 @@
       <div id="epub-frame">
         <div id="page-overlay"></div>
         <iframe id="content-iframe" src="about:blank"></iframe>
+      </div>
+      <div id="fxl-container">
+        <div id="fxl-spread">
+          <img id="fxl-page-a" alt=""/>
+          <img id="fxl-page-b" alt="" class="hidden"/>
+        </div>
       </div>
       <button class="chapter-btn" id="btn-prev" onclick="prevChapter()" data-i18n-title="btn.prev">
         <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
@@ -685,7 +784,7 @@ const I18N = {
     'help.author':          '著者：{creator}',
     'help.chapters':        'チャプター数：{n}',
     'help.tocItems':        '目次項目数：{n}',
-    'help.body':            '<p><strong>📱 ページスクロール（主操作）</strong></p><p>　左スワイプ：1画面分 前進スクロール</p><p>　右スワイプ：1画面分 後退スクロール</p><p>　画面下「次へ」・上「前へ」ボタン</p><p>　※章末尾/先頭で自動的に章移動</p><br><p><strong>📖 章切り替え</strong></p><p>　右「›」ボタン：前の章</p><p>　左「‹」ボタン：次の章</p><br><p><strong>🔵 Bluetoothキーボード</strong></p><p>　スペース：次へ　Shift+スペース：前へ</p><p>　← 次の章　→ 前の章</p><br><p><strong>🔍 全文検索</strong></p><p>　サイドバー（目次ボタン）→「検索」タブにキーワードを入力してEnter</p><p>　タップするとその章に移動（ジャンプ履歴にも記録）</p><br><p><strong>🎨 表示設定（歯車アイコン）</strong></p><p>　フォント：22種（游明朝・ゴシック・Google Fonts など）</p><p>　テーマ：8色（標準・セピア・白紙・ダーク・さくら・星空・抹茶・月夜）</p><p>　文字サイズ・行間・余白・書字方向も変更可能</p><br><p><strong>🔖 しおり・ジャンプ履歴</strong></p><p>　読み位置は自動記録。サイドバーの目次タブでジャンプ履歴と元の位置に戻れます</p><p>　📥 ローカル読込　📤 ローカル書出　☁↓ Drive読込　☁↑ Drive保存</p><p style="font-size:12px;opacity:.6;">　※ Drive機能はHTTP/HTTPSサーバー経由の起動とGoogle Client IDの設定が必要です</p><br><p><strong>📚 読みかけリスト</strong></p><p>　本を開いていないとき、ウェルカム画面に読みかけの本を一覧表示します</p><p>　各カードに表紙・タイトル・著者名・進捗バー・最終閲覧日を表示</p><p>　カード右下「このファイルを開く」でファイルを選ぶと前回の続きから自動再開</p><p>　最終章の末尾まで読み進めると画面下部に読了バナーが表示されます</p><p>　「読みかけリストへ」：本を閉じてリストへ戻る。読了済みとしてリストから自動除外</p><p>　「閉じない」：バナーを閉じてそのまま読み続けられます</p><p>　⚙ 設定パネル末尾「本を閉じる」でいつでもリストへ戻れます（読み位置を自動保存）</p><p>　リスト右上「編集」ボタンで編集モードに切り替え、各カードの × で削除できます</p><br><p><strong>ファイル形式</strong></p><p>　.epub / .kepub（Kobo）対応</p>',
+    'help.body':            '<p><strong>📱 ページスクロール（主操作）</strong></p><p>　左スワイプ：1画面分 前進スクロール</p><p>　右スワイプ：1画面分 後退スクロール</p><p>　画面下「次へ」・上「前へ」ボタン</p><p>　※章末尾/先頭で自動的に章移動</p><br><p><strong>📖 章切り替え（リフロー型のみ）</strong></p><p>　右「›」ボタン：前の章</p><p>　左「‹」ボタン：次の章</p><br><p><strong>🔵 Bluetoothキーボード</strong></p><p>　スペース：次へ　Shift+スペース：前へ</p><p>　← 次の章　→ 前の章（リフロー型のみ）</p><br><p><strong>🎯 ページジャンプ（サイドバー）</strong></p><p>　サイドバー（☰ 目次ボタン）最上部の「ジャンプ」パネル</p><p>　スライダー：ドラッグで任意位置にプレビュー＆ジャンプ</p><p>　📖 表紙 / -10 / +10 / 🏁 末尾 の4ボタン</p><p>　ページ番号（リフロー型は章番号）を入力して Go または Enter</p><p>　ジャンプ前の位置は自動的にジャンプ履歴（↩）に記録、タップで戻れます</p><br><p><strong>🖼️ マンガ・雑誌モード（FXL / Fixed Layout）</strong></p><p>　pre-paginated 指定の ePub を自動検出し、画像1枚/ページ を画面内フィット表示</p><p>　iPad 横画面では2ページ見開き自動表示</p><p>　組方向・フォント等は無効化、代わりに⚙設定の「見開き表示」で自動/単ページ/見開きを切替</p><p>　マンガ（RTL）は右ページから順に表示、見開き時は中央で隣接</p><p>　スマホでは☰→ジャンプパネルで表紙・末尾・任意ページへ遷移</p><br><p><strong>🔍 全文検索（リフロー型のみ）</strong></p><p>　サイドバー（目次ボタン）→「検索」タブにキーワードを入力してEnter</p><p>　タップするとその章に移動（ジャンプ履歴にも記録）</p><p>　画像形式の本（FXL）では全文検索は利用できません</p><br><p><strong>🎨 表示設定（歯車アイコン）</strong></p><p>　フォント：22種（游明朝・ゴシック・Google Fonts など）※リフロー型のみ</p><p>　テーマ：8色（標準・セピア・白紙・ダーク・さくら・星空・抹茶・月夜）</p><p>　文字サイズ・行間・余白・書字方向 ※リフロー型のみ</p><p>　見開き表示（FXL時のみ）：自動 / 単ページ / 見開き</p><br><p><strong>🔖 しおり・ジャンプ履歴</strong></p><p>　読み位置は自動記録。サイドバーの目次タブでジャンプ履歴と元の位置に戻れます</p><p>　📥 ローカル読込　📤 ローカル書出　☁↓ Drive読込　☁↑ Drive保存</p><p style="font-size:12px;opacity:.6;">　※ Drive機能はHTTP/HTTPSサーバー経由の起動とGoogle Client IDの設定が必要です</p><br><p><strong>📚 読みかけリスト</strong></p><p>　本を開いていないとき、ウェルカム画面に読みかけの本を一覧表示します</p><p>　各カードに表紙・タイトル・著者名・進捗バー・最終閲覧日を表示</p><p>　カード右下「このファイルを開く」でファイルを選ぶと前回の続きから自動再開</p><p>　最終章の末尾まで読み進めると画面下部に読了バナーが表示されます</p><p>　「読みかけリストへ」：本を閉じてリストへ戻る。読了済みとしてリストから自動除外</p><p>　「閉じない」：バナーを閉じてそのまま読み続けられます</p><p>　⚙ 設定パネル末尾「本を閉じる」でいつでもリストへ戻れます（読み位置を自動保存）</p><p>　リスト右上「編集」ボタンで編集モードに切り替え、各カードの × で削除できます</p><br><p><strong>ファイル形式</strong></p><p>　.epub / .kepub（Kobo）対応。リフロー型・固定レイアウト型（マンガ・雑誌）どちらも自動判別</p>',
     'toast.webFontFile':    '☁ ウェブフォントはオフラインまたはfile://環境で表示されない場合があります',
     'toast.resume':         '📖 前回の続きから再開（{n} / {total}章）',
     'toast.fileMissing':    '⚠️ ファイルが見つかりません: {path}',
@@ -709,7 +808,20 @@ const I18N = {
     'btn.fullscreen.exit':       '読書モード終了',
     'settings.driveGroup':       'Google Drive',
     'settings.driveAutoSave':    'しおり自動保存',
+    'settings.spreadMode':       '見開き表示',
+    'spread.auto':               '自動',
+    'spread.single':             '単ページ',
+    'spread.spread':             '見開き',
+    'search.fxlUnsupported':     'この本は画像形式のため全文検索は利用できません',
+    'fxl.unsupportedPage':       'FXLモードでは表示できないページです',
     'progress.tooltip':     '{n} 章 / 全 {total} 章',
+    'progress.tooltipFxl':  '{n} / 全 {total} ページ',
+    'jump.title':           'ジャンプ',
+    'jump.cover':           '📖 表紙',
+    'jump.end':             '🏁 末尾',
+    'jump.pageInput':       'ページ番号',
+    'jump.chapterInput':    '章番号',
+    'jump.go':              'Go',
     'err.noContainerXml':   'META-INF/container.xml が見つかりません。有効な ePub ファイルではない可能性があります。',
     'err.noRootfile':       'container.xml に rootfile 要素がありません。ePub の構造が不正です。',
     'err.noFullPath':       'rootfile の full-path 属性がありません。',
@@ -815,7 +927,7 @@ const I18N = {
     'help.author':          'Author: {creator}',
     'help.chapters':        'Chapters: {n}',
     'help.tocItems':        'TOC items: {n}',
-    'help.body':            '<p><strong>📱 Page scroll (main operation)</strong></p><p>&nbsp;Swipe left: scroll forward one page</p><p>&nbsp;Swipe right: scroll back one page</p><p>&nbsp;"Next" button (bottom) / "Prev" button (top)</p><p>&nbsp;※ Automatically advances chapter at boundaries</p><br><p><strong>📖 Chapter navigation</strong></p><p>&nbsp;"›" button (right): previous chapter</p><p>&nbsp;"‹" button (left): next chapter</p><br><p><strong>🔵 Bluetooth keyboard</strong></p><p>&nbsp;Space: forward　Shift+Space: back</p><p>&nbsp;← next chapter　→ previous chapter</p><br><p><strong>🔍 Full-text search</strong></p><p>&nbsp;Open sidebar (Contents button) → "Search" tab, type a keyword and press Enter</p><p>&nbsp;Tap a result to jump to that chapter (also recorded in jump history)</p><br><p><strong>🎨 Display settings (⚙ icon)</strong></p><p>&nbsp;Font: 22 options (Mincho, Gothic, Google Fonts, etc.)</p><p>&nbsp;Theme: 8 colors (Standard, Sepia, White, Dark, Sakura, Starry Night, Matcha, Moonlit)</p><p>&nbsp;Font size, line height, margin, and writing mode</p><br><p><strong>🔖 Bookmarks &amp; jump history</strong></p><p>&nbsp;Reading position is saved automatically. Sidebar TOC tab shows jump history.</p><p>&nbsp;📥 Local import　📤 Local export　☁↓ Drive load　☁↑ Drive save</p><p style="font-size:12px;opacity:.6;">&nbsp;※ Drive features require HTTP/HTTPS server and Google Client ID configuration</p><br><p><strong>📚 Reading list</strong></p><p>&nbsp;When no book is open, the welcome screen shows a list of books in progress</p><p>&nbsp;Each card shows the cover, title, author, progress bar, and last read date</p><p>&nbsp;Tap "Open this file" on a card to pick the file and resume where you left off</p><p>&nbsp;When you reach the end of the last chapter, a "Finished" banner appears</p><p>&nbsp;"Back to reading list": close the book and return to the list (marked as completed)</p><p>&nbsp;"Stay": dismiss the banner and keep reading</p><p>&nbsp;"Close book" at the bottom of ⚙ Settings closes the book anytime (position is saved)</p><p>&nbsp;Tap "Edit" (top right of list) to enter edit mode; tap × on a card to remove it from the list</p><br><p><strong>File formats</strong></p><p>&nbsp;.epub / .kepub (Kobo) supported</p>',
+    'help.body':            '<p><strong>📱 Page scroll (main operation)</strong></p><p>&nbsp;Swipe left: scroll forward one page</p><p>&nbsp;Swipe right: scroll back one page</p><p>&nbsp;"Next" button (bottom) / "Prev" button (top)</p><p>&nbsp;※ Automatically advances chapter at boundaries</p><br><p><strong>📖 Chapter navigation (reflow only)</strong></p><p>&nbsp;"›" button (right): previous chapter</p><p>&nbsp;"‹" button (left): next chapter</p><br><p><strong>🔵 Bluetooth keyboard</strong></p><p>&nbsp;Space: forward　Shift+Space: back</p><p>&nbsp;← next chapter　→ previous chapter (reflow only)</p><br><p><strong>🎯 Page Jump (sidebar)</strong></p><p>&nbsp;Jump panel at the top of the sidebar (☰ Contents button)</p><p>&nbsp;Slider: drag to preview, release to jump</p><p>&nbsp;📖 Cover / -10 / +10 / 🏁 End buttons</p><p>&nbsp;Type a page number (or chapter # in reflow mode) and tap Go or press Enter</p><p>&nbsp;Previous position is saved to jump history (↩); tap to return</p><br><p><strong>🖼️ Manga / Magazine mode (FXL / Fixed Layout)</strong></p><p>&nbsp;Auto-detects pre-paginated ePubs; displays one image per page, fit to screen</p><p>&nbsp;iPad landscape shows two-page spreads automatically</p><p>&nbsp;Writing mode & font settings are disabled; use "Spread layout" in ⚙ settings (Auto / Single / Two-page)</p><p>&nbsp;Manga (RTL) displays the right page first; spread pairs are adjacent at the center</p><p>&nbsp;On iPhone, use the sidebar jump panel to navigate to cover / end / any page</p><br><p><strong>🔍 Full-text search (reflow only)</strong></p><p>&nbsp;Open sidebar (Contents button) → "Search" tab, type a keyword and press Enter</p><p>&nbsp;Tap a result to jump to that chapter (also recorded in jump history)</p><p>&nbsp;Image-based books (FXL) do not support full-text search</p><br><p><strong>🎨 Display settings (⚙ icon)</strong></p><p>&nbsp;Font: 22 options (Mincho, Gothic, Google Fonts, etc.) — reflow only</p><p>&nbsp;Theme: 8 colors (Standard, Sepia, White, Dark, Sakura, Starry Night, Matcha, Moonlit)</p><p>&nbsp;Font size, line height, margin, and writing mode — reflow only</p><p>&nbsp;Spread layout (FXL only): Auto / Single page / Two-page</p><br><p><strong>🔖 Bookmarks &amp; jump history</strong></p><p>&nbsp;Reading position is saved automatically. Sidebar TOC tab shows jump history.</p><p>&nbsp;📥 Local import　📤 Local export　☁↓ Drive load　☁↑ Drive save</p><p style="font-size:12px;opacity:.6;">&nbsp;※ Drive features require HTTP/HTTPS server and Google Client ID configuration</p><br><p><strong>📚 Reading list</strong></p><p>&nbsp;When no book is open, the welcome screen shows a list of books in progress</p><p>&nbsp;Each card shows the cover, title, author, progress bar, and last read date</p><p>&nbsp;Tap "Open this file" on a card to pick the file and resume where you left off</p><p>&nbsp;When you reach the end of the last chapter, a "Finished" banner appears</p><p>&nbsp;"Back to reading list": close the book and return to the list (marked as completed)</p><p>&nbsp;"Stay": dismiss the banner and keep reading</p><p>&nbsp;"Close book" at the bottom of ⚙ Settings closes the book anytime (position is saved)</p><p>&nbsp;Tap "Edit" (top right of list) to enter edit mode; tap × on a card to remove it from the list</p><br><p><strong>File formats</strong></p><p>&nbsp;.epub / .kepub (Kobo) supported. Both reflowable and fixed-layout (manga / magazine) books are auto-detected</p>',
     'toast.webFontFile':    '☁ Web fonts may not display in offline or file:// environments',
     'toast.resume':         '📖 Resumed from chapter {n} of {total}',
     'toast.fileMissing':    '⚠️ File not found: {path}',
@@ -839,7 +951,20 @@ const I18N = {
     'btn.fullscreen.exit':       'Exit reader',
     'settings.driveGroup':       'Google Drive',
     'settings.driveAutoSave':    'Auto-save bookmarks',
+    'settings.spreadMode':       'Spread layout',
+    'spread.auto':               'Auto',
+    'spread.single':             'Single page',
+    'spread.spread':             'Two-page',
+    'search.fxlUnsupported':     'Full-text search is unavailable for image-based books',
+    'fxl.unsupportedPage':       'This page cannot be displayed in FXL mode',
     'progress.tooltip':     'Chapter {n} of {total}',
+    'progress.tooltipFxl':  'Page {n} of {total}',
+    'jump.title':           'Jump',
+    'jump.cover':           '📖 Cover',
+    'jump.end':             '🏁 End',
+    'jump.pageInput':       'Page #',
+    'jump.chapterInput':    'Chapter #',
+    'jump.go':              'Go',
     'err.noContainerXml':   'META-INF/container.xml not found. This may not be a valid ePub file.',
     'err.noRootfile':       'No rootfile element in container.xml. The ePub structure is invalid.',
     'err.noFullPath':       'Missing full-path attribute in rootfile.',
@@ -945,7 +1070,7 @@ const I18N = {
     'help.author':          '作者：{creator}',
     'help.chapters':        '章節數：{n}',
     'help.tocItems':        '目錄項目數：{n}',
-    'help.body':            '<p><strong>📱 頁面捲動（主要操作）</strong></p><p>　向左滑動：前進一頁</p><p>　向右滑動：後退一頁</p><p>　畫面下方「下一頁」・上方「上一頁」按鈕</p><p>　※章節末尾/開頭時自動切換章節</p><br><p><strong>📖 章節切換</strong></p><p>　右側「›」按鈕：上一章</p><p>　左側「‹」按鈕：下一章</p><br><p><strong>🔵 藍牙鍵盤</strong></p><p>　空白鍵：前進　Shift+空白：後退</p><p>　← 下一章　→ 上一章</p><br><p><strong>🔍 全文搜尋</strong></p><p>　側邊欄（目錄按鈕）→「搜尋」索引標籤，輸入關鍵字後按 Enter</p><p>　點擊結果即可跳轉至該章（同時記錄於跳轉歷史）</p><br><p><strong>🎨 顯示設定（⚙圖示）</strong></p><p>　字型：22 種（明朝體・黑體・Google Fonts 等）</p><p>　主題：8 色（標準・棕褐・白紙・暗色・櫻花・星空・抹茶・月夜）</p><p>　字型大小・行距・邊距・書寫方向</p><br><p><strong>🔖 書籤・跳轉歷史</strong></p><p>　閱讀位置自動記錄。側邊欄目錄索引標籤可查看跳轉歷史</p><p>　📥 本機匯入　📤 本機匯出　☁↓ Drive 載入　☁↑ Drive 儲存</p><p style="font-size:12px;opacity:.6;">　※ Drive 功能需透過 HTTP/HTTPS 伺服器啟動並設定 Google Client ID</p><br><p><strong>📚 閱讀中清單</strong></p><p>　未開啟書籍時，歡迎畫面顯示正在閱讀的書籍清單</p><p>　書卡顯示封面、書名、作者、進度列及最後閱讀日期</p><p>　點選書卡右下角「開啟此檔案」，選擇檔案後從上次位置繼續閱讀</p><p>　讀到最後一章末尾時，畫面下方會出現讀完提示橫幅</p><p>　「回到閱讀清單」：關閉書籍並返回清單（標記為已讀完並自動移除）</p><p>　「繼續閱讀」：關閉橫幅，繼續閱讀</p><p>　⚙ 設定面板底部的「關閉書籍」可隨時返回清單（自動儲存閱讀位置）</p><p>　點選清單右上角「編輯」進入編輯模式，點選書卡 × 可從清單移除</p><br><p><strong>支援格式</strong></p><p>　.epub / .kepub（Kobo）</p>',
+    'help.body':            '<p><strong>📱 頁面捲動（主要操作）</strong></p><p>　向左滑動：前進一頁</p><p>　向右滑動：後退一頁</p><p>　畫面下方「下一頁」・上方「上一頁」按鈕</p><p>　※章節末尾/開頭時自動切換章節</p><br><p><strong>📖 章節切換（僅限流式排版）</strong></p><p>　右側「›」按鈕：上一章</p><p>　左側「‹」按鈕：下一章</p><br><p><strong>🔵 藍牙鍵盤</strong></p><p>　空白鍵：前進　Shift+空白：後退</p><p>　← 下一章　→ 上一章（僅限流式排版）</p><br><p><strong>🎯 頁面跳轉（側邊欄）</strong></p><p>　側邊欄（☰ 目錄按鈕）最上方的「跳轉」面板</p><p>　滑桿：拖曳預覽並跳至任意位置</p><p>　📖 封面 / -10 / +10 / 🏁 末頁 四個按鈕</p><p>　輸入頁碼（流式排版為章節號）後按 Go 或 Enter</p><p>　跳轉前位置自動記錄於跳轉歷史（↩），點選即可返回</p><br><p><strong>🖼️ 漫畫・雜誌模式（FXL / Fixed Layout）</strong></p><p>　自動偵測 pre-paginated ePub，每頁單張圖片等比縮放顯示</p><p>　iPad 橫向畫面自動顯示跨頁（兩頁並排）</p><p>　書寫方向・字型等設定停用，改以⚙設定「跨頁顯示」切換自動/單頁/跨頁</p><p>　漫畫（RTL）依右頁起始顯示，跨頁時於畫面中央相鄰</p><p>　iPhone 可透過☰→跳轉面板瀏覽封面・末頁・任意頁</p><br><p><strong>🔍 全文搜尋（僅限流式排版）</strong></p><p>　側邊欄（目錄按鈕）→「搜尋」索引標籤，輸入關鍵字後按 Enter</p><p>　點擊結果即可跳轉至該章（同時記錄於跳轉歷史）</p><p>　圖片格式書籍（FXL）無法使用全文搜尋</p><br><p><strong>🎨 顯示設定（⚙圖示）</strong></p><p>　字型：22 種（明朝體・黑體・Google Fonts 等）※僅限流式排版</p><p>　主題：8 色（標準・棕褐・白紙・暗色・櫻花・星空・抹茶・月夜）</p><p>　字型大小・行距・邊距・書寫方向 ※僅限流式排版</p><p>　跨頁顯示（僅 FXL）：自動 / 單頁 / 跨頁</p><br><p><strong>🔖 書籤・跳轉歷史</strong></p><p>　閱讀位置自動記錄。側邊欄目錄索引標籤可查看跳轉歷史</p><p>　📥 本機匯入　📤 本機匯出　☁↓ Drive 載入　☁↑ Drive 儲存</p><p style="font-size:12px;opacity:.6;">　※ Drive 功能需透過 HTTP/HTTPS 伺服器啟動並設定 Google Client ID</p><br><p><strong>📚 閱讀中清單</strong></p><p>　未開啟書籍時，歡迎畫面顯示正在閱讀的書籍清單</p><p>　書卡顯示封面、書名、作者、進度列及最後閱讀日期</p><p>　點選書卡右下角「開啟此檔案」，選擇檔案後從上次位置繼續閱讀</p><p>　讀到最後一章末尾時，畫面下方會出現讀完提示橫幅</p><p>　「回到閱讀清單」：關閉書籍並返回清單（標記為已讀完並自動移除）</p><p>　「繼續閱讀」：關閉橫幅，繼續閱讀</p><p>　⚙ 設定面板底部的「關閉書籍」可隨時返回清單（自動儲存閱讀位置）</p><p>　點選清單右上角「編輯」進入編輯模式，點選書卡 × 可從清單移除</p><br><p><strong>支援格式</strong></p><p>　.epub / .kepub（Kobo）。流式排版與固定版式（漫畫・雜誌）均自動偵測</p>',
     'toast.webFontFile':    '☁ 離線或 file:// 環境下，網路字型可能無法顯示',
     'toast.resume':         '📖 從第 {n} 章（共 {total} 章）繼續閱讀',
     'toast.fileMissing':    '⚠️ 找不到檔案：{path}',
@@ -969,7 +1094,20 @@ const I18N = {
     'btn.fullscreen.exit':       '結束閱讀模式',
     'settings.driveGroup':       'Google Drive',
     'settings.driveAutoSave':    '自動儲存書籤',
+    'settings.spreadMode':       '跨頁顯示',
+    'spread.auto':               '自動',
+    'spread.single':             '單頁',
+    'spread.spread':             '跨頁',
+    'search.fxlUnsupported':     '此書為圖片格式，無法使用全文搜尋',
+    'fxl.unsupportedPage':       'FXL 模式無法顯示此頁面',
     'progress.tooltip':     '第 {n} 章 / 共 {total} 章',
+    'progress.tooltipFxl':  '第 {n} / 共 {total} 頁',
+    'jump.title':           '跳轉',
+    'jump.cover':           '📖 封面',
+    'jump.end':             '🏁 末頁',
+    'jump.pageInput':       '頁碼',
+    'jump.chapterInput':    '章節號',
+    'jump.go':              'Go',
     'err.noContainerXml':   '找不到 META-INF/container.xml，可能不是有效的 ePub 檔案。',
     'err.noRootfile':       'container.xml 中找不到 rootfile 元素，ePub 結構無效。',
     'err.noFullPath':       'rootfile 缺少 full-path 屬性。',
@@ -1075,7 +1213,7 @@ const I18N = {
     'help.author':          '作者：{creator}',
     'help.chapters':        '章节数：{n}',
     'help.tocItems':        '目录项目数：{n}',
-    'help.body':            '<p><strong>📱 页面滚动（主要操作）</strong></p><p>　向左滑动：前进一页</p><p>　向右滑动：后退一页</p><p>　画面下方「下一页」・上方「上一页」按钮</p><p>　※章节末尾/开头时自动切换章节</p><br><p><strong>📖 章节切换</strong></p><p>　右侧「›」按钮：上一章</p><p>　左侧「‹」按钮：下一章</p><br><p><strong>🔵 蓝牙键盘</strong></p><p>　空格键：前进　Shift+空格：后退</p><p>　← 下一章　→ 上一章</p><br><p><strong>🔍 全文搜索</strong></p><p>　侧边栏（目录按钮）→「搜索」选项卡，输入关键词后按 Enter</p><p>　点击结果即可跳转至该章（同时记录于跳转历史）</p><br><p><strong>🎨 显示设置（⚙图标）</strong></p><p>　字体：22 种（明朝体・黑体・Google Fonts 等）</p><p>　主题：8 色（标准・棕褐・白纸・深色・樱花・星空・抹茶・月夜）</p><p>　字体大小・行距・边距・书写方向</p><br><p><strong>🔖 书签・跳转历史</strong></p><p>　阅读位置自动记录。侧边栏目录选项卡可查看跳转历史</p><p>　📥 本地导入　📤 本地导出　☁↓ Drive 加载　☁↑ Drive 保存</p><p style="font-size:12px;opacity:.6;">　※ Drive 功能需通过 HTTP/HTTPS 服务器启动并配置 Google Client ID</p><br><p><strong>📚 阅读中列表</strong></p><p>　未打开书籍时，欢迎页面显示正在阅读的书籍列表</p><p>　书卡显示封面、书名、作者、进度条及最后阅读日期</p><p>　点击书卡右下角「打开此文件」，选择文件后从上次位置继续阅读</p><p>　读到最后一章末尾时，画面下方会出现读完提示横幅</p><p>　「回到阅读列表」：关闭书籍并返回列表（标记为已读完并自动移除）</p><p>　「继续阅读」：关闭横幅，继续阅读</p><p>　⚙ 设置面板底部的「关闭书籍」可随时返回列表（自动保存阅读位置）</p><p>　点击列表右上角「编辑」进入编辑模式，点击书卡 × 可从列表中删除</p><br><p><strong>支持格式</strong></p><p>　.epub / .kepub（Kobo）</p>',
+    'help.body':            '<p><strong>📱 页面滚动（主要操作）</strong></p><p>　向左滑动：前进一页</p><p>　向右滑动：后退一页</p><p>　画面下方「下一页」・上方「上一页」按钮</p><p>　※章节末尾/开头时自动切换章节</p><br><p><strong>📖 章节切换（仅限流式排版）</strong></p><p>　右侧「›」按钮：上一章</p><p>　左侧「‹」按钮：下一章</p><br><p><strong>🔵 蓝牙键盘</strong></p><p>　空格键：前进　Shift+空格：后退</p><p>　← 下一章　→ 上一章（仅限流式排版）</p><br><p><strong>🎯 页面跳转（侧边栏）</strong></p><p>　侧边栏（☰ 目录按钮）最上方的「跳转」面板</p><p>　滑块：拖动预览并跳至任意位置</p><p>　📖 封面 / -10 / +10 / 🏁 末页 四个按钮</p><p>　输入页码（流式排版为章节号）后按 Go 或 Enter</p><p>　跳转前位置自动记录于跳转历史（↩），点击即可返回</p><br><p><strong>🖼️ 漫画・杂志模式（FXL / Fixed Layout）</strong></p><p>　自动检测 pre-paginated ePub，每页单张图片等比缩放显示</p><p>　iPad 横向画面自动显示跨页（两页并排）</p><p>　书写方向・字体等设置停用，改以⚙设置「跨页显示」切换自动/单页/跨页</p><p>　漫画（RTL）依右页起始显示，跨页时于画面中央相邻</p><p>　iPhone 可通过☰→跳转面板浏览封面・末页・任意页</p><br><p><strong>🔍 全文搜索（仅限流式排版）</strong></p><p>　侧边栏（目录按钮）→「搜索」选项卡，输入关键词后按 Enter</p><p>　点击结果即可跳转至该章（同时记录于跳转历史）</p><p>　图片格式书籍（FXL）无法使用全文搜索</p><br><p><strong>🎨 显示设置（⚙图标）</strong></p><p>　字体：22 种（明朝体・黑体・Google Fonts 等）※仅限流式排版</p><p>　主题：8 色（标准・棕褐・白纸・深色・樱花・星空・抹茶・月夜）</p><p>　字体大小・行距・边距・书写方向 ※仅限流式排版</p><p>　跨页显示（仅 FXL）：自动 / 单页 / 跨页</p><br><p><strong>🔖 书签・跳转历史</strong></p><p>　阅读位置自动记录。侧边栏目录选项卡可查看跳转历史</p><p>　📥 本地导入　📤 本地导出　☁↓ Drive 加载　☁↑ Drive 保存</p><p style="font-size:12px;opacity:.6;">　※ Drive 功能需通过 HTTP/HTTPS 服务器启动并配置 Google Client ID</p><br><p><strong>📚 阅读中列表</strong></p><p>　未打开书籍时，欢迎页面显示正在阅读的书籍列表</p><p>　书卡显示封面、书名、作者、进度条及最后阅读日期</p><p>　点击书卡右下角「打开此文件」，选择文件后从上次位置继续阅读</p><p>　读到最后一章末尾时，画面下方会出现读完提示横幅</p><p>　「回到阅读列表」：关闭书籍并返回列表（标记为已读完并自动移除）</p><p>　「继续阅读」：关闭横幅，继续阅读</p><p>　⚙ 设置面板底部的「关闭书籍」可随时返回列表（自动保存阅读位置）</p><p>　点击列表右上角「编辑」进入编辑模式，点击书卡 × 可从列表中删除</p><br><p><strong>支持格式</strong></p><p>　.epub / .kepub（Kobo）。流式排版与固定版式（漫画・杂志）均自动检测</p>',
     'toast.webFontFile':    '☁ 离线或 file:// 环境下，网络字体可能无法显示',
     'toast.resume':         '📖 从第 {n} 章（共 {total} 章）继续阅读',
     'toast.fileMissing':    '⚠️ 找不到文件：{path}',
@@ -1099,7 +1237,20 @@ const I18N = {
     'btn.fullscreen.exit':       '退出阅读模式',
     'settings.driveGroup':       'Google Drive',
     'settings.driveAutoSave':    '自动保存书签',
+    'settings.spreadMode':       '跨页显示',
+    'spread.auto':               '自动',
+    'spread.single':             '单页',
+    'spread.spread':             '跨页',
+    'search.fxlUnsupported':     '此书为图片格式，无法使用全文搜索',
+    'fxl.unsupportedPage':       'FXL 模式无法显示此页面',
     'progress.tooltip':     '第 {n} 章 / 共 {total} 章',
+    'progress.tooltipFxl':  '第 {n} / 共 {total} 页',
+    'jump.title':           '跳转',
+    'jump.cover':           '📖 封面',
+    'jump.end':             '🏁 末页',
+    'jump.pageInput':       '页码',
+    'jump.chapterInput':    '章节号',
+    'jump.go':              'Go',
     'err.noContainerXml':   '找不到 META-INF/container.xml，可能不是有效的 ePub 文件。',
     'err.noRootfile':       'container.xml 中找不到 rootfile 元素，ePub 结构无效。',
     'err.noFullPath':       'rootfile 缺少 full-path 属性。',
@@ -1199,7 +1350,16 @@ const state = {
   driveAutoSave:false,   // Drive自動保存が有効かどうか
   fullscreen:false,      // フルスクリーン中（localStorageに保存しない）
   publisherAxis:null,    // publisher モード時の検出軸 ('h'=vertical-rl | 'v'=horizontal-tb | null=未検出)
+  // Fixed Layout (マンガ・雑誌) 関連
+  renderMode:'reflow',   // 'reflow' | 'fxl'
+  fxlPpd:'ltr',          // 'rtl' | 'ltr' - page-progression-direction
+  fxlPairs:null,         // [{items:[spineIdx] | [spineIdx,spineIdx]}, ...] 論理ペア配列
+  currentPairIdx:0,      // 現在のペア位置（描画時のみ使用）
+  spreadMode:'auto',     // 'auto' | 'single' | 'spread' (epub_settings に永続化)
 };
+
+// FXL 画像 Blob URL キャッシュ (spineIdx → objectURL)。renderFxlPair で前後ペア分のみ保持
+const _fxlBlobCache = new Map();
 
 // テーマ別 ePub 本文エリアの色（iframe 内に直接注入）
 const THEME_CONTENT = {
@@ -1371,8 +1531,30 @@ async function loadEpub(file) {
     state.spine = [];
     opfDoc.querySelectorAll('spine itemref').forEach(ref => {
       const item = state.manifest[ref.getAttribute('idref')];
-      if (item) state.spine.push(item);
+      if (!item) return;
+      state.spine.push({ ...item, spreadProps: ref.getAttribute('properties') || '' });
     });
+
+    // ── FXL (pre-paginated / fixed-layout) 判定 ──
+    const spineEl = opfDoc.querySelector('spine');
+    const renditionLayout = opfDoc.querySelector('metadata meta[property="rendition:layout"]');
+    const legacyFxl = opfDoc.querySelector('metadata meta[name="fixed-layout"]');
+    const isFxl = (renditionLayout && renditionLayout.textContent.trim() === 'pre-paginated') ||
+                  (legacyFxl && legacyFxl.getAttribute('content') === 'true');
+    state.renderMode = isFxl ? 'fxl' : 'reflow';
+    if (isFxl) {
+      const ppdAttr = (spineEl && (spineEl.getAttribute('page-progression-direction') || '').toLowerCase()) || '';
+      if (ppdAttr === 'rtl' || ppdAttr === 'ltr') {
+        state.fxlPpd = ppdAttr;
+      } else {
+        state.fxlPpd = inferPpdFromSpread(state.spine);
+      }
+      state.fxlPairs = buildFxlPairs(state.spine, state.fxlPpd);
+    } else {
+      state.fxlPairs = null;
+      state.fxlPpd = 'ltr';
+    }
+    document.body.classList.toggle('mode-fxl', isFxl);
 
     state.toc = [];
     const navEl = [...opfDoc.querySelectorAll('manifest item')]
@@ -1471,6 +1653,100 @@ function updateTocHighlight() {
       cur && (cur.href === th || cur.absPath === state.opfDir+th || cur.absPath.endsWith('/'+th))
     );
   });
+}
+
+// ══════════════════════════════════════════
+//  Jump Panel — TOC サイドバー内のページジャンプ UI
+// ══════════════════════════════════════════
+function updateJumpPanel() {
+  const panel = document.getElementById('jump-panel');
+  if (!panel) return;
+  if (!state.epub || state.spine.length === 0) {
+    panel.classList.add('hidden');
+    return;
+  }
+  panel.classList.remove('hidden');
+  const total = state.spine.length;
+  const cur = state.currentSpineIdx + 1;
+  const slider = document.getElementById('jump-slider');
+  const input = document.getElementById('jump-number-input');
+  const label = document.getElementById('jump-current-label');
+  const inputLabel = document.getElementById('jump-input-label');
+  if (slider) {
+    slider.max = total;
+    slider.value = cur;
+    updateJumpSliderBubblePosition(cur);
+  }
+  if (input) {
+    input.max = total;
+    input.placeholder = cur;
+  }
+  if (label) {
+    const key = state.renderMode === 'fxl' ? 'progress.tooltipFxl' : 'progress.tooltip';
+    label.textContent = t(key, { n: cur, total });
+  }
+  if (inputLabel) {
+    inputLabel.textContent = t(state.renderMode === 'fxl' ? 'jump.pageInput' : 'jump.chapterInput');
+  }
+}
+
+function updateJumpSliderBubblePosition(val) {
+  const slider = document.getElementById('jump-slider');
+  const bubble = document.getElementById('jump-slider-bubble');
+  if (!slider || !bubble) return;
+  const min = parseFloat(slider.min) || 1;
+  const max = parseFloat(slider.max) || 1;
+  const pct = max > min ? (val - min) / (max - min) : 0;
+  const THUMB_W = 20;
+  const w = slider.offsetWidth;
+  const thumbCenterPx = (THUMB_W / 2) + pct * (w - THUMB_W);
+  bubble.style.left = thumbCenterPx + 'px';
+}
+
+function handleJumpSliderInput(val) {
+  const bubble = document.getElementById('jump-slider-bubble');
+  const n = parseInt(val, 10);
+  if (isNaN(n)) return;
+  if (bubble) {
+    bubble.textContent = n + ' / ' + state.spine.length;
+    bubble.classList.add('show');
+  }
+  updateJumpSliderBubblePosition(n);
+}
+
+function handleJumpSliderChange(val) {
+  const bubble = document.getElementById('jump-slider-bubble');
+  setTimeout(() => { if (bubble) bubble.classList.remove('show'); }, 300);
+  const n = parseInt(val, 10);
+  if (isNaN(n)) return;
+  jumpToSpineIdx(n - 1);
+}
+
+function jumpToSpineIdx(idx) {
+  if (!state.epub) return;
+  const target = Math.max(0, Math.min(state.spine.length - 1, idx));
+  if (target === state.currentSpineIdx) return;
+  pushJumpHistory();
+  if (state.renderMode === 'fxl') {
+    renderFxlPair(target);
+  } else {
+    renderPage(target, 'start');
+  }
+}
+
+function jumpToCover() { jumpToSpineIdx(0); }
+function jumpToEnd()   { jumpToSpineIdx(state.spine.length - 1); }
+function jumpRelative(delta) {
+  if (!state.epub) return;
+  jumpToSpineIdx(state.currentSpineIdx + delta);
+}
+function jumpToInput() {
+  const input = document.getElementById('jump-number-input');
+  if (!input) return;
+  const n = parseInt(input.value, 10);
+  if (isNaN(n)) return;
+  jumpToSpineIdx(n - 1);
+  input.value = '';
 }
 
 // ══════════════════════════════════════════
@@ -2034,6 +2310,11 @@ async function renderPage(idx, scrollTarget) {
   if (!state.epub || idx < 0 || idx >= state.spine.length) return;
   if (scrollTarget === undefined) scrollTarget = 'start';
   dismissFinishedBanner();
+  // FXL モードは iframe を使わず #fxl-container に画像直配置
+  if (state.renderMode === 'fxl') {
+    await renderFxlPair(idx);
+    return;
+  }
   const seq = ++_renderSeq;
   _isRendering = true;
   _intraChapterRatio = 0;
@@ -2064,18 +2345,264 @@ async function renderPage(idx, scrollTarget) {
 }
 
 // ══════════════════════════════════════════
+//  FXL (Fixed Layout) rendering — マンガ・雑誌モード
+// ══════════════════════════════════════════
+
+// spine の spread プロパティから page-progression-direction を推論
+function inferPpdFromSpread(spine) {
+  for (const item of spine) {
+    const p = item.spreadProps || '';
+    if (/page-spread-right/.test(p)) return 'rtl';
+    if (/page-spread-left/.test(p)) return 'ltr';
+  }
+  return 'ltr';
+}
+
+// 論理ペア配列を構築: [{items:[spineIdx] | [spineIdx,spineIdx]}, ...]
+// pair.items[0] は「論理的に先に読む側」(RTL=右ページ, LTR=左ページ)。
+function buildFxlPairs(spine, ppd) {
+  const firstSide  = ppd === 'rtl' ? 'right' : 'left';
+  const secondSide = ppd === 'rtl' ? 'left'  : 'right';
+  const reCenter = /(^|\s)(rendition:)?page-spread-center(\s|$)/;
+  const reFirst  = new RegExp('(^|\\s)(rendition:)?page-spread-' + firstSide  + '(\\s|$)');
+  const reSecond = new RegExp('(^|\\s)(rendition:)?page-spread-' + secondSide + '(\\s|$)');
+  const pairs = [];
+  let i = 0;
+  while (i < spine.length) {
+    const p = spine[i].spreadProps || '';
+    if (reCenter.test(p)) { pairs.push({ items: [i] }); i++; continue; }
+    const np = i + 1 < spine.length ? (spine[i+1].spreadProps || '') : '';
+    if (reFirst.test(p) && reSecond.test(np)) { pairs.push({ items: [i, i+1] }); i += 2; continue; }
+    pairs.push({ items: [i] }); i++;
+  }
+  return pairs;
+}
+
+function findPairIdxForSpine(spineIdx) {
+  if (!state.fxlPairs) return 0;
+  for (let i = 0; i < state.fxlPairs.length; i++) {
+    if (state.fxlPairs[i].items.indexOf(spineIdx) >= 0) return i;
+  }
+  return 0;
+}
+
+// 有効な見開き表示モード判定（auto の場合はアスペクト比で自動判定）
+function isEffectiveSpread() {
+  if (state.renderMode !== 'fxl') return false;
+  if (state.spreadMode === 'single') return false;
+  if (state.spreadMode === 'spread') return true;
+  return window.innerWidth >= window.innerHeight * 1.3;
+}
+
+// XHTML から画像パスを抽出（<svg><image> 優先、無ければ <img>）
+function extractFxlImagePath(xhtmlText, absXhtmlPath) {
+  // XHTML 自己終端タグ <script.../> <style.../> を HTML 互換形式に変換。
+  // HTML5 パーサは自己終端 / を script/style で認識せず、以降すべてを raw text として
+  // 食い尽くすため body が空になり画像を検出できなくなる（buildSrcdoc と同じ対策）。
+  const preprocessed = xhtmlText.replace(/<(script|style)(\s[^>]*)?\s*\/>/gi, '<$1$2></$1>');
+  const doc = new DOMParser().parseFromString(preprocessed, 'text/html');
+  const el = doc.querySelector('svg image') || doc.querySelector('img');
+  if (!el) return null;
+  const href = el.getAttributeNS('http://www.w3.org/1999/xlink', 'href')
+            || el.getAttribute('xlink:href')
+            || el.getAttribute('href')
+            || el.getAttribute('src');
+  if (!href) return null;
+  const baseDir = absXhtmlPath.substring(0, absXhtmlPath.lastIndexOf('/') + 1);
+  return resolvePath(baseDir, href);
+}
+
+async function loadFxlPageBlobUrl(spineIdx) {
+  if (_fxlBlobCache.has(spineIdx)) return _fxlBlobCache.get(spineIdx);
+  const item = state.spine[spineIdx];
+  if (!item) return null;
+  const xhtmlFile = state.epub.file(item.absPath);
+  if (!xhtmlFile) return null;
+  const xhtmlText = await xhtmlFile.async('string');
+  const imgPath = extractFxlImagePath(xhtmlText, item.absPath);
+  if (!imgPath) return null;
+  const imgFile = state.epub.file(imgPath);
+  if (!imgFile) return null;
+  const blob = await imgFile.async('blob');
+  const url = URL.createObjectURL(blob);
+  _fxlBlobCache.set(spineIdx, url);
+  return url;
+}
+
+function trimFxlBlobCache(keepIdxSet) {
+  for (const [k, url] of _fxlBlobCache) {
+    if (!keepIdxSet.has(k)) {
+      URL.revokeObjectURL(url);
+      _fxlBlobCache.delete(k);
+    }
+  }
+}
+
+function revokeAllFxlBlobs() {
+  for (const url of _fxlBlobCache.values()) URL.revokeObjectURL(url);
+  _fxlBlobCache.clear();
+}
+
+// FXL 描画。spineIdx を主入力とし、spread 有効時は同ペア両面、single 時は該当1面のみ描画する。
+async function renderFxlPair(spineIdx) {
+  if (!state.fxlPairs || spineIdx < 0 || spineIdx >= state.spine.length) return;
+  const seq = ++_renderSeq;
+  _isRendering = true;
+  _intraChapterRatio = 0;
+  state.currentSpineIdx = spineIdx;
+  state.currentPairIdx = findPairIdxForSpine(spineIdx);
+  const pair = state.fxlPairs[state.currentPairIdx];
+  flashOverlay();
+  savePos(0);
+
+  const imgA = document.getElementById('fxl-page-a');
+  const imgB = document.getElementById('fxl-page-b');
+  const spread = document.getElementById('fxl-spread');
+  const spreadActive = isEffectiveSpread() && pair.items.length === 2;
+
+  spread.classList.toggle('rtl', state.fxlPpd === 'rtl');
+  spread.classList.toggle('spread', spreadActive);
+  spread.classList.toggle('single', !spreadActive);
+  // iOS Safari がクラス変更に応じて img の width を再計算しない稀なケース（見開き→単ページ切替で
+  // imgA が width:50% のまま右半分に残る）への対策として、明示的にレイアウトを強制する。
+  void spread.offsetWidth;
+
+  const aIdx = spreadActive ? pair.items[0] : spineIdx;
+  const bIdx = spreadActive ? pair.items[1] : -1;
+
+  const keep = new Set();
+  const pIdx = state.currentPairIdx;
+  for (let p = Math.max(0, pIdx - 1); p <= Math.min(state.fxlPairs.length - 1, pIdx + 1); p++) {
+    state.fxlPairs[p].items.forEach(s => keep.add(s));
+  }
+  keep.add(aIdx);
+  if (bIdx >= 0) keep.add(bIdx);
+
+  try {
+    const urlA = await loadFxlPageBlobUrl(aIdx);
+    if (seq !== _renderSeq) return;
+    if (urlA) {
+      imgA.src = urlA;
+      imgA.classList.remove('hidden');
+      imgA.alt = '';
+    } else {
+      imgA.removeAttribute('src');
+      imgA.alt = t('fxl.unsupportedPage');
+    }
+
+    if (bIdx >= 0) {
+      const urlB = await loadFxlPageBlobUrl(bIdx);
+      if (seq !== _renderSeq) return;
+      if (urlB) {
+        imgB.src = urlB;
+        imgB.classList.remove('hidden');
+        imgB.alt = '';
+      } else {
+        imgB.removeAttribute('src');
+        imgB.alt = t('fxl.unsupportedPage');
+      }
+    } else {
+      imgB.removeAttribute('src');
+      imgB.classList.add('hidden');
+    }
+  } catch(err) {
+    console.warn('FXL render failed:', err);
+  } finally {
+    // seq !== _renderSeq なら新しい描画に置き換えられているため、
+    // 新しい方のキャッシュ/UI を壊さぬよう本体更新をスキップ。
+    if (seq === _renderSeq) {
+      trimFxlBlobCache(keep);
+      _fxlLastSpreadState = spreadActive;
+      updatePageInfo();
+      updateTocHighlight();
+      _isRendering = false;
+    }
+  }
+}
+
+function advanceFxlPage(dir) {
+  if (!state.fxlPairs) return;
+  if (isEffectiveSpread()) {
+    const next = state.currentPairIdx + dir;
+    if (next < 0) return;
+    if (next >= state.fxlPairs.length) {
+      if (dir === 1) { savePos(1.0); showFinishedBanner(); }
+      return;
+    }
+    const nextSpineIdx = state.fxlPairs[next].items[0];
+    renderFxlPair(nextSpineIdx);
+  } else {
+    const nextSpine = state.currentSpineIdx + dir;
+    if (nextSpine < 0) return;
+    if (nextSpine >= state.spine.length) {
+      if (dir === 1) { savePos(1.0); showFinishedBanner(); }
+      return;
+    }
+    renderFxlPair(nextSpine);
+  }
+}
+
+// FXL タッチスワイプ（iOS 専用）: #fxl-container 上での左右スワイプでページ送り
+(function () {
+  let touchStartX = 0, touchStartY = 0;
+  const SWIPE_THRESHOLD = 50;
+  function onStart(e) {
+    if (state.renderMode !== 'fxl') return;
+    const t = e.touches[0];
+    touchStartX = t.clientX; touchStartY = t.clientY;
+  }
+  function onEnd(e) {
+    if (state.renderMode !== 'fxl') return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - touchStartX;
+    const dy = t.clientY - touchStartY;
+    if (Math.abs(dx) < SWIPE_THRESHOLD || Math.abs(dx) < Math.abs(dy)) return;
+    // dx < 0 = 左スワイプ = 前進(dir=1), dx > 0 = 右スワイプ = 後退(dir=-1)
+    advanceFxlPage(dx < 0 ? 1 : -1);
+  }
+  // DOM 構築後に登録
+  window.addEventListener('DOMContentLoaded', () => {
+    const c = document.getElementById('fxl-container');
+    if (!c) return;
+    c.addEventListener('touchstart', onStart, { passive:true });
+    c.addEventListener('touchend', onEnd, { passive:true });
+  });
+})();
+
+// リサイズ対応: spread ⇔ single の切替時のみ再描画
+let _fxlResizeTimer = null;
+let _fxlLastSpreadState = null;
+window.addEventListener('resize', () => {
+  if (state.renderMode !== 'fxl') return;
+  clearTimeout(_fxlResizeTimer);
+  _fxlResizeTimer = setTimeout(() => {
+    const cur = isEffectiveSpread();
+    if (_fxlLastSpreadState !== cur) {
+      _fxlLastSpreadState = cur;
+      renderFxlPair(state.currentSpineIdx);
+    }
+  }, 200);
+});
+
+// ══════════════════════════════════════════
 //  Navigation
 // ══════════════════════════════════════════
 function nextChapter() {
+  if (state.renderMode === 'fxl') return;
   if (state.currentSpineIdx < state.spine.length-1) renderPage(state.currentSpineIdx+1, 'start');
 }
 function prevChapter() {
+  if (state.renderMode === 'fxl') return;
   if (state.currentSpineIdx > 0) renderPage(state.currentSpineIdx-1, 'start');
 }
 
 function scrollPage(direction) {
   const active = document.activeElement;
   if (active && (active.classList.contains('scroll-btn') || active.classList.contains('chapter-btn'))) active.blur();
+  if (state.renderMode === 'fxl') {
+    advanceFxlPage(direction);
+    return;
+  }
   const iframe = document.getElementById('content-iframe');
   if (iframe.contentWindow) {
     iframe.contentWindow.postMessage({type:'EPUB_SCROLL', direction}, '*');
@@ -2167,9 +2694,11 @@ function flashNavButtons() {
     _mobileProgressTimer = setTimeout(() => document.getElementById('mobile-progress').classList.remove('show'), 3500);
   }
 }
-// 縦書き（vertical-rl）軸かどうかを返す。
+// 縦書き（vertical-rl）軸かどうかを返す。進捗バーの方向制御等にも使用。
 // publisher モードは iframe から EPUB_AXIS メッセージで検出した軸を参照する。
+// FXL RTL ブック（日本マンガ等）は進捗バーを右→左に流すため true を返す。
 function isVerticalAxis() {
+  if (state.renderMode === 'fxl') return state.fxlPpd === 'rtl';
   return state.writingMode === 'vertical' ||
     (state.writingMode === 'publisher' && state.publisherAxis === 'h');
 }
@@ -2181,6 +2710,7 @@ function updatePageInfo() {
   fill.style.width = pct + '%';
   // 縦書きは右→左方向に読み進めるためバーを右端起点に
   fill.style.marginLeft = isVerticalAxis() ? 'auto' : '';
+  updateJumpPanel();
 }
 
 // ══════════════════════════════════════════
@@ -2210,7 +2740,8 @@ function updatePageInfo() {
     if (!state.epub || state.spine.length < 2) { tooltip.classList.remove('show'); return; }
     const idx   = idxFromRatio(ratioFromEvent(e));
     const rect  = bar.getBoundingClientRect();
-    tooltip.textContent  = t('progress.tooltip', { n: idx + 1, total: state.spine.length });
+    const ttKey = state.renderMode === 'fxl' ? 'progress.tooltipFxl' : 'progress.tooltip';
+    tooltip.textContent  = t(ttKey, { n: idx + 1, total: state.spine.length });
     tooltip.style.left   = e.clientX + 'px';
     tooltip.style.top    = rect.top + 'px';
     tooltip.classList.add('show');
@@ -2233,13 +2764,20 @@ document.addEventListener('keydown', e => {
     case 'ArrowUp': case 'PageUp':
       scrollPage(-1); e.preventDefault(); break;
     case 'ArrowLeft':
-      nextChapter(); e.preventDefault(); break;
+      if (state.renderMode !== 'fxl') { nextChapter(); e.preventDefault(); }
+      break;
     case 'ArrowRight':
-      prevChapter(); e.preventDefault(); break;
+      if (state.renderMode !== 'fxl') { prevChapter(); e.preventDefault(); }
+      break;
     case 'Home':
       renderPage(0, 'start'); e.preventDefault(); break;
     case 'End':
-      renderPage(state.spine.length-1, 'end'); e.preventDefault(); break;
+      if (state.renderMode === 'fxl') {
+        renderFxlPair(state.spine.length - 1);
+      } else {
+        renderPage(state.spine.length-1, 'end');
+      }
+      e.preventDefault(); break;
     case 'f':
       toggleFullscreen(); e.preventDefault(); break;
     case 'Escape':
@@ -2263,6 +2801,7 @@ function saveSettings() {
       writingMode:   state.writingMode,
       fwdBtnSize:    state.fwdBtnSize,
       driveAutoSave: state.driveAutoSave,
+      spreadMode:    state.spreadMode,
     }));
   } catch(e) {
     notifyStorageError();
@@ -2281,6 +2820,7 @@ function loadSettings() {
     if (s.writingMode)           { state.writingMode = s.writingMode;   const el = document.getElementById('writing-mode-select'); if(el) el.value = s.writingMode; }
     if (s.fwdBtnSize)            { state.fwdBtnSize = s.fwdBtnSize;     const el = document.getElementById('fwd-btn-size-select'); if(el) el.value = s.fwdBtnSize; applyFwdBtnSize(s.fwdBtnSize); }
     if (s.driveAutoSave !== undefined) { state.driveAutoSave = !!s.driveAutoSave; updateAutoSaveToggleUI(); }
+    if (s.spreadMode)            { state.spreadMode = s.spreadMode;     const el = document.getElementById('spread-mode-select'); if(el) el.value = s.spreadMode; }
   } catch(e) { console.warn("Failed to load settings fully:", e); }
 }
 
@@ -2497,6 +3037,7 @@ async function runSearch(query, seq) {
 
 function startSearch() {
   if (!state.epub) { showToast(t('search.noEpub')); return; }
+  if (state.renderMode === 'fxl') { showToast(t('search.fxlUnsupported')); return; }
   const query = document.getElementById('search-input').value.trim();
   if (!query) return;
 
@@ -2679,6 +3220,15 @@ function changeFwdBtnSize(v) {
   saveSettings();
 }
 
+function changeSpreadMode(v) {
+  if (v !== 'auto' && v !== 'single' && v !== 'spread') return;
+  state.spreadMode = v;
+  saveSettings();
+  if (state.renderMode === 'fxl' && state.fxlPairs) {
+    renderFxlPair(state.currentSpineIdx);
+  }
+}
+
 // ══════════════════════════════════════════
 //  File Picker
 // ══════════════════════════════════════════
@@ -2834,6 +3384,8 @@ function openFilePickerForBook(bookKey) {
 function updateCloseBookBtnVisibility() {
   const g = document.getElementById('close-book-group');
   if (g) g.style.display = state.epub ? 'block' : 'none';
+  const fxlGroup = document.getElementById('fxl-settings-group');
+  if (fxlGroup) fxlGroup.style.display = (state.epub && state.renderMode === 'fxl') ? 'block' : 'none';
 }
 
 function closeBook() {
@@ -2852,9 +3404,18 @@ function closeBook() {
   state.currentSpineIdx = 0;
   state.bookTitle = ''; state.bookCreator = ''; state.bookCoverDataUri = '';
   state.bookKey = ''; state.publisherAxis = null;
+  state.renderMode = 'reflow'; state.fxlPpd = 'ltr';
+  state.fxlPairs = null; state.currentPairIdx = 0;
+  revokeAllFxlBlobs();
+  document.body.classList.remove('mode-fxl');
+  _fxlLastSpreadState = null;
   _intraChapterRatio = 0;
   _originalBookmark = null; _jumpHistory = []; _bookFinished = false;
   document.getElementById('content-iframe').src = 'about:blank';
+  const imgA = document.getElementById('fxl-page-a');
+  const imgB = document.getElementById('fxl-page-b');
+  if (imgA) imgA.removeAttribute('src');
+  if (imgB) { imgB.removeAttribute('src'); imgB.classList.add('hidden'); }
   document.getElementById('book-title').textContent = t('app.title');
   document.getElementById('page-container').classList.remove('visible');
   resetSearch();
