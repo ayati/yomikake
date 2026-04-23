@@ -3176,7 +3176,12 @@ function changeLineHeight(v) {
 }
 function changeTheme(v) {
   state.theme = v;
-  document.body.className = v ? 'theme-'+v : '';
+  // mode-fxl / fullscreen など他クラスを保持し theme-* だけ差し替える。
+  // className を丸ごと代入すると FXL モードで body.mode-fxl が外れ、
+  // #fxl-container が非表示になって書籍が表示されなくなる。
+  const cls = document.body.classList;
+  Array.from(cls).forEach(c => { if (c.indexOf('theme-') === 0) cls.remove(c); });
+  if (v) cls.add('theme-' + v);
   saveSettings();
   if (state.spine.length) renderPage(state.currentSpineIdx);
 }
