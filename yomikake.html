@@ -267,6 +267,42 @@
   body:not(.mode-fxl) #fxl-search-notice { display:none; }
   /* FXL 時に不要な設定グループを非表示 */
   body.mode-fxl .fxl-hide-group { display:none !important; }
+  /* 非FXL時は FXL ズーム用ボタン・設定グループを非表示 */
+  body:not(.mode-fxl) .fxl-only { display:none !important; }
+
+  /* ── FXL ズーム（Phase 3）──
+     #fxl-spread 自身を transform 対象とする。内部 img は flex + object-fit を維持。 */
+  #fxl-spread { transform-origin:50% 50%; transition:transform .22s cubic-bezier(0.16,1,0.3,1); }
+  #fxl-spread.panning { transition:none; }
+  body.fxl-zoomed #fxl-spread { will-change:transform; }
+  body.fxl-zoomed #fxl-container { cursor:grab; touch-action:none; }
+  body.fxl-zoomed #fxl-container.dragging { cursor:grabbing; }
+  body.fxl-zoomed #btn-fxl-zoom { color:var(--accent); background:var(--ui-hover,rgba(0,0,0,.06)); }
+  /* ズームボタンはFXL時のみ表示（.fxl-only で制御） */
+
+  /* 領域ピル：ズーム中のみ右下に小さく表示 */
+  #fxl-region-pill { position:absolute;
+    right:14px;
+    bottom:max(14px, env(safe-area-inset-bottom, 14px));
+    background:rgba(0,0,0,.62); color:#fff; padding:6px 12px; border-radius:20px;
+    font-size:13px; z-index:28; display:none; gap:6px; align-items:center;
+    backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
+    cursor:pointer; user-select:none; -webkit-user-select:none;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,monospace;
+    font-variant-numeric:tabular-nums; letter-spacing:.3px; white-space:nowrap;
+    box-shadow:0 2px 8px rgba(0,0,0,.25); }
+  body.mode-fxl.fxl-zoomed #fxl-region-pill { display:flex; }
+  #fxl-region-pill:active { transform:scale(.96); }
+
+  /* Next/Back ボタンのズーム時バッジ（.scroll-btn 既に position:absolute なので relative 化不要） */
+  .fxl-nav-badge { position:absolute; font-size:11px; font-weight:700;
+    background:rgba(255,255,255,.28); color:#fff; padding:2px 7px; border-radius:10px;
+    font-variant-numeric:tabular-nums; letter-spacing:.3px; pointer-events:none;
+    display:none; }
+  #btn-scroll-fwd .fxl-nav-badge { right:14px; bottom:14px; }
+  #btn-scroll-back .fxl-nav-badge { right:10px; top:10px; font-size:10px; padding:1px 5px; }
+  body.mode-fxl.fxl-zoomed #btn-scroll-fwd .fxl-nav-badge,
+  body.mode-fxl.fxl-zoomed #btn-scroll-back .fxl-nav-badge { display:inline-block; }
 
   #epub-frame { background:var(--paper); box-shadow:0 12px 48px var(--page-shadow),0 2px 12px var(--shadow); border-radius:4px; overflow:hidden; position:relative; display:flex; flex-direction:column; width:100%; max-width:var(--frame-max-width,900px); transition:max-width .3s cubic-bezier(0.16,1,0.3,1); }
   #page-overlay { position:absolute; inset:0; background:var(--paper); opacity:0; pointer-events:none; z-index:10; transition:opacity .2s cubic-bezier(0.2,0,0,1); }
@@ -423,6 +459,10 @@
 
   <div class="tb-sep"></div>
 
+  <button class="icon-btn fxl-only" id="btn-fxl-zoom" onclick="toggleFxlZoom()" data-i18n-title="btn.zoom" aria-pressed="false">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="21" y2="21"/><line x1="8" y1="11" x2="14" y2="11"/><line x1="11" y1="8" x2="11" y2="14"/></svg>
+  </button>
+
   <button class="icon-btn" id="settings-btn" onclick="toggleSettings()" data-i18n-title="btn.settings">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
   </button>
@@ -546,6 +586,26 @@
           <option value="spread" data-i18n="spread.spread">見開き</option>
         </select>
       </div>
+      <div class="set-row">
+        <span class="set-label" data-i18n="settings.fxlZoomLevel">拡大倍率</span>
+        <select class="modern-select" id="fxl-zoom-level-select" onchange="changeFxlZoomLevel(this.value)">
+          <option value="1.5">1.5x</option>
+          <option value="2.0" selected>2.0x</option>
+          <option value="2.5">2.5x</option>
+        </select>
+      </div>
+      <div class="set-row">
+        <span class="set-label" data-i18n="settings.fxlRegionOrder">領域順</span>
+        <select class="modern-select" id="fxl-region-order-select" onchange="changeFxlRegionOrder(this.value)">
+          <option value="story" data-i18n="region.story">ストーリー</option>
+          <option value="yonkoma" data-i18n="region.yonkoma">4コマ</option>
+        </select>
+      </div>
+      <div class="set-row">
+        <span class="set-label" data-i18n="settings.fxlLtrAutoFlip">LTR書籍で反転</span>
+        <button id="fxl-ltr-flip-toggle" onclick="toggleFxlLtrAutoFlip()"
+                style="border:1px solid var(--ui-border);border-radius:8px;padding:6px 16px;min-width:60px;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;">ON</button>
+      </div>
     </div>
 
     <div class="set-group" id="drive-auto-group">
@@ -650,14 +710,20 @@
       </button>
       <button class="scroll-btn" id="btn-scroll-back" onclick="scrollPage(-1)" data-i18n-title="btn.scrollBack">
         <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
+        <span class="fxl-nav-badge" id="btn-scroll-back-badge"></span>
       </button>
       <button class="scroll-btn" id="btn-scroll-fwd" onclick="scrollPage(1)" data-i18n-title="btn.scrollFwd">
         <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+        <span class="fxl-nav-badge" id="btn-scroll-fwd-badge"></span>
       </button>
       <div id="mobile-progress" aria-hidden="true">
         <span id="mobile-chapter-info"></span>
         <div id="mobile-overall-bar"><div id="mobile-overall-fill"></div></div>
         <div id="mobile-intra-bar"><div id="mobile-intra-fill"></div></div>
+      </div>
+      <div id="fxl-region-pill" role="button" tabindex="0" onclick="onFxlRegionPillClick()" aria-hidden="true">
+        <span id="fxl-region-pill-icon">🎯</span>
+        <span id="fxl-region-pill-label">1 / 6</span>
       </div>
     </div>
     <div id="finished-banner">
@@ -801,7 +867,7 @@ const I18N = {
     'help.author':          '著者：{creator}',
     'help.chapters':        'チャプター数：{n}',
     'help.tocItems':        '目次項目数：{n}',
-    'help.body':            '<p><strong>📜 ページスクロール（主操作）</strong></p><p>　スペースキー：1画面分 前進スクロール</p><p>　Shift+スペース：1画面分 後退スクロール</p><p>　↓ / PageDown：前進スクロール</p><p>　↑ / PageUp：後退スクロール</p><p>　画面下「次へ↓」・上「↑前へ」ボタン</p><p>　※章末尾/先頭で自動的に章移動</p><br><p><strong>📖 章切り替え（リフロー型のみ）</strong></p><p>　← キー：次の章　　→ キー：前の章</p><p>　Home：最初の章　　End：最後の章</p><br><p><strong>🎯 ページジャンプ（サイドバー）</strong></p><p>　サイドバー（☰ 目次ボタン）最上部の「ジャンプ」パネル</p><p>　スライダー：ドラッグで任意位置にプレビュー＆ジャンプ</p><p>　📖 表紙 / -10 / +10 / 🏁 末尾 の4ボタン</p><p>　ページ番号（リフロー型は章番号）を入力して Go または Enter</p><p>　ジャンプ前の位置は自動的にジャンプ履歴（↩）に記録され、タップで戻れます</p><br><p><strong>🖼️ マンガ・雑誌モード（FXL / Fixed Layout）</strong></p><p>　pre-paginated 指定の ePub を自動検出し、画像1枚/ページ を画面内フィット表示</p><p>　PC/タブレット横長画面では2ページ見開き自動表示</p><p>　組方向・フォント等は無効化、代わりに⚙設定の「見開き表示」で自動/単ページ/見開きを切替</p><p>　マンガ（RTL）は右ページから順に表示、見開き時は中央で隣接</p><p>　スマホでは☰ボタン→ジャンプパネルで表紙・末尾・任意ページへ遷移</p><br><p><strong>🔍 全文検索（リフロー型のみ）</strong></p><p>　サイドバー（目次ボタン）→「検索」タブにキーワードを入力して Enter</p><p>　章タイトルと一致箇所のスニペットを表示。クリックでその章に移動（ジャンプ履歴にも記録）</p><p>　画像形式の本（FXL）では全文検索は利用できません</p><br><p><strong>🎨 表示設定（⚙アイコン）</strong></p><p>　フォント：22種（游明朝・ゴシック・Google Fonts など）※リフロー型のみ</p><p>　テーマ：8色（標準・セピア・白紙・ダーク・さくら・星空・抹茶・月夜）</p><p>　文字サイズ・行間・余白・書字方向 ※リフロー型のみ</p><p>　見開き表示（FXL時のみ）：自動 / 単ページ / 見開き</p><br><p><strong>🔖 しおり・ジャンプ履歴</strong></p><p>　読み位置は自動記録。サイドバーの目次タブでジャンプ履歴と元の位置に戻れます</p><p>　📥 ローカル読込：PCに保存した .json ファイルからしおりを読み込む</p><p>　📤 ローカル書出：しおりを .json ファイルとしてPCに書き出す</p><p>　☁↓ Drive読込：Google Driveからしおりを読み込む（ローカルを上書き）</p><p>　☁↑ Drive保存：しおりをGoogle Driveに保存する（複数デバイス間で共有可能）</p><p style="font-size:12px;opacity:.6;">　※ Drive機能はHTTPサーバー経由の起動とGoogle Client IDの設定が必要です</p><br><p><strong>📚 読みかけリスト</strong></p><p>　本を開いていないとき、ウェルカム画面に読みかけの本を一覧表示します</p><p>　各カードに表紙・タイトル・著者名・進捗バー・最終閲覧日を表示</p><p>　カード右下「このファイルを開く」でファイルを選ぶと前回の続きから自動再開</p><p>　最終章の末尾まで読み進めると画面下部に読了バナーが表示されます</p><p>　「読みかけリストへ」：本を閉じてリストへ戻る。読了済みとしてリストから自動除外</p><p>　「閉じない」：バナーを閉じてそのまま読み続けられます</p><p>　⚙ 設定パネル末尾「本を閉じる」でいつでもリストへ戻れます（読み位置を自動保存）</p><p>　リスト右上「編集」ボタンで編集モードに切り替え、各カードの × で削除できます</p><br><p><strong>⬛ フルスクリーン</strong></p><p>　f キー（またはツールバーボタン）でUI非表示・全画面読書モード。Esc または上端タップで解除</p><br><p><strong>ファイル形式</strong></p><p>　.epub / .kepub（Kobo）対応。リフロー型・固定レイアウト型（マンガ・雑誌）どちらも自動判別</p>',
+    'help.body':            '<p><strong>📜 ページスクロール（主操作）</strong></p><p>　スペースキー：1画面分 前進スクロール</p><p>　Shift+スペース：1画面分 後退スクロール</p><p>　↓ / PageDown：前進スクロール</p><p>　↑ / PageUp：後退スクロール</p><p>　画面下「次へ↓」・上「↑前へ」ボタン</p><p>　※章末尾/先頭で自動的に章移動</p><br><p><strong>📖 章切り替え（リフロー型のみ）</strong></p><p>　← キー：次の章　　→ キー：前の章</p><p>　Home：最初の章　　End：最後の章</p><br><p><strong>🎯 ページジャンプ（サイドバー）</strong></p><p>　サイドバー（☰ 目次ボタン）最上部の「ジャンプ」パネル</p><p>　スライダー：ドラッグで任意位置にプレビュー＆ジャンプ</p><p>　📖 表紙 / -10 / +10 / 🏁 末尾 の4ボタン</p><p>　ページ番号（リフロー型は章番号）を入力して Go または Enter</p><p>　ジャンプ前の位置は自動的にジャンプ履歴（↩）に記録され、タップで戻れます</p><br><p><strong>🖼️ マンガ・雑誌モード（FXL / Fixed Layout）</strong></p><p>　pre-paginated 指定の ePub を自動検出し、画像1枚/ページ を画面内フィット表示</p><p>　PC/タブレット横長画面では2ページ見開き自動表示</p><p>　組方向・フォント等は無効化、代わりに⚙設定の「見開き表示」で自動/単ページ/見開きを切替</p><p>　マンガ（RTL）は右ページから順に表示、見開き時は中央で隣接</p><p>　スマホでは☰ボタン→ジャンプパネルで表紙・末尾・任意ページへ遷移</p><br><p><strong>🔍 コマ読みズーム（FXLのみ）</strong></p><p>　ツールバー🔍ボタン または ダブルタップ で ON、もう一度で OFF。キーボード <code>z</code> でもトグル</p><p>　1ページを 2列×3行=6領域 に分け、Nextボタン/下エリアタップ で順次遷移（5タップで1ページ読了→次ページ1領域目へ）</p><p>　遷移順は⚙設定「領域順」：<b>ストーリー</b>=右上→左上→右中→左中→右下→左下、<b>4コマ</b>=右列3個→左列3個</p><p>　LTR書籍（洋書）は自動で左右反転（⚙設定「LTR書籍で反転」でOFFにも可能）</p><p>　ズーム中の任意ドラッグで自由パン（🌀自由モード）へ移行。右下の領域ピル🎯/🌀をタップで復帰/次領域へ</p><p>　ズーム中に画面端からさらに読み進み方向へ引っ張る（ラバーバンド）と次/前ページへ一気にジャンプ</p><p>　キーボード <code>1</code>～<code>6</code> で領域直接指定、<code>0</code>/<code>Esc</code> で解除、<code>Space</code>/<code>↑↓</code> で順次遷移</p><p>　⚙設定「拡大倍率」：1.5x / 2.0x / 2.5x 選択</p><br><p><strong>🔍 全文検索（リフロー型のみ）</strong></p><p>　サイドバー（目次ボタン）→「検索」タブにキーワードを入力して Enter</p><p>　章タイトルと一致箇所のスニペットを表示。クリックでその章に移動（ジャンプ履歴にも記録）</p><p>　画像形式の本（FXL）では全文検索は利用できません</p><br><p><strong>🎨 表示設定（⚙アイコン）</strong></p><p>　フォント：22種（游明朝・ゴシック・Google Fonts など）※リフロー型のみ</p><p>　テーマ：8色（標準・セピア・白紙・ダーク・さくら・星空・抹茶・月夜）</p><p>　文字サイズ・行間・余白・書字方向 ※リフロー型のみ</p><p>　見開き表示（FXL時のみ）：自動 / 単ページ / 見開き</p><br><p><strong>🔖 しおり・ジャンプ履歴</strong></p><p>　読み位置は自動記録。サイドバーの目次タブでジャンプ履歴と元の位置に戻れます</p><p>　📥 ローカル読込：PCに保存した .json ファイルからしおりを読み込む</p><p>　📤 ローカル書出：しおりを .json ファイルとしてPCに書き出す</p><p>　☁↓ Drive読込：Google Driveからしおりを読み込む（ローカルを上書き）</p><p>　☁↑ Drive保存：しおりをGoogle Driveに保存する（複数デバイス間で共有可能）</p><p style="font-size:12px;opacity:.6;">　※ Drive機能はHTTPサーバー経由の起動とGoogle Client IDの設定が必要です</p><br><p><strong>📚 読みかけリスト</strong></p><p>　本を開いていないとき、ウェルカム画面に読みかけの本を一覧表示します</p><p>　各カードに表紙・タイトル・著者名・進捗バー・最終閲覧日を表示</p><p>　カード右下「このファイルを開く」でファイルを選ぶと前回の続きから自動再開</p><p>　最終章の末尾まで読み進めると画面下部に読了バナーが表示されます</p><p>　「読みかけリストへ」：本を閉じてリストへ戻る。読了済みとしてリストから自動除外</p><p>　「閉じない」：バナーを閉じてそのまま読み続けられます</p><p>　⚙ 設定パネル末尾「本を閉じる」でいつでもリストへ戻れます（読み位置を自動保存）</p><p>　リスト右上「編集」ボタンで編集モードに切り替え、各カードの × で削除できます</p><br><p><strong>⬛ フルスクリーン</strong></p><p>　f キー（またはツールバーボタン）でUI非表示・全画面読書モード。Esc または上端タップで解除</p><br><p><strong>ファイル形式</strong></p><p>　.epub / .kepub（Kobo）対応。リフロー型・固定レイアウト型（マンガ・雑誌）どちらも自動判別</p>',
     'toast.webFontFile':    '☁ ウェブフォントはオフラインまたはfile://環境で表示されない場合があります',
     'toast.resume':         '📖 前回の続きから再開（{n} / {total}章）',
     'toast.fileMissing':    '⚠️ ファイルが見つかりません: {path}',
@@ -831,6 +897,15 @@ const I18N = {
     'spread.spread':             '見開き',
     'search.fxlUnsupported':     'この本は画像形式のため全文検索は利用できません',
     'fxl.unsupportedPage':       'FXLモードでは表示できないページです',
+    'btn.zoom':                  '🔍 ズーム (z)',
+    'settings.fxlZoomLevel':     '拡大倍率',
+    'settings.fxlRegionOrder':   '領域順',
+    'settings.fxlLtrAutoFlip':   'LTR書籍で反転',
+    'region.story':              'ストーリー',
+    'region.yonkoma':            '4コマ',
+    'pill.free':                 '自由',
+    'toast.zoomOn':              'ズーム ON',
+    'toast.zoomOff':             'ズーム OFF',
     'progress.tooltip':     '{n} 章 / 全 {total} 章',
     'progress.tooltipFxl':  '{n} / 全 {total} ページ',
     'jump.title':           'ジャンプ',
@@ -945,7 +1020,7 @@ const I18N = {
     'help.author':          'Author: {creator}',
     'help.chapters':        'Chapters: {n}',
     'help.tocItems':        'TOC items: {n}',
-    'help.body':            '<p><strong>📜 Page scroll (main operation)</strong></p><p>&nbsp;Space: scroll forward one page</p><p>&nbsp;Shift+Space: scroll back one page</p><p>&nbsp;↓ / PageDown: scroll forward</p><p>&nbsp;↑ / PageUp: scroll back</p><p>&nbsp;"Next ↓" button (bottom) / "↑ Prev" button (top)</p><p>&nbsp;※ Automatically advances chapter at boundaries</p><br><p><strong>📖 Chapter navigation (reflow only)</strong></p><p>&nbsp;← key: next chapter　　→ key: previous chapter</p><p>&nbsp;Home: first chapter　　End: last chapter</p><br><p><strong>🎯 Page Jump (sidebar)</strong></p><p>&nbsp;Jump panel at the top of the sidebar (☰ Contents button)</p><p>&nbsp;Slider: drag to preview, release to jump to any page</p><p>&nbsp;📖 Cover / -10 / +10 / 🏁 End buttons</p><p>&nbsp;Type a page number (or chapter # in reflow mode) and tap Go or press Enter</p><p>&nbsp;Previous position is saved to jump history (↩) automatically; tap to return</p><br><p><strong>🖼️ Manga / Magazine mode (FXL / Fixed Layout)</strong></p><p>&nbsp;Auto-detects pre-paginated ePubs; displays one image per page, fit to screen</p><p>&nbsp;Landscape screens show two-page spreads automatically</p><p>&nbsp;Writing mode & font settings are disabled; use "Spread layout" in ⚙ settings (Auto / Single / Two-page)</p><p>&nbsp;Manga (RTL) displays the right page first; spread pairs are adjacent at the center</p><p>&nbsp;On smartphones, use the sidebar jump panel to navigate to cover / end / any page</p><br><p><strong>🔍 Full-text search (reflow only)</strong></p><p>&nbsp;Open sidebar (Contents button) → "Search" tab, type a keyword and press Enter</p><p>&nbsp;Click a result to jump to that chapter (also recorded in jump history)</p><p>&nbsp;Image-based books (FXL) do not support full-text search</p><br><p><strong>🎨 Display settings (⚙ icon)</strong></p><p>&nbsp;Font: 22 options (Mincho, Gothic, Google Fonts, etc.) — reflow only</p><p>&nbsp;Theme: 8 colors (Standard, Sepia, White, Dark, Sakura, Starry Night, Matcha, Moonlit)</p><p>&nbsp;Font size, line height, margin, and writing mode — reflow only</p><p>&nbsp;Spread layout (FXL only): Auto / Single page / Two-page</p><br><p><strong>🔖 Bookmarks &amp; jump history</strong></p><p>&nbsp;Reading position is saved automatically. Sidebar TOC tab shows jump history.</p><p>&nbsp;📥 Local import: Load bookmarks from a saved .json file on your device</p><p>&nbsp;📤 Local export: Download bookmarks as a .json file to your device</p><p>&nbsp;☁↓ Drive load: Load bookmarks from Google Drive (overwrites local data)</p><p>&nbsp;☁↑ Drive save: Save bookmarks to Google Drive (share across devices)</p><p style="font-size:12px;opacity:.6;">&nbsp;※ Drive features require an HTTP server and Google Client ID configuration</p><br><p><strong>📚 Reading list</strong></p><p>&nbsp;When no book is open, the welcome screen shows a list of books in progress</p><p>&nbsp;Each card shows the cover, title, author, progress bar, and last read date</p><p>&nbsp;Tap "Open this file" on a card to pick the file and resume where you left off</p><p>&nbsp;When you reach the end of the last chapter, a "Finished" banner appears</p><p>&nbsp;"Back to reading list": close the book and return to the list (marked as completed)</p><p>&nbsp;"Stay": dismiss the banner and keep reading</p><p>&nbsp;"Close book" at the bottom of ⚙ Settings closes the book anytime (position is saved)</p><p>&nbsp;Tap "Edit" (top right of list) to enter edit mode; tap × on a card to remove it from the list</p><br><p><strong>⬛ Fullscreen</strong></p><p>&nbsp;Press f (or toolbar button) to hide UI and read fullscreen. Press Esc or tap top edge to exit.</p><br><p><strong>File formats</strong></p><p>&nbsp;.epub / .kepub (Kobo) supported. Both reflowable and fixed-layout (manga / magazine) books are auto-detected</p>',
+    'help.body':            '<p><strong>📜 Page scroll (main operation)</strong></p><p>&nbsp;Space: scroll forward one page</p><p>&nbsp;Shift+Space: scroll back one page</p><p>&nbsp;↓ / PageDown: scroll forward</p><p>&nbsp;↑ / PageUp: scroll back</p><p>&nbsp;"Next ↓" button (bottom) / "↑ Prev" button (top)</p><p>&nbsp;※ Automatically advances chapter at boundaries</p><br><p><strong>📖 Chapter navigation (reflow only)</strong></p><p>&nbsp;← key: next chapter　　→ key: previous chapter</p><p>&nbsp;Home: first chapter　　End: last chapter</p><br><p><strong>🎯 Page Jump (sidebar)</strong></p><p>&nbsp;Jump panel at the top of the sidebar (☰ Contents button)</p><p>&nbsp;Slider: drag to preview, release to jump to any page</p><p>&nbsp;📖 Cover / -10 / +10 / 🏁 End buttons</p><p>&nbsp;Type a page number (or chapter # in reflow mode) and tap Go or press Enter</p><p>&nbsp;Previous position is saved to jump history (↩) automatically; tap to return</p><br><p><strong>🖼️ Manga / Magazine mode (FXL / Fixed Layout)</strong></p><p>&nbsp;Auto-detects pre-paginated ePubs; displays one image per page, fit to screen</p><p>&nbsp;Landscape screens show two-page spreads automatically</p><p>&nbsp;Writing mode & font settings are disabled; use "Spread layout" in ⚙ settings (Auto / Single / Two-page)</p><p>&nbsp;Manga (RTL) displays the right page first; spread pairs are adjacent at the center</p><p>&nbsp;On smartphones, use the sidebar jump panel to navigate to cover / end / any page</p><br><p><strong>🔍 Panel zoom (FXL only)</strong></p><p>&nbsp;Toggle with the 🔍 toolbar button, double-tap the page, or press <code>z</code>.</p><p>&nbsp;Each page is split into 2 columns × 3 rows (6 regions). Tap Next to step through the regions (5 steps per page, then moves to region 1 of the next page).</p><p>&nbsp;Order is configurable in ⚙ Settings "Region order": <b>Story</b> = TR→TL→MR→ML→BR→BL, <b>4-panel</b> = right column 3 → left column 3.</p><p>&nbsp;LTR books are auto-mirrored. You can disable this via "Flip for LTR books".</p><p>&nbsp;Drag anywhere to switch to free pan (🌀). Tap the bottom-right pill (🎯/🌀) to snap back to a preset or step to next region.</p><p>&nbsp;While zoomed, keep dragging past the edge ("rubber band") to jump to the next/prev page.</p><p>&nbsp;Keyboard: <code>1</code>-<code>6</code> jumps to region, <code>0</code>/<code>Esc</code> exits, <code>Space</code>/<code>↑↓</code> steps.</p><p>&nbsp;⚙ Settings "Zoom level": 1.5x / 2.0x / 2.5x.</p><br><p><strong>🔍 Full-text search (reflow only)</strong></p><p>&nbsp;Open sidebar (Contents button) → "Search" tab, type a keyword and press Enter</p><p>&nbsp;Click a result to jump to that chapter (also recorded in jump history)</p><p>&nbsp;Image-based books (FXL) do not support full-text search</p><br><p><strong>🎨 Display settings (⚙ icon)</strong></p><p>&nbsp;Font: 22 options (Mincho, Gothic, Google Fonts, etc.) — reflow only</p><p>&nbsp;Theme: 8 colors (Standard, Sepia, White, Dark, Sakura, Starry Night, Matcha, Moonlit)</p><p>&nbsp;Font size, line height, margin, and writing mode — reflow only</p><p>&nbsp;Spread layout (FXL only): Auto / Single page / Two-page</p><br><p><strong>🔖 Bookmarks &amp; jump history</strong></p><p>&nbsp;Reading position is saved automatically. Sidebar TOC tab shows jump history.</p><p>&nbsp;📥 Local import: Load bookmarks from a saved .json file on your device</p><p>&nbsp;📤 Local export: Download bookmarks as a .json file to your device</p><p>&nbsp;☁↓ Drive load: Load bookmarks from Google Drive (overwrites local data)</p><p>&nbsp;☁↑ Drive save: Save bookmarks to Google Drive (share across devices)</p><p style="font-size:12px;opacity:.6;">&nbsp;※ Drive features require an HTTP server and Google Client ID configuration</p><br><p><strong>📚 Reading list</strong></p><p>&nbsp;When no book is open, the welcome screen shows a list of books in progress</p><p>&nbsp;Each card shows the cover, title, author, progress bar, and last read date</p><p>&nbsp;Tap "Open this file" on a card to pick the file and resume where you left off</p><p>&nbsp;When you reach the end of the last chapter, a "Finished" banner appears</p><p>&nbsp;"Back to reading list": close the book and return to the list (marked as completed)</p><p>&nbsp;"Stay": dismiss the banner and keep reading</p><p>&nbsp;"Close book" at the bottom of ⚙ Settings closes the book anytime (position is saved)</p><p>&nbsp;Tap "Edit" (top right of list) to enter edit mode; tap × on a card to remove it from the list</p><br><p><strong>⬛ Fullscreen</strong></p><p>&nbsp;Press f (or toolbar button) to hide UI and read fullscreen. Press Esc or tap top edge to exit.</p><br><p><strong>File formats</strong></p><p>&nbsp;.epub / .kepub (Kobo) supported. Both reflowable and fixed-layout (manga / magazine) books are auto-detected</p>',
     'toast.webFontFile':    '☁ Web fonts may not display in offline or file:// environments',
     'toast.resume':         '📖 Resumed from chapter {n} of {total}',
     'toast.fileMissing':    '⚠️ File not found: {path}',
@@ -975,6 +1050,15 @@ const I18N = {
     'spread.spread':             'Two-page',
     'search.fxlUnsupported':     'Full-text search is unavailable for image-based books',
     'fxl.unsupportedPage':       'This page cannot be displayed in FXL mode',
+    'btn.zoom':                  '🔍 Zoom (z)',
+    'settings.fxlZoomLevel':     'Zoom level',
+    'settings.fxlRegionOrder':   'Region order',
+    'settings.fxlLtrAutoFlip':   'Flip for LTR books',
+    'region.story':              'Story',
+    'region.yonkoma':            '4-panel',
+    'pill.free':                 'Free',
+    'toast.zoomOn':              'Zoom on',
+    'toast.zoomOff':             'Zoom off',
     'progress.tooltip':     'Chapter {n} of {total}',
     'progress.tooltipFxl':  'Page {n} of {total}',
     'jump.title':           'Jump',
@@ -1089,7 +1173,7 @@ const I18N = {
     'help.author':          '作者：{creator}',
     'help.chapters':        '章節數：{n}',
     'help.tocItems':        '目錄項目數：{n}',
-    'help.body':            '<p><strong>📜 頁面捲動（主要操作）</strong></p><p>　空白鍵：前進一頁</p><p>　Shift+空白：後退一頁</p><p>　↓ / PageDown：前進捲動</p><p>　↑ / PageUp：後退捲動</p><p>　畫面下方「下一頁↓」・上方「↑上一頁」按鈕</p><p>　※章節末尾/開頭時自動切換章節</p><br><p><strong>📖 章節切換（僅限流式排版）</strong></p><p>　← 鍵：下一章　　→ 鍵：上一章</p><p>　Home：第一章　　End：最後一章</p><br><p><strong>🎯 頁面跳轉（側邊欄）</strong></p><p>　側邊欄（☰ 目錄按鈕）最上方的「跳轉」面板</p><p>　滑桿：拖曳預覽並跳至任意位置</p><p>　📖 封面 / -10 / +10 / 🏁 末頁 四個按鈕</p><p>　輸入頁碼（流式排版為章節號）後按 Go 或 Enter</p><p>　跳轉前位置自動記錄於跳轉歷史（↩），點選即可返回</p><br><p><strong>🖼️ 漫畫・雜誌模式（FXL / Fixed Layout）</strong></p><p>　自動偵測 pre-paginated ePub，每頁單張圖片等比縮放顯示</p><p>　橫向畫面自動顯示跨頁（兩頁並排）</p><p>　書寫方向・字型等設定停用，改以⚙設定「跨頁顯示」切換自動/單頁/跨頁</p><p>　漫畫（RTL）依右頁起始顯示，跨頁時於畫面中央相鄰</p><p>　手機可透過☰按鈕→跳轉面板瀏覽封面・末頁・任意頁</p><br><p><strong>🔍 全文搜尋（僅限流式排版）</strong></p><p>　側邊欄（目錄按鈕）→「搜尋」索引標籤，輸入關鍵字後按 Enter</p><p>　點擊結果即可跳轉至該章（同時記錄於跳轉歷史）</p><p>　圖片格式書籍（FXL）無法使用全文搜尋</p><br><p><strong>🎨 顯示設定（⚙圖示）</strong></p><p>　字型：22 種（明朝體・黑體・Google Fonts 等）※僅限流式排版</p><p>　主題：8 色（標準・棕褐・白紙・暗色・櫻花・星空・抹茶・月夜）</p><p>　字型大小・行距・邊距・書寫方向 ※僅限流式排版</p><p>　跨頁顯示（僅 FXL）：自動 / 單頁 / 跨頁</p><br><p><strong>🔖 書籤・跳轉歷史</strong></p><p>　閱讀位置自動記錄。側邊欄目錄索引標籤可查看跳轉歷史</p><p>　📥 本機匯入：從已儲存的 .json 檔案載入書籤</p><p>　📤 本機匯出：將書籤下載為 .json 檔案</p><p>　☁↓ 從 Drive 載入：從 Google Drive 載入書籤（覆蓋本機資料）</p><p>　☁↑ 儲存至 Drive：將書籤儲存至 Google Drive（可跨裝置共用）</p><p style="font-size:12px;opacity:.6;">　※ Drive 功能需透過 HTTP 伺服器啟動並設定 Google Client ID</p><br><p><strong>📚 閱讀中清單</strong></p><p>　未開啟書籍時，歡迎畫面顯示正在閱讀的書籍清單</p><p>　書卡顯示封面、書名、作者、進度列及最後閱讀日期</p><p>　點選書卡右下角「開啟此檔案」，選擇檔案後從上次位置繼續閱讀</p><p>　讀到最後一章末尾時，畫面下方會出現讀完提示橫幅</p><p>　「回到閱讀清單」：關閉書籍並返回清單（標記為已讀完並自動移除）</p><p>　「繼續閱讀」：關閉橫幅，繼續閱讀</p><p>　⚙ 設定面板底部的「關閉書籍」可隨時返回清單（自動儲存閱讀位置）</p><p>　點選清單右上角「編輯」進入編輯模式，點選書卡 × 可從清單移除</p><br><p><strong>⬛ 全螢幕</strong></p><p>　按 f 鍵（或工具列按鈕）隱藏 UI 全螢幕閱讀。按 Esc 或點選上緣退出</p><br><p><strong>支援格式</strong></p><p>　.epub / .kepub（Kobo）。流式排版與固定版式（漫畫・雜誌）均自動偵測</p>',
+    'help.body':            '<p><strong>📜 頁面捲動（主要操作）</strong></p><p>　空白鍵：前進一頁</p><p>　Shift+空白：後退一頁</p><p>　↓ / PageDown：前進捲動</p><p>　↑ / PageUp：後退捲動</p><p>　畫面下方「下一頁↓」・上方「↑上一頁」按鈕</p><p>　※章節末尾/開頭時自動切換章節</p><br><p><strong>📖 章節切換（僅限流式排版）</strong></p><p>　← 鍵：下一章　　→ 鍵：上一章</p><p>　Home：第一章　　End：最後一章</p><br><p><strong>🎯 頁面跳轉（側邊欄）</strong></p><p>　側邊欄（☰ 目錄按鈕）最上方的「跳轉」面板</p><p>　滑桿：拖曳預覽並跳至任意位置</p><p>　📖 封面 / -10 / +10 / 🏁 末頁 四個按鈕</p><p>　輸入頁碼（流式排版為章節號）後按 Go 或 Enter</p><p>　跳轉前位置自動記錄於跳轉歷史（↩），點選即可返回</p><br><p><strong>🖼️ 漫畫・雜誌模式（FXL / Fixed Layout）</strong></p><p>　自動偵測 pre-paginated ePub，每頁單張圖片等比縮放顯示</p><p>　橫向畫面自動顯示跨頁（兩頁並排）</p><p>　書寫方向・字型等設定停用，改以⚙設定「跨頁顯示」切換自動/單頁/跨頁</p><p>　漫畫（RTL）依右頁起始顯示，跨頁時於畫面中央相鄰</p><p>　手機可透過☰按鈕→跳轉面板瀏覽封面・末頁・任意頁</p><br><p><strong>🔍 分格閱讀縮放（僅 FXL）</strong></p><p>　工具列🔍按鈕 或 雙擊頁面 即可開啟／關閉，鍵盤 <code>z</code> 亦可切換</p><p>　單頁劃分為 2欄×3列=6個區域，Next 按鈕逐個切換（5次到達下一頁第1區域）</p><p>　順序於⚙設定「區域順序」選擇：<b>故事型</b>=右上→左上→右中→左中→右下→左下，<b>四格</b>=右欄3個→左欄3個</p><p>　LTR 書籍會自動左右反轉（可於⚙設定「LTR 書籍左右反轉」關閉）</p><p>　任意拖曳進入🌀自由模式，右下區域膠囊🎯/🌀點擊可回到預設/下個區域</p><p>　縮放中邊緣再拉（橡皮筋手勢）可跳至下一／前一頁</p><p>　鍵盤 <code>1</code>～<code>6</code> 直接跳區域，<code>0</code>/<code>Esc</code> 解除，<code>Space</code>/<code>↑↓</code> 逐個切換</p><p>　⚙設定「縮放倍率」：1.5x / 2.0x / 2.5x</p><br><p><strong>🔍 全文搜尋（僅限流式排版）</strong></p><p>　側邊欄（目錄按鈕）→「搜尋」索引標籤，輸入關鍵字後按 Enter</p><p>　點擊結果即可跳轉至該章（同時記錄於跳轉歷史）</p><p>　圖片格式書籍（FXL）無法使用全文搜尋</p><br><p><strong>🎨 顯示設定（⚙圖示）</strong></p><p>　字型：22 種（明朝體・黑體・Google Fonts 等）※僅限流式排版</p><p>　主題：8 色（標準・棕褐・白紙・暗色・櫻花・星空・抹茶・月夜）</p><p>　字型大小・行距・邊距・書寫方向 ※僅限流式排版</p><p>　跨頁顯示（僅 FXL）：自動 / 單頁 / 跨頁</p><br><p><strong>🔖 書籤・跳轉歷史</strong></p><p>　閱讀位置自動記錄。側邊欄目錄索引標籤可查看跳轉歷史</p><p>　📥 本機匯入：從已儲存的 .json 檔案載入書籤</p><p>　📤 本機匯出：將書籤下載為 .json 檔案</p><p>　☁↓ 從 Drive 載入：從 Google Drive 載入書籤（覆蓋本機資料）</p><p>　☁↑ 儲存至 Drive：將書籤儲存至 Google Drive（可跨裝置共用）</p><p style="font-size:12px;opacity:.6;">　※ Drive 功能需透過 HTTP 伺服器啟動並設定 Google Client ID</p><br><p><strong>📚 閱讀中清單</strong></p><p>　未開啟書籍時，歡迎畫面顯示正在閱讀的書籍清單</p><p>　書卡顯示封面、書名、作者、進度列及最後閱讀日期</p><p>　點選書卡右下角「開啟此檔案」，選擇檔案後從上次位置繼續閱讀</p><p>　讀到最後一章末尾時，畫面下方會出現讀完提示橫幅</p><p>　「回到閱讀清單」：關閉書籍並返回清單（標記為已讀完並自動移除）</p><p>　「繼續閱讀」：關閉橫幅，繼續閱讀</p><p>　⚙ 設定面板底部的「關閉書籍」可隨時返回清單（自動儲存閱讀位置）</p><p>　點選清單右上角「編輯」進入編輯模式，點選書卡 × 可從清單移除</p><br><p><strong>⬛ 全螢幕</strong></p><p>　按 f 鍵（或工具列按鈕）隱藏 UI 全螢幕閱讀。按 Esc 或點選上緣退出</p><br><p><strong>支援格式</strong></p><p>　.epub / .kepub（Kobo）。流式排版與固定版式（漫畫・雜誌）均自動偵測</p>',
     'toast.webFontFile':    '☁ 離線或 file:// 環境下，網路字型可能無法顯示',
     'toast.resume':         '📖 從第 {n} 章（共 {total} 章）繼續閱讀',
     'toast.fileMissing':    '⚠️ 找不到檔案：{path}',
@@ -1119,6 +1203,15 @@ const I18N = {
     'spread.spread':             '跨頁',
     'search.fxlUnsupported':     '此書為圖片格式，無法使用全文搜尋',
     'fxl.unsupportedPage':       'FXL 模式無法顯示此頁面',
+    'btn.zoom':                  '🔍 縮放 (z)',
+    'settings.fxlZoomLevel':     '縮放倍率',
+    'settings.fxlRegionOrder':   '區域順序',
+    'settings.fxlLtrAutoFlip':   'LTR 書籍左右反轉',
+    'region.story':              '故事型',
+    'region.yonkoma':            '四格',
+    'pill.free':                 '自由',
+    'toast.zoomOn':              '縮放開啟',
+    'toast.zoomOff':             '縮放關閉',
     'progress.tooltip':     '第 {n} 章 / 共 {total} 章',
     'progress.tooltipFxl':  '第 {n} / 共 {total} 頁',
     'jump.title':           '跳轉',
@@ -1233,7 +1326,7 @@ const I18N = {
     'help.author':          '作者：{creator}',
     'help.chapters':        '章节数：{n}',
     'help.tocItems':        '目录项目数：{n}',
-    'help.body':            '<p><strong>📜 页面滚动（主要操作）</strong></p><p>　空格键：前进一页</p><p>　Shift+空格：后退一页</p><p>　↓ / PageDown：向前滚动</p><p>　↑ / PageUp：向后滚动</p><p>　画面下方「前进↓」・上方「↑后退」按钮</p><p>　※章节末尾/开头时自动切换章节</p><br><p><strong>📖 章节切换（仅限流式排版）</strong></p><p>　← 键：下一章　　→ 键：上一章</p><p>　Home：第一章　　End：最后一章</p><br><p><strong>🎯 页面跳转（侧边栏）</strong></p><p>　侧边栏（☰ 目录按钮）最上方的「跳转」面板</p><p>　滑块：拖动预览并跳至任意位置</p><p>　📖 封面 / -10 / +10 / 🏁 末页 四个按钮</p><p>　输入页码（流式排版为章节号）后按 Go 或 Enter</p><p>　跳转前位置自动记录于跳转历史（↩），点击即可返回</p><br><p><strong>🖼️ 漫画・杂志模式（FXL / Fixed Layout）</strong></p><p>　自动检测 pre-paginated ePub，每页单张图片等比缩放显示</p><p>　横向画面自动显示跨页（两页并排）</p><p>　书写方向・字体等设置停用，改以⚙设置「跨页显示」切换自动/单页/跨页</p><p>　漫画（RTL）依右页起始显示，跨页时于画面中央相邻</p><p>　手机可通过☰按钮→跳转面板浏览封面・末页・任意页</p><br><p><strong>🔍 全文搜索（仅限流式排版）</strong></p><p>　侧边栏（目录按钮）→「搜索」选项卡，输入关键词后按 Enter</p><p>　点击结果即可跳转至该章（同时记录于跳转历史）</p><p>　图片格式书籍（FXL）无法使用全文搜索</p><br><p><strong>🎨 显示设置（⚙图标）</strong></p><p>　字体：22 种（明朝体・黑体・Google Fonts 等）※仅限流式排版</p><p>　主题：8 色（标准・棕褐・白纸・深色・樱花・星空・抹茶・月夜）</p><p>　字体大小・行距・边距・书写方向 ※仅限流式排版</p><p>　跨页显示（仅 FXL）：自动 / 单页 / 跨页</p><br><p><strong>🔖 书签・跳转历史</strong></p><p>　阅读位置自动记录。侧边栏目录选项卡可查看跳转历史</p><p>　📥 本地导入：从已保存的 .json 文件加载书签</p><p>　📤 本地导出：将书签下载为 .json 文件</p><p>　☁↓ 从 Drive 加载：从 Google Drive 加载书签（覆盖本地数据）</p><p>　☁↑ 保存至 Drive：将书签保存至 Google Drive（可跨设备共用）</p><p style="font-size:12px;opacity:.6;">　※ Drive 功能需通过 HTTP 服务器启动并配置 Google Client ID</p><br><p><strong>📚 阅读中列表</strong></p><p>　未打开书籍时，欢迎页面显示正在阅读的书籍列表</p><p>　书卡显示封面、书名、作者、进度条及最后阅读日期</p><p>　点击书卡右下角「打开此文件」，选择文件后从上次位置继续阅读</p><p>　读到最后一章末尾时，画面下方会出现读完提示横幅</p><p>　「回到阅读列表」：关闭书籍并返回列表（标记为已读完并自动移除）</p><p>　「继续阅读」：关闭横幅，继续阅读</p><p>　⚙ 设置面板底部的「关闭书籍」可随时返回列表（自动保存阅读位置）</p><p>　点击列表右上角「编辑」进入编辑模式，点击书卡 × 可从列表中删除</p><br><p><strong>⬛ 全屏</strong></p><p>　按 f 键（或工具栏按钮）隐藏 UI 全屏阅读。按 Esc 或点击顶部退出</p><br><p><strong>支持格式</strong></p><p>　.epub / .kepub（Kobo）。流式排版与固定版式（漫画・杂志）均自动检测</p>',
+    'help.body':            '<p><strong>📜 页面滚动（主要操作）</strong></p><p>　空格键：前进一页</p><p>　Shift+空格：后退一页</p><p>　↓ / PageDown：向前滚动</p><p>　↑ / PageUp：向后滚动</p><p>　画面下方「前进↓」・上方「↑后退」按钮</p><p>　※章节末尾/开头时自动切换章节</p><br><p><strong>📖 章节切换（仅限流式排版）</strong></p><p>　← 键：下一章　　→ 键：上一章</p><p>　Home：第一章　　End：最后一章</p><br><p><strong>🎯 页面跳转（侧边栏）</strong></p><p>　侧边栏（☰ 目录按钮）最上方的「跳转」面板</p><p>　滑块：拖动预览并跳至任意位置</p><p>　📖 封面 / -10 / +10 / 🏁 末页 四个按钮</p><p>　输入页码（流式排版为章节号）后按 Go 或 Enter</p><p>　跳转前位置自动记录于跳转历史（↩），点击即可返回</p><br><p><strong>🖼️ 漫画・杂志模式（FXL / Fixed Layout）</strong></p><p>　自动检测 pre-paginated ePub，每页单张图片等比缩放显示</p><p>　横向画面自动显示跨页（两页并排）</p><p>　书写方向・字体等设置停用，改以⚙设置「跨页显示」切换自动/单页/跨页</p><p>　漫画（RTL）依右页起始显示，跨页时于画面中央相邻</p><p>　手机可通过☰按钮→跳转面板浏览封面・末页・任意页</p><br><p><strong>🔍 分格阅读缩放（仅 FXL）</strong></p><p>　工具栏🔍按钮 或 双击页面 开启/关闭，键盘 <code>z</code> 也可切换</p><p>　单页划分为 2列×3行=6个区域，Next 按钮逐个切换（5次到达下一页第1区域）</p><p>　顺序于⚙设置「区域顺序」选择：<b>故事型</b>=右上→左上→右中→左中→右下→左下，<b>四格</b>=右列3个→左列3个</p><p>　LTR 书籍会自动左右反转（可于⚙设置「LTR 书籍左右反转」关闭）</p><p>　任意拖动进入🌀自由模式，右下区域胶囊🎯/🌀点击可回到预设/下个区域</p><p>　缩放中边缘再拉（橡皮筋手势）可跳至下一／前一页</p><p>　键盘 <code>1</code>～<code>6</code> 直接跳区域，<code>0</code>/<code>Esc</code> 解除，<code>Space</code>/<code>↑↓</code> 逐个切换</p><p>　⚙设置「缩放倍率」：1.5x / 2.0x / 2.5x</p><br><p><strong>🔍 全文搜索（仅限流式排版）</strong></p><p>　侧边栏（目录按钮）→「搜索」选项卡，输入关键词后按 Enter</p><p>　点击结果即可跳转至该章（同时记录于跳转历史）</p><p>　图片格式书籍（FXL）无法使用全文搜索</p><br><p><strong>🎨 显示设置（⚙图标）</strong></p><p>　字体：22 种（明朝体・黑体・Google Fonts 等）※仅限流式排版</p><p>　主题：8 色（标准・棕褐・白纸・深色・樱花・星空・抹茶・月夜）</p><p>　字体大小・行距・边距・书写方向 ※仅限流式排版</p><p>　跨页显示（仅 FXL）：自动 / 单页 / 跨页</p><br><p><strong>🔖 书签・跳转历史</strong></p><p>　阅读位置自动记录。侧边栏目录选项卡可查看跳转历史</p><p>　📥 本地导入：从已保存的 .json 文件加载书签</p><p>　📤 本地导出：将书签下载为 .json 文件</p><p>　☁↓ 从 Drive 加载：从 Google Drive 加载书签（覆盖本地数据）</p><p>　☁↑ 保存至 Drive：将书签保存至 Google Drive（可跨设备共用）</p><p style="font-size:12px;opacity:.6;">　※ Drive 功能需通过 HTTP 服务器启动并配置 Google Client ID</p><br><p><strong>📚 阅读中列表</strong></p><p>　未打开书籍时，欢迎页面显示正在阅读的书籍列表</p><p>　书卡显示封面、书名、作者、进度条及最后阅读日期</p><p>　点击书卡右下角「打开此文件」，选择文件后从上次位置继续阅读</p><p>　读到最后一章末尾时，画面下方会出现读完提示横幅</p><p>　「回到阅读列表」：关闭书籍并返回列表（标记为已读完并自动移除）</p><p>　「继续阅读」：关闭横幅，继续阅读</p><p>　⚙ 设置面板底部的「关闭书籍」可随时返回列表（自动保存阅读位置）</p><p>　点击列表右上角「编辑」进入编辑模式，点击书卡 × 可从列表中删除</p><br><p><strong>⬛ 全屏</strong></p><p>　按 f 键（或工具栏按钮）隐藏 UI 全屏阅读。按 Esc 或点击顶部退出</p><br><p><strong>支持格式</strong></p><p>　.epub / .kepub（Kobo）。流式排版与固定版式（漫画・杂志）均自动检测</p>',
     'toast.webFontFile':    '☁ 离线或 file:// 环境下，网络字体可能无法显示',
     'toast.resume':         '📖 从第 {n} 章（共 {total} 章）继续阅读',
     'toast.fileMissing':    '⚠️ 找不到文件：{path}',
@@ -1263,6 +1356,15 @@ const I18N = {
     'spread.spread':             '跨页',
     'search.fxlUnsupported':     '此书为图片格式，无法使用全文搜索',
     'fxl.unsupportedPage':       'FXL 模式无法显示此页面',
+    'btn.zoom':                  '🔍 缩放 (z)',
+    'settings.fxlZoomLevel':     '缩放倍率',
+    'settings.fxlRegionOrder':   '区域顺序',
+    'settings.fxlLtrAutoFlip':   'LTR 书籍左右反转',
+    'region.story':              '故事型',
+    'region.yonkoma':            '四格',
+    'pill.free':                 '自由',
+    'toast.zoomOn':              '缩放开启',
+    'toast.zoomOff':             '缩放关闭',
     'progress.tooltip':     '第 {n} 章 / 共 {total} 章',
     'progress.tooltipFxl':  '第 {n} / 共 {total} 页',
     'jump.title':           '跳转',
@@ -1377,6 +1479,23 @@ const state = {
   fxlPairs:null,         // [{items:[spineIdx] | [spineIdx,spineIdx]}, ...] 論理ペア配列
   currentPairIdx:0,      // 現在のペア位置（描画時のみ使用）
   spreadMode:'auto',     // 'auto' | 'single' | 'spread' (epub_settings に永続化)
+  // FXL ズーム（Phase 3）。fxlZoomEnabled/fxlZoom は永続化しない（本を開くたびに OFF 起動）
+  fxlZoomEnabled:false,
+  fxlZoom: {
+    level: 2.0,          // 拡大倍率（プリセット時）
+    tx: 0, ty: 0,        // pan オフセット（CSS px、#fxl-spread の transform 用）
+    regionIdx: 0,        // 0..5 現在のプリセット領域
+    mode: 'preset',      // 'preset' | 'free'（ドラッグPAN 中は 'free'）
+  },
+  fxlZoomLevel: 2.0,     // 永続化：1.5 | 2.0 | 2.5
+  fxlRegionOrder: 'story', // 永続化：'story' | 'yonkoma'
+  fxlLtrAutoFlip: true,  // 永続化：LTR書籍で領域順を左右反転するか
+};
+
+// 2列×3行 領域順。[col, row] 形式。col: 0=L, 1=R ／ row: 0=T, 1=M, 2=B
+const FXL_REGION_ORDERS = {
+  story:   [[1,0],[0,0],[1,1],[0,1],[1,2],[0,2]],  // RT,LT,RM,LM,RB,LB
+  yonkoma: [[1,0],[1,1],[1,2],[0,0],[0,1],[0,2]],  // RT,RM,RB,LT,LM,LB
 };
 
 // FXL 画像 Blob URL キャッシュ (spineIdx → objectURL)。renderFxlPair で前後ペア分のみ保持
@@ -1604,6 +1723,12 @@ async function loadEpub(file, fileHandle = null) {
       state.fxlPpd = 'ltr';
     }
     document.body.classList.toggle('mode-fxl', isFxl);
+    // 前の本で残った FXL ズーム状態・transform を必ずリセット
+    state.fxlZoomEnabled = false;
+    resetFxlZoom();
+    document.body.classList.remove('fxl-zoomed');
+    updateFxlNextBtnUI();
+    updateFxlRegionPillUI();
 
     // TOC from nav doc
     state.toc = [];
@@ -2458,6 +2583,226 @@ function revokeAllFxlBlobs() {
   _fxlBlobCache.clear();
 }
 
+// ══════════════════════════════════════════
+//  FXL ズーム（Phase 3）
+//  - #fxl-spread に transform:translate()+scale() を適用して拡大表示
+//  - 6領域プリセット（2列×3行）を順次ステップ or ドラッグPANで自由移動
+// ══════════════════════════════════════════
+
+// 現在フォーカスされているページの container 座標矩形を返す。
+// - single モード、またはペアに画像1枚のみ → container 全域
+// - spread モード2面ペア → 左右どちら半分か（ppd と items[] の位置で判定）
+function getTargetPageRect() {
+  const cont = document.getElementById('fxl-container');
+  if (!cont) return { x:0, y:0, w:0, h:0 };
+  const W = cont.clientWidth, H = cont.clientHeight;
+  const pair = state.fxlPairs && state.fxlPairs[state.currentPairIdx];
+  const spreadActive = isEffectiveSpread() && pair && pair.items.length === 2;
+  if (!spreadActive) return { x:0, y:0, w:W, h:H };
+  const isFirst = pair.items[0] === state.currentSpineIdx;
+  const rtl = state.fxlPpd === 'rtl';
+  // RTL: imgA(=items[0]) は右半分 / LTR: imgA は左半分
+  const targetOnRight = rtl ? isFirst : !isFirst;
+  return { x: targetOnRight ? W/2 : 0, y:0, w: W/2, h: H };
+}
+
+// 現在の regionIdx に対応するセル (col,row) を返す（LTR自動反転を考慮）
+function regionCellForIdx(idx) {
+  const order = FXL_REGION_ORDERS[state.fxlRegionOrder] || FXL_REGION_ORDERS.story;
+  const cell = order[Math.max(0, Math.min(5, idx))];
+  let col = cell[0], row = cell[1];
+  if (state.fxlLtrAutoFlip && state.fxlPpd === 'ltr') col = 1 - col;
+  return { col, row };
+}
+
+// pan オフセットをクランプ（スプレッドが container から剥がれないよう制限）
+// excess は入力値とクランプ後の差分（rubber-band 検知に使用）
+function clampFxlPan(tx, ty) {
+  const L = state.fxlZoom.level;
+  const cont = document.getElementById('fxl-container');
+  const W = cont ? cont.clientWidth : 0;
+  const H = cont ? cont.clientHeight : 0;
+  const maxX = Math.max(0, (L - 1) * W / 2);
+  const maxY = Math.max(0, (L - 1) * H / 2);
+  const cx = Math.max(-maxX, Math.min(maxX, tx));
+  const cy = Math.max(-maxY, Math.min(maxY, ty));
+  return { tx:cx, ty:cy, excessX: tx - cx, excessY: ty - cy, maxX, maxY };
+}
+
+// 現在の state.fxlZoom を #fxl-spread に反映
+function applyFxlZoom() {
+  const el = document.getElementById('fxl-spread');
+  if (!el) return;
+  const z = state.fxlZoom;
+  if (z.level <= 1.001) {
+    el.style.transform = '';
+  } else {
+    el.style.transform = 'translate(' + z.tx + 'px, ' + z.ty + 'px) scale(' + z.level + ')';
+  }
+}
+
+// regionIdx に対応する領域にズーム（transform-origin:50% 50% 前提で、セル中心が画面中央に来るよう tx/ty を算出）
+function applyFxlRegionPreset() {
+  const z = state.fxlZoom;
+  const { col, row } = regionCellForIdx(z.regionIdx);
+  const r = getTargetPageRect();
+  const cont = document.getElementById('fxl-container');
+  if (!cont || r.w === 0 || r.h === 0) return;
+  const W = cont.clientWidth, H = cont.clientHeight;
+  const cellCx = r.x + r.w * (col + 0.5) / 2;
+  const cellCy = r.y + r.h * (row + 0.5) / 3;
+  const raw = clampFxlPan(-(cellCx - W/2) * z.level, -(cellCy - H/2) * z.level);
+  z.tx = raw.tx; z.ty = raw.ty;
+  z.mode = 'preset';
+  applyFxlZoom();
+  if (typeof updateFxlRegionPillUI === 'function') updateFxlRegionPillUI();
+  if (typeof updateFxlNextBtnUI === 'function') updateFxlNextBtnUI();
+}
+
+// ズーム状態を完全リセット（fit 表示へ）。enabled フラグはこの関数では触らない。
+function resetFxlZoom() {
+  state.fxlZoom.level = 1;
+  state.fxlZoom.tx = 0;
+  state.fxlZoom.ty = 0;
+  state.fxlZoom.regionIdx = 0;
+  state.fxlZoom.mode = 'preset';
+  const el = document.getElementById('fxl-spread');
+  if (el) { el.style.transform = ''; el.classList.remove('panning'); }
+}
+
+// ズーム ON：指定領域（省略時は 0=先頭）にスナップ
+function enableFxlZoom(startRegionIdx) {
+  if (state.renderMode !== 'fxl' || !state.fxlPairs) return;
+  state.fxlZoomEnabled = true;
+  state.fxlZoom.level = state.fxlZoomLevel;
+  state.fxlZoom.regionIdx = (typeof startRegionIdx === 'number') ? Math.max(0, Math.min(5, startRegionIdx)) : 0;
+  state.fxlZoom.mode = 'preset';
+  document.body.classList.add('fxl-zoomed');
+  const btn = document.getElementById('btn-fxl-zoom');
+  if (btn) btn.setAttribute('aria-pressed', 'true');
+  applyFxlRegionPreset();
+  if (typeof updateFxlRegionPillUI === 'function') updateFxlRegionPillUI();
+  if (typeof updateFxlNextBtnUI === 'function') updateFxlNextBtnUI();
+}
+
+// ズーム OFF：fit 表示に戻す
+function disableFxlZoom() {
+  state.fxlZoomEnabled = false;
+  resetFxlZoom();
+  document.body.classList.remove('fxl-zoomed');
+  const btn = document.getElementById('btn-fxl-zoom');
+  if (btn) btn.setAttribute('aria-pressed', 'false');
+  if (typeof updateFxlNextBtnUI === 'function') updateFxlNextBtnUI();
+}
+
+function toggleFxlZoom() {
+  if (state.fxlZoomEnabled) disableFxlZoom();
+  else enableFxlZoom(0);
+}
+
+// Next/Back バッジ表示更新
+function updateFxlNextBtnUI() {
+  const fwd  = document.getElementById('btn-scroll-fwd-badge');
+  const back = document.getElementById('btn-scroll-back-badge');
+  if (!fwd || !back) return;
+  if (!(state.renderMode === 'fxl' && state.fxlZoomEnabled)) {
+    fwd.textContent = ''; back.textContent = '';
+    return;
+  }
+  const z = state.fxlZoom;
+  if (z.mode === 'preset' && z.regionIdx < 5) fwd.textContent = (z.regionIdx + 2) + '/6';
+  else                                         fwd.textContent = '⏭';
+  if (z.mode === 'preset' && z.regionIdx > 0) back.textContent = z.regionIdx + '/6';
+  else                                         back.textContent = '⏮';
+}
+
+// 領域ピル表示更新
+function updateFxlRegionPillUI() {
+  const pill = document.getElementById('fxl-region-pill');
+  if (!pill) return;
+  const icon = document.getElementById('fxl-region-pill-icon');
+  const lbl  = document.getElementById('fxl-region-pill-label');
+  const z = state.fxlZoom;
+  if (z.mode === 'free') {
+    if (icon) icon.textContent = '🌀';
+    if (lbl)  lbl.textContent  = t('pill.free');
+  } else {
+    if (icon) icon.textContent = '🎯';
+    if (lbl)  lbl.textContent  = (z.regionIdx + 1) + ' / 6';
+  }
+}
+
+// 領域ピルのクリック: free 中は現在 regionIdx にスナップ復帰、preset 中は次領域へ
+function onFxlRegionPillClick() {
+  if (!state.fxlZoomEnabled) return;
+  if (state.fxlZoom.mode === 'free') {
+    applyFxlRegionPreset();   // 直近 regionIdx に復帰
+  } else {
+    advanceFxlZoomStep(1);
+  }
+}
+
+// spine 単位で前後へ移動（ズーム時の領域ステップから呼ばれる）。
+// spread 表示中の見開き内 target 切替のみ再描画不要（両面とも既に表示中）。
+// single 表示（isEffectiveSpread=false）では別 spine は画面上に無いため、再描画が必要。
+function advanceFxlZoomSpine(dir) {
+  if (!state.fxlPairs) return;
+  const pair = state.fxlPairs[state.currentPairIdx];
+  const pos  = pair.items.indexOf(state.currentSpineIdx);
+  const sameP = (dir > 0 && pos >= 0 && pos < pair.items.length - 1) ||
+                (dir < 0 && pos > 0);
+  if (sameP) {
+    const newSpine = pair.items[pos + dir];
+    if (isEffectiveSpread() && pair.items.length === 2) {
+      // 見開き表示中: target 切替だけで足りる（両ページとも既に画面上）
+      state.currentSpineIdx = newSpine;
+      savePos(0);
+      updatePageInfo();
+      updateTocHighlight();
+      applyFxlRegionPreset();
+    } else {
+      // 単ページ表示中: 別画像に差し替える必要あり → 再描画（末尾フックで zoom 復元）
+      renderFxlPair(newSpine);
+    }
+    return;
+  }
+  // ペア境界を跨ぐ
+  const nextPairIdx = state.currentPairIdx + dir;
+  if (nextPairIdx < 0) return;
+  if (nextPairIdx >= state.fxlPairs.length) {
+    if (dir > 0) {
+      savePos(1.0);
+      showFinishedBanner();
+      disableFxlZoom();
+    }
+    return;
+  }
+  const nextPair = state.fxlPairs[nextPairIdx];
+  const targetSpine = dir > 0
+    ? nextPair.items[0]
+    : nextPair.items[nextPair.items.length - 1];
+  renderFxlPair(targetSpine);  // 末尾フックで applyFxlRegionPreset が走る
+}
+
+// ズーム時の Next/Back 動作（scrollPage から呼ばれる）
+function advanceFxlZoomStep(dir) {
+  const z = state.fxlZoom;
+  if (z.mode === 'free') {
+    z.regionIdx = dir > 0 ? 0 : 5;
+    z.mode = 'preset';
+    advanceFxlZoomSpine(dir);
+    return;
+  }
+  const next = z.regionIdx + dir;
+  if (next >= 0 && next <= 5) {
+    z.regionIdx = next;
+    applyFxlRegionPreset();
+  } else {
+    z.regionIdx = dir > 0 ? 0 : 5;
+    advanceFxlZoomSpine(dir);
+  }
+}
+
 // FXL 描画。spineIdx を主入力とし、spread 有効時は同ペア両面、single 時は該当1面のみ描画する。
 async function renderFxlPair(spineIdx) {
   if (!state.fxlPairs || spineIdx < 0 || spineIdx >= state.spine.length) return;
@@ -2533,6 +2878,13 @@ async function renderFxlPair(spineIdx) {
       updatePageInfo();
       updateTocHighlight();
       _isRendering = false;
+      // ズーム有効時は、新ページに合わせて現在 regionIdx のプリセットを再適用
+      if (state.fxlZoomEnabled) {
+        // レイアウト確定を待ってから適用（spread 切替直後の rect 取得を確実にする）
+        requestAnimationFrame(() => {
+          if (state.fxlZoomEnabled && state.renderMode === 'fxl') applyFxlRegionPreset();
+        });
+      }
     }
   }
 }
@@ -2560,7 +2912,8 @@ function advanceFxlPage(dir) {
   }
 }
 
-// リサイズ対応: spread ⇔ single の切替時のみ再描画
+// リサイズ対応: spread ⇔ single の切替時のみ再描画。
+// ズーム中は常に領域プリセットを再計算（viewport サイズ変化で tx/ty が狂うため）
 let _fxlResizeTimer = null;
 let _fxlLastSpreadState = null;
 window.addEventListener('resize', () => {
@@ -2570,10 +2923,160 @@ window.addEventListener('resize', () => {
     const cur = isEffectiveSpread();
     if (_fxlLastSpreadState !== cur) {
       _fxlLastSpreadState = cur;
-      renderFxlPair(state.currentSpineIdx);
+      renderFxlPair(state.currentSpineIdx);   // renderFxlPair の末尾フックでズーム復元
+    } else if (state.fxlZoomEnabled) {
+      applyFxlRegionPreset();
     }
   }, 200);
 });
+
+// ══════════════════════════════════════════
+//  FXL ズーム時のドラッグ PAN（PointerEvent 統一）
+//  - 5px 超の移動でタップ扱いを解除し mode='free' に遷移
+//  - clamp 超過を累積し、読み進み方向で 50px 超えたら rubber-band → 次/前ページへ
+// ══════════════════════════════════════════
+(function attachFxlPan(){
+  const PAN_TAP_THRESHOLD = 5;
+  const RUBBER_BAND_PX    = 50;
+  let active=false, sx=0, sy=0, ox=0, oy=0;
+  let overshoot=0, overshootDir=0, dragMoved=false;
+  let tapStartX=0, tapStartY=0, tapStartT=0;   // 単純タップ（ダブルタップ検知用）
+
+  function getEl() { return document.getElementById('fxl-container'); }
+
+  function endDrag(el) {
+    if (!active) return;
+    active=false; dragMoved=false; overshoot=0; overshootDir=0;
+    const sp = document.getElementById('fxl-spread');
+    if (sp) sp.classList.remove('panning');
+    if (el) el.classList.remove('dragging');
+  }
+
+  function onPointerDown(e) {
+    const el = getEl();
+    if (!el) return;
+    if (state.renderMode !== 'fxl') return;
+    // タップ計測用（ズーム有無に関わらず記録。mouse/pen/touch 全対応）
+    tapStartX = e.clientX; tapStartY = e.clientY; tapStartT = Date.now();
+    if (!state.fxlZoomEnabled || state.fxlZoom.level <= 1.001) return;
+    active = true; dragMoved = false;
+    sx = e.clientX; sy = e.clientY;
+    ox = state.fxlZoom.tx; oy = state.fxlZoom.ty;
+    overshoot = 0; overshootDir = 0;
+    try { el.setPointerCapture(e.pointerId); } catch(_) {}
+    el.classList.add('dragging');
+  }
+
+  function onPointerMove(e) {
+    if (!active) return;
+    const dx = e.clientX - sx, dy = e.clientY - sy;
+    if (!dragMoved && Math.hypot(dx, dy) > PAN_TAP_THRESHOLD) {
+      dragMoved = true;
+      state.fxlZoom.mode = 'free';
+      const sp = document.getElementById('fxl-spread');
+      if (sp) sp.classList.add('panning');
+      updateFxlRegionPillUI();
+      updateFxlNextBtnUI();
+    }
+    if (!dragMoved) return;
+    const c = clampFxlPan(ox + dx, oy + dy);
+    state.fxlZoom.tx = c.tx; state.fxlZoom.ty = c.ty;
+    applyFxlZoom();
+    // rubber-band: 横方向の超過を累積
+    if (Math.abs(c.excessX) > 0) {
+      const dirSign = c.excessX > 0 ? 1 : -1;
+      if (dirSign !== overshootDir) { overshoot = 0; overshootDir = dirSign; }
+      overshoot = Math.max(overshoot, Math.abs(c.excessX));
+      if (overshoot > RUBBER_BAND_PX) {
+        // dirSign>0（右方向超過）: RTL→前ページ(-1)、LTR→次ページ(+1)
+        const advDir = (state.fxlPpd === 'rtl') ? -dirSign : dirSign;
+        const el = getEl();
+        try { el && el.releasePointerCapture(e.pointerId); } catch(_) {}
+        endDrag(el);
+        advanceFxlZoomStep(advDir);
+      }
+    }
+  }
+
+  function onPointerUp(e) {
+    const el = getEl();
+    const wasTap = active && !dragMoved;
+    endDrag(el);
+    // タップ処理（ダブルタップ検出）— ズーム中でなくても FXL モードなら有効
+    if (state.renderMode !== 'fxl') return;
+    const moved = Math.hypot(e.clientX - tapStartX, e.clientY - tapStartY);
+    if (moved < PAN_TAP_THRESHOLD && (Date.now() - tapStartT) < 500) {
+      handleFxlTap(e.clientX, e.clientY);
+    }
+  }
+
+  window.addEventListener('DOMContentLoaded', () => {
+    const el = getEl();
+    if (!el) return;
+    el.addEventListener('pointerdown',   onPointerDown);
+    el.addEventListener('pointermove',   onPointerMove);
+    el.addEventListener('pointerup',     onPointerUp);
+    el.addEventListener('pointercancel', () => endDrag(el));
+    el.addEventListener('pointerleave',  () => endDrag(el));
+  });
+})();
+
+// ダブルタップ検出：同位置（30px以内）で 300ms 以内にもう一度タップされたら反転トグル
+let _fxlLastTap = { t:0, x:0, y:0 };
+function handleFxlTap(clientX, clientY) {
+  const now = Date.now();
+  if (now - _fxlLastTap.t < 300 &&
+      Math.abs(clientX - _fxlLastTap.x) < 30 &&
+      Math.abs(clientY - _fxlLastTap.y) < 30) {
+    if (state.fxlZoomEnabled) {
+      disableFxlZoom();
+    } else {
+      enableFxlZoom(regionIdxFromPoint(clientX, clientY));
+    }
+    _fxlLastTap = { t:0, x:0, y:0 };
+    return;
+  }
+  _fxlLastTap = { t: now, x: clientX, y: clientY };
+}
+
+// タップ座標から現在の領域順に照らしたプリセット idx を逆算
+function regionIdxFromPoint(clientX, clientY) {
+  const cont = document.getElementById('fxl-container');
+  if (!cont) return 0;
+  const rect = cont.getBoundingClientRect();
+  const x = clientX - rect.left, y = clientY - rect.top;
+  // getTargetPageRect は state.currentSpineIdx の target を前提とするが、
+  // ダブルタップ ON 時は「タップ位置が現在ビューポートのどこか」を使う。
+  // spread 時の片側判定は tap 位置が左右どちらの半分にあるかで決める。
+  const W = cont.clientWidth, H = cont.clientHeight;
+  const pair = state.fxlPairs && state.fxlPairs[state.currentPairIdx];
+  const spreadActive = isEffectiveSpread() && pair && pair.items.length === 2;
+  let r;
+  if (spreadActive) {
+    // 左右どちら半分にあるかで片側ページの矩形を決める
+    const onRight = x >= W/2;
+    r = { x: onRight ? W/2 : 0, y:0, w: W/2, h: H };
+    // 現在の target がクリック側ページと一致していない場合、spine を切替
+    const isFirst = pair.items[0] === state.currentSpineIdx;
+    const rtl = state.fxlPpd === 'rtl';
+    const firstOnRight = rtl ? true : false;
+    const clickedFirst = (onRight === firstOnRight);
+    if (clickedFirst !== isFirst) {
+      state.currentSpineIdx = clickedFirst ? pair.items[0] : pair.items[1];
+    }
+  } else {
+    r = { x:0, y:0, w:W, h:H };
+  }
+  const col = (x - r.x) < r.w/2 ? 0 : 1;
+  const row = Math.max(0, Math.min(2, Math.floor((y - r.y) / (r.h / 3))));
+  const order = FXL_REGION_ORDERS[state.fxlRegionOrder] || FXL_REGION_ORDERS.story;
+  for (let i=0; i<6; i++) {
+    let oc = order[i][0], orr = order[i][1];
+    if (state.fxlLtrAutoFlip && state.fxlPpd === 'ltr') oc = 1 - oc;
+    if (oc === col && orr === row) return i;
+  }
+  return 0;
+}
 
 // ══════════════════════════════════════════
 //  Navigation
@@ -2593,7 +3096,8 @@ function scrollPage(direction) {
     try { document.activeElement.blur(); } catch(e) {}
   }
   if (state.renderMode === 'fxl') {
-    advanceFxlPage(direction);
+    if (state.fxlZoomEnabled) advanceFxlZoomStep(direction);
+    else advanceFxlPage(direction);
     return;
   }
   const iframe = document.getElementById('content-iframe');
@@ -2749,6 +3253,21 @@ function updatePageInfo() {
 // ══════════════════════════════════════════
 document.addEventListener('keydown', e => {
   if (e.target.tagName === 'SELECT' || e.target.tagName === 'INPUT') return;
+  // FXL ズーム専用ショートカット（z / 0 / 1-6 / Escape）
+  if (state.renderMode === 'fxl') {
+    if (e.key === 'z' || e.key === 'Z') {
+      toggleFxlZoom(); e.preventDefault(); return;
+    }
+    if (state.fxlZoomEnabled) {
+      if (e.key === '0') { disableFxlZoom(); e.preventDefault(); return; }
+      if (e.key === 'Escape') { disableFxlZoom(); e.preventDefault(); return; }
+      if (/^[1-6]$/.test(e.key)) {
+        state.fxlZoom.regionIdx = parseInt(e.key, 10) - 1;
+        applyFxlRegionPreset();
+        e.preventDefault(); return;
+      }
+    }
+  }
   switch(e.key) {
     case ' ':
       e.shiftKey ? scrollPage(-1) : scrollPage(1);
@@ -2797,6 +3316,9 @@ function saveSettings() {
       fwdBtnSize:    state.fwdBtnSize,
       driveAutoSave: state.driveAutoSave,
       spreadMode:    state.spreadMode,
+      fxlZoomLevel:  state.fxlZoomLevel,
+      fxlRegionOrder:state.fxlRegionOrder,
+      fxlLtrAutoFlip:state.fxlLtrAutoFlip,
     }));
   } catch(e) {
     notifyStorageError();
@@ -2816,6 +3338,19 @@ function loadSettings() {
     if (s.fwdBtnSize)            { state.fwdBtnSize = s.fwdBtnSize;     const el = document.getElementById('fwd-btn-size-select'); if(el) el.value = s.fwdBtnSize; applyFwdBtnSize(s.fwdBtnSize); }
     if (s.driveAutoSave !== undefined) { state.driveAutoSave = !!s.driveAutoSave; updateAutoSaveToggleUI(); }
     if (s.spreadMode)            { state.spreadMode = s.spreadMode;     const el = document.getElementById('spread-mode-select'); if(el) el.value = s.spreadMode; }
+    if (typeof s.fxlZoomLevel === 'number' && [1.5, 2.0, 2.5].indexOf(s.fxlZoomLevel) >= 0) {
+      state.fxlZoomLevel = s.fxlZoomLevel;
+      state.fxlZoom.level = s.fxlZoomLevel;
+      const el = document.getElementById('fxl-zoom-level-select'); if(el) el.value = String(s.fxlZoomLevel.toFixed(1));
+    }
+    if (s.fxlRegionOrder === 'story' || s.fxlRegionOrder === 'yonkoma') {
+      state.fxlRegionOrder = s.fxlRegionOrder;
+      const el = document.getElementById('fxl-region-order-select'); if(el) el.value = s.fxlRegionOrder;
+    }
+    if (typeof s.fxlLtrAutoFlip === 'boolean') {
+      state.fxlLtrAutoFlip = s.fxlLtrAutoFlip;
+      if (typeof updateFxlLtrAutoFlipUI === 'function') updateFxlLtrAutoFlipUI();
+    }
   } catch(e) { console.warn("Failed to load settings fully:", e); }
 }
 
@@ -3240,6 +3775,39 @@ function changeSpreadMode(v) {
   }
 }
 
+// FXL ズーム倍率 / 領域順 / LTR 反転 の設定ハンドラ
+function changeFxlZoomLevel(v) {
+  const lv = parseFloat(v);
+  if (!(lv >= 1.5 && lv <= 2.5)) return;
+  state.fxlZoomLevel = lv;
+  saveSettings();
+  if (state.fxlZoomEnabled) {
+    state.fxlZoom.level = lv;
+    applyFxlRegionPreset();
+  }
+}
+function changeFxlRegionOrder(v) {
+  if (v !== 'story' && v !== 'yonkoma') return;
+  state.fxlRegionOrder = v;
+  saveSettings();
+  if (state.fxlZoomEnabled) applyFxlRegionPreset();
+}
+function toggleFxlLtrAutoFlip() {
+  state.fxlLtrAutoFlip = !state.fxlLtrAutoFlip;
+  saveSettings();
+  updateFxlLtrAutoFlipUI();
+  if (state.fxlZoomEnabled) applyFxlRegionPreset();
+}
+function updateFxlLtrAutoFlipUI() {
+  const btn = document.getElementById('fxl-ltr-flip-toggle');
+  if (!btn) return;
+  const on = !!state.fxlLtrAutoFlip;
+  btn.textContent = on ? 'ON' : 'OFF';
+  btn.style.background = on ? 'var(--accent)' : '';
+  btn.style.color      = on ? '#fff' : '';
+  btn.style.borderColor = on ? 'var(--accent)' : 'var(--ui-border)';
+}
+
 // ══════════════════════════════════════════
 //  File System Handle — IndexedDB helpers
 //  Chrome/Edge の File System Access API でハンドルを永続化する。
@@ -3511,7 +4079,10 @@ function closeBook() {
   state.renderMode = 'reflow'; state.fxlPpd = 'ltr';
   state.fxlPairs = null; state.currentPairIdx = 0;
   revokeAllFxlBlobs();
-  document.body.classList.remove('mode-fxl');
+  // FXL ズーム状態クリア
+  state.fxlZoomEnabled = false;
+  resetFxlZoom();
+  document.body.classList.remove('mode-fxl', 'fxl-zoomed');
   _fxlLastSpreadState = null;
   _intraChapterRatio = 0;
   _originalBookmark = null; _jumpHistory = []; _bookFinished = false;
@@ -4155,6 +4726,7 @@ initLang();
 applyI18n();
 document.getElementById('toc-btn').classList.add('active');
 loadSettings();
+updateFxlLtrAutoFlipUI();
 showResumeBanner();
 updateThemeBtnUI();
 loadPreviewFonts();
