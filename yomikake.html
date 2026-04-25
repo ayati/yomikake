@@ -358,6 +358,16 @@
   #file-input { display:none; }
   #toast { position:fixed; top:72px; left:50%; transform:translateX(-50%) translateY(-10px); background:var(--text); color:var(--bg); padding:10px 24px; border-radius:24px; font-size:13px; font-weight:500; z-index:300; opacity:0; visibility:hidden; transition:all .3s cubic-bezier(0.16,1,0.3,1); pointer-events:none; white-space:nowrap; box-shadow:0 8px 24px rgba(0,0,0,0.15); }
   #toast.show { opacity:1; visibility:visible; transform:translateX(-50%) translateY(0); }
+
+  #loading-overlay { position:fixed; inset:0; background:rgba(0,0,0,.45); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); z-index:250; display:none; align-items:center; justify-content:center; opacity:0; transition:opacity .2s; }
+  #loading-overlay.show { display:flex; opacity:1; }
+  #loading-box { background:var(--ui-bg); border:1px solid var(--ui-border); border-radius:16px; padding:28px 32px; min-width:260px; max-width:88vw; color:var(--ui-text); box-shadow:0 16px 48px rgba(0,0,0,.3); display:flex; flex-direction:column; align-items:center; gap:14px; }
+  #loading-spinner { width:40px; height:40px; border:3px solid var(--ui-border); border-top-color:var(--accent); border-radius:50%; animation:loading-spin .9s linear infinite; }
+  @keyframes loading-spin { to { transform:rotate(360deg); } }
+  #loading-file-msg { font-size:14px; font-weight:500; color:var(--ui-text); max-width:280px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:center; }
+  #loading-file-msg:empty { display:none; }
+  #loading-stage { font-size:14px; font-weight:500; min-height:20px; text-align:center; opacity:.85; }
+  #loading-file { font-size:12px; opacity:.65; max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:center; font-variant-numeric:tabular-nums; }
   
   ::-webkit-scrollbar { width:8px; height:8px; }
   ::-webkit-scrollbar-track { background:transparent; }
@@ -746,6 +756,15 @@
 
 <div id="toast"></div>
 
+<div id="loading-overlay">
+  <div id="loading-box">
+    <div id="loading-file-msg"></div>
+    <div id="loading-spinner"></div>
+    <div id="loading-stage" data-i18n="loading.unzipping">📦 ePubを展開中…</div>
+    <div id="loading-file"></div>
+  </div>
+</div>
+
 <div id="modal-overlay">
   <div id="modal-box">
     <h3 id="modal-title">操作ガイド</h3>
@@ -868,6 +887,11 @@ const I18N = {
     'help.chapters':        'チャプター数：{n}',
     'help.tocItems':        '目次項目数：{n}',
     'help.body':            '<p><strong>📜 ページスクロール（主操作）</strong></p><p>　スペースキー：1画面分 前進スクロール</p><p>　Shift+スペース：1画面分 後退スクロール</p><p>　↓ / PageDown：前進スクロール</p><p>　↑ / PageUp：後退スクロール</p><p>　画面下「次へ↓」・上「↑前へ」ボタン</p><p>　※章末尾/先頭で自動的に章移動</p><br><p><strong>📖 章切り替え（リフロー型のみ）</strong></p><p>　← キー：次の章　　→ キー：前の章</p><p>　Home：最初の章　　End：最後の章</p><br><p><strong>🎯 ページジャンプ（サイドバー）</strong></p><p>　サイドバー（☰ 目次ボタン）最上部の「ジャンプ」パネル</p><p>　スライダー：ドラッグで任意位置にプレビュー＆ジャンプ</p><p>　📖 表紙 / -10 / +10 / 🏁 末尾 の4ボタン</p><p>　ページ番号（リフロー型は章番号）を入力して Go または Enter</p><p>　ジャンプ前の位置は自動的にジャンプ履歴（↩）に記録され、タップで戻れます</p><br><p><strong>🖼️ マンガ・雑誌モード（FXL / Fixed Layout）</strong></p><p>　pre-paginated 指定の ePub を自動検出し、画像1枚/ページ を画面内フィット表示</p><p>　PC/タブレット横長画面では2ページ見開き自動表示</p><p>　組方向・フォント等は無効化、代わりに⚙設定の「見開き表示」で自動/単ページ/見開きを切替</p><p>　マンガ（RTL）は右ページから順に表示、見開き時は中央で隣接</p><p>　スマホでは☰ボタン→ジャンプパネルで表紙・末尾・任意ページへ遷移</p><br><p><strong>🔍 コマ読みズーム（FXLのみ）</strong></p><p>　ツールバー🔍ボタン または ダブルタップ で ON、もう一度で OFF。キーボード <code>z</code> でもトグル</p><p>　1ページを 2列×3行=6領域 に分け、Nextボタン/下エリアタップ で順次遷移（5タップで1ページ読了→次ページ1領域目へ）</p><p>　遷移順は⚙設定「領域順」：<b>ストーリー</b>=右上→左上→右中→左中→右下→左下、<b>4コマ</b>=右列3個→左列3個</p><p>　LTR書籍（洋書）は自動で左右反転（⚙設定「LTR書籍で反転」でOFFにも可能）</p><p>　ズーム中の任意ドラッグで自由パン（🌀自由モード）へ移行。右下の領域ピル🎯/🌀をタップで復帰/次領域へ</p><p>　ズーム中に画面端からさらに読み進み方向へ引っ張る（ラバーバンド）と次/前ページへ一気にジャンプ</p><p>　キーボード <code>1</code>～<code>6</code> で領域直接指定、<code>0</code>/<code>Esc</code> で解除、<code>Space</code>/<code>↑↓</code> で順次遷移</p><p>　⚙設定「拡大倍率」：1.5x / 2.0x / 2.5x 選択</p><br><p><strong>🔍 全文検索（リフロー型のみ）</strong></p><p>　サイドバー（目次ボタン）→「検索」タブにキーワードを入力して Enter</p><p>　章タイトルと一致箇所のスニペットを表示。クリックでその章に移動（ジャンプ履歴にも記録）</p><p>　画像形式の本（FXL）では全文検索は利用できません</p><br><p><strong>🎨 表示設定（⚙アイコン）</strong></p><p>　フォント：22種（游明朝・ゴシック・Google Fonts など）※リフロー型のみ</p><p>　テーマ：8色（標準・セピア・白紙・ダーク・さくら・星空・抹茶・月夜）</p><p>　文字サイズ・行間・余白・書字方向 ※リフロー型のみ</p><p>　見開き表示（FXL時のみ）：自動 / 単ページ / 見開き</p><br><p><strong>🔖 しおり・ジャンプ履歴</strong></p><p>　読み位置は自動記録。サイドバーの目次タブでジャンプ履歴と元の位置に戻れます</p><p>　📥 ローカル読込：PCに保存した .json ファイルからしおりを読み込む</p><p>　📤 ローカル書出：しおりを .json ファイルとしてPCに書き出す</p><p>　☁↓ Drive読込：Google Driveからしおりを読み込む（ローカルを上書き）</p><p>　☁↑ Drive保存：しおりをGoogle Driveに保存する（複数デバイス間で共有可能）</p><p style="font-size:12px;opacity:.6;">　※ Drive機能はHTTPサーバー経由の起動とGoogle Client IDの設定が必要です</p><br><p><strong>📚 読みかけリスト</strong></p><p>　本を開いていないとき、ウェルカム画面に読みかけの本を一覧表示します</p><p>　各カードに表紙・タイトル・著者名・進捗バー・最終閲覧日を表示</p><p>　カード右下「このファイルを開く」でファイルを選ぶと前回の続きから自動再開</p><p>　最終章の末尾まで読み進めると画面下部に読了バナーが表示されます</p><p>　「読みかけリストへ」：本を閉じてリストへ戻る。読了済みとしてリストから自動除外</p><p>　「閉じない」：バナーを閉じてそのまま読み続けられます</p><p>　⚙ 設定パネル末尾「本を閉じる」でいつでもリストへ戻れます（読み位置を自動保存）</p><p>　リスト右上「編集」ボタンで編集モードに切り替え、各カードの × で削除できます</p><br><p><strong>⬛ フルスクリーン</strong></p><p>　f キー（またはツールバーボタン）でUI非表示・全画面読書モード。Esc または上端タップで解除</p><br><p><strong>ファイル形式</strong></p><p>　.epub / .kepub（Kobo）対応。リフロー型・固定レイアウト型（マンガ・雑誌）どちらも自動判別</p>',
+    'loading.fetching':     '📂 ファイルを取得しています…',
+    'loading.opening':      '「{filename}」を開いています…',
+    'loading.unzipping':    '📦 ePubを展開中…',
+    'loading.parsing':      '📖 目次を構築中…',
+    'loading.rendering':    '🎨 表示を準備中…',
     'toast.webFontFile':    '☁ ウェブフォントはオフラインまたはfile://環境で表示されない場合があります',
     'toast.resume':         '📖 前回の続きから再開（{n} / {total}章）',
     'toast.fileMissing':    '⚠️ ファイルが見つかりません: {path}',
@@ -1021,6 +1045,11 @@ const I18N = {
     'help.chapters':        'Chapters: {n}',
     'help.tocItems':        'TOC items: {n}',
     'help.body':            '<p><strong>📜 Page scroll (main operation)</strong></p><p>&nbsp;Space: scroll forward one page</p><p>&nbsp;Shift+Space: scroll back one page</p><p>&nbsp;↓ / PageDown: scroll forward</p><p>&nbsp;↑ / PageUp: scroll back</p><p>&nbsp;"Next ↓" button (bottom) / "↑ Prev" button (top)</p><p>&nbsp;※ Automatically advances chapter at boundaries</p><br><p><strong>📖 Chapter navigation (reflow only)</strong></p><p>&nbsp;← key: next chapter　　→ key: previous chapter</p><p>&nbsp;Home: first chapter　　End: last chapter</p><br><p><strong>🎯 Page Jump (sidebar)</strong></p><p>&nbsp;Jump panel at the top of the sidebar (☰ Contents button)</p><p>&nbsp;Slider: drag to preview, release to jump to any page</p><p>&nbsp;📖 Cover / -10 / +10 / 🏁 End buttons</p><p>&nbsp;Type a page number (or chapter # in reflow mode) and tap Go or press Enter</p><p>&nbsp;Previous position is saved to jump history (↩) automatically; tap to return</p><br><p><strong>🖼️ Manga / Magazine mode (FXL / Fixed Layout)</strong></p><p>&nbsp;Auto-detects pre-paginated ePubs; displays one image per page, fit to screen</p><p>&nbsp;Landscape screens show two-page spreads automatically</p><p>&nbsp;Writing mode & font settings are disabled; use "Spread layout" in ⚙ settings (Auto / Single / Two-page)</p><p>&nbsp;Manga (RTL) displays the right page first; spread pairs are adjacent at the center</p><p>&nbsp;On smartphones, use the sidebar jump panel to navigate to cover / end / any page</p><br><p><strong>🔍 Panel zoom (FXL only)</strong></p><p>&nbsp;Toggle with the 🔍 toolbar button, double-tap the page, or press <code>z</code>.</p><p>&nbsp;Each page is split into 2 columns × 3 rows (6 regions). Tap Next to step through the regions (5 steps per page, then moves to region 1 of the next page).</p><p>&nbsp;Order is configurable in ⚙ Settings "Region order": <b>Story</b> = TR→TL→MR→ML→BR→BL, <b>4-panel</b> = right column 3 → left column 3.</p><p>&nbsp;LTR books are auto-mirrored. You can disable this via "Flip for LTR books".</p><p>&nbsp;Drag anywhere to switch to free pan (🌀). Tap the bottom-right pill (🎯/🌀) to snap back to a preset or step to next region.</p><p>&nbsp;While zoomed, keep dragging past the edge ("rubber band") to jump to the next/prev page.</p><p>&nbsp;Keyboard: <code>1</code>-<code>6</code> jumps to region, <code>0</code>/<code>Esc</code> exits, <code>Space</code>/<code>↑↓</code> steps.</p><p>&nbsp;⚙ Settings "Zoom level": 1.5x / 2.0x / 2.5x.</p><br><p><strong>🔍 Full-text search (reflow only)</strong></p><p>&nbsp;Open sidebar (Contents button) → "Search" tab, type a keyword and press Enter</p><p>&nbsp;Click a result to jump to that chapter (also recorded in jump history)</p><p>&nbsp;Image-based books (FXL) do not support full-text search</p><br><p><strong>🎨 Display settings (⚙ icon)</strong></p><p>&nbsp;Font: 22 options (Mincho, Gothic, Google Fonts, etc.) — reflow only</p><p>&nbsp;Theme: 8 colors (Standard, Sepia, White, Dark, Sakura, Starry Night, Matcha, Moonlit)</p><p>&nbsp;Font size, line height, margin, and writing mode — reflow only</p><p>&nbsp;Spread layout (FXL only): Auto / Single page / Two-page</p><br><p><strong>🔖 Bookmarks &amp; jump history</strong></p><p>&nbsp;Reading position is saved automatically. Sidebar TOC tab shows jump history.</p><p>&nbsp;📥 Local import: Load bookmarks from a saved .json file on your device</p><p>&nbsp;📤 Local export: Download bookmarks as a .json file to your device</p><p>&nbsp;☁↓ Drive load: Load bookmarks from Google Drive (overwrites local data)</p><p>&nbsp;☁↑ Drive save: Save bookmarks to Google Drive (share across devices)</p><p style="font-size:12px;opacity:.6;">&nbsp;※ Drive features require an HTTP server and Google Client ID configuration</p><br><p><strong>📚 Reading list</strong></p><p>&nbsp;When no book is open, the welcome screen shows a list of books in progress</p><p>&nbsp;Each card shows the cover, title, author, progress bar, and last read date</p><p>&nbsp;Tap "Open this file" on a card to pick the file and resume where you left off</p><p>&nbsp;When you reach the end of the last chapter, a "Finished" banner appears</p><p>&nbsp;"Back to reading list": close the book and return to the list (marked as completed)</p><p>&nbsp;"Stay": dismiss the banner and keep reading</p><p>&nbsp;"Close book" at the bottom of ⚙ Settings closes the book anytime (position is saved)</p><p>&nbsp;Tap "Edit" (top right of list) to enter edit mode; tap × on a card to remove it from the list</p><br><p><strong>⬛ Fullscreen</strong></p><p>&nbsp;Press f (or toolbar button) to hide UI and read fullscreen. Press Esc or tap top edge to exit.</p><br><p><strong>File formats</strong></p><p>&nbsp;.epub / .kepub (Kobo) supported. Both reflowable and fixed-layout (manga / magazine) books are auto-detected</p>',
+    'loading.fetching':     '📂 Fetching file…',
+    'loading.opening':      'Opening "{filename}"…',
+    'loading.unzipping':    '📦 Unzipping ePub…',
+    'loading.parsing':      '📖 Building table of contents…',
+    'loading.rendering':    '🎨 Preparing display…',
     'toast.webFontFile':    '☁ Web fonts may not display in offline or file:// environments',
     'toast.resume':         '📖 Resumed from chapter {n} of {total}',
     'toast.fileMissing':    '⚠️ File not found: {path}',
@@ -1174,6 +1203,11 @@ const I18N = {
     'help.chapters':        '章節數：{n}',
     'help.tocItems':        '目錄項目數：{n}',
     'help.body':            '<p><strong>📜 頁面捲動（主要操作）</strong></p><p>　空白鍵：前進一頁</p><p>　Shift+空白：後退一頁</p><p>　↓ / PageDown：前進捲動</p><p>　↑ / PageUp：後退捲動</p><p>　畫面下方「下一頁↓」・上方「↑上一頁」按鈕</p><p>　※章節末尾/開頭時自動切換章節</p><br><p><strong>📖 章節切換（僅限流式排版）</strong></p><p>　← 鍵：下一章　　→ 鍵：上一章</p><p>　Home：第一章　　End：最後一章</p><br><p><strong>🎯 頁面跳轉（側邊欄）</strong></p><p>　側邊欄（☰ 目錄按鈕）最上方的「跳轉」面板</p><p>　滑桿：拖曳預覽並跳至任意位置</p><p>　📖 封面 / -10 / +10 / 🏁 末頁 四個按鈕</p><p>　輸入頁碼（流式排版為章節號）後按 Go 或 Enter</p><p>　跳轉前位置自動記錄於跳轉歷史（↩），點選即可返回</p><br><p><strong>🖼️ 漫畫・雜誌模式（FXL / Fixed Layout）</strong></p><p>　自動偵測 pre-paginated ePub，每頁單張圖片等比縮放顯示</p><p>　橫向畫面自動顯示跨頁（兩頁並排）</p><p>　書寫方向・字型等設定停用，改以⚙設定「跨頁顯示」切換自動/單頁/跨頁</p><p>　漫畫（RTL）依右頁起始顯示，跨頁時於畫面中央相鄰</p><p>　手機可透過☰按鈕→跳轉面板瀏覽封面・末頁・任意頁</p><br><p><strong>🔍 分格閱讀縮放（僅 FXL）</strong></p><p>　工具列🔍按鈕 或 雙擊頁面 即可開啟／關閉，鍵盤 <code>z</code> 亦可切換</p><p>　單頁劃分為 2欄×3列=6個區域，Next 按鈕逐個切換（5次到達下一頁第1區域）</p><p>　順序於⚙設定「區域順序」選擇：<b>故事型</b>=右上→左上→右中→左中→右下→左下，<b>四格</b>=右欄3個→左欄3個</p><p>　LTR 書籍會自動左右反轉（可於⚙設定「LTR 書籍左右反轉」關閉）</p><p>　任意拖曳進入🌀自由模式，右下區域膠囊🎯/🌀點擊可回到預設/下個區域</p><p>　縮放中邊緣再拉（橡皮筋手勢）可跳至下一／前一頁</p><p>　鍵盤 <code>1</code>～<code>6</code> 直接跳區域，<code>0</code>/<code>Esc</code> 解除，<code>Space</code>/<code>↑↓</code> 逐個切換</p><p>　⚙設定「縮放倍率」：1.5x / 2.0x / 2.5x</p><br><p><strong>🔍 全文搜尋（僅限流式排版）</strong></p><p>　側邊欄（目錄按鈕）→「搜尋」索引標籤，輸入關鍵字後按 Enter</p><p>　點擊結果即可跳轉至該章（同時記錄於跳轉歷史）</p><p>　圖片格式書籍（FXL）無法使用全文搜尋</p><br><p><strong>🎨 顯示設定（⚙圖示）</strong></p><p>　字型：22 種（明朝體・黑體・Google Fonts 等）※僅限流式排版</p><p>　主題：8 色（標準・棕褐・白紙・暗色・櫻花・星空・抹茶・月夜）</p><p>　字型大小・行距・邊距・書寫方向 ※僅限流式排版</p><p>　跨頁顯示（僅 FXL）：自動 / 單頁 / 跨頁</p><br><p><strong>🔖 書籤・跳轉歷史</strong></p><p>　閱讀位置自動記錄。側邊欄目錄索引標籤可查看跳轉歷史</p><p>　📥 本機匯入：從已儲存的 .json 檔案載入書籤</p><p>　📤 本機匯出：將書籤下載為 .json 檔案</p><p>　☁↓ 從 Drive 載入：從 Google Drive 載入書籤（覆蓋本機資料）</p><p>　☁↑ 儲存至 Drive：將書籤儲存至 Google Drive（可跨裝置共用）</p><p style="font-size:12px;opacity:.6;">　※ Drive 功能需透過 HTTP 伺服器啟動並設定 Google Client ID</p><br><p><strong>📚 閱讀中清單</strong></p><p>　未開啟書籍時，歡迎畫面顯示正在閱讀的書籍清單</p><p>　書卡顯示封面、書名、作者、進度列及最後閱讀日期</p><p>　點選書卡右下角「開啟此檔案」，選擇檔案後從上次位置繼續閱讀</p><p>　讀到最後一章末尾時，畫面下方會出現讀完提示橫幅</p><p>　「回到閱讀清單」：關閉書籍並返回清單（標記為已讀完並自動移除）</p><p>　「繼續閱讀」：關閉橫幅，繼續閱讀</p><p>　⚙ 設定面板底部的「關閉書籍」可隨時返回清單（自動儲存閱讀位置）</p><p>　點選清單右上角「編輯」進入編輯模式，點選書卡 × 可從清單移除</p><br><p><strong>⬛ 全螢幕</strong></p><p>　按 f 鍵（或工具列按鈕）隱藏 UI 全螢幕閱讀。按 Esc 或點選上緣退出</p><br><p><strong>支援格式</strong></p><p>　.epub / .kepub（Kobo）。流式排版與固定版式（漫畫・雜誌）均自動偵測</p>',
+    'loading.fetching':     '📂 正在取得檔案…',
+    'loading.opening':      '正在開啟「{filename}」…',
+    'loading.unzipping':    '📦 正在解壓 ePub…',
+    'loading.parsing':      '📖 正在建立目錄…',
+    'loading.rendering':    '🎨 正在準備顯示…',
     'toast.webFontFile':    '☁ 離線或 file:// 環境下，網路字型可能無法顯示',
     'toast.resume':         '📖 從第 {n} 章（共 {total} 章）繼續閱讀',
     'toast.fileMissing':    '⚠️ 找不到檔案：{path}',
@@ -1327,6 +1361,11 @@ const I18N = {
     'help.chapters':        '章节数：{n}',
     'help.tocItems':        '目录项目数：{n}',
     'help.body':            '<p><strong>📜 页面滚动（主要操作）</strong></p><p>　空格键：前进一页</p><p>　Shift+空格：后退一页</p><p>　↓ / PageDown：向前滚动</p><p>　↑ / PageUp：向后滚动</p><p>　画面下方「前进↓」・上方「↑后退」按钮</p><p>　※章节末尾/开头时自动切换章节</p><br><p><strong>📖 章节切换（仅限流式排版）</strong></p><p>　← 键：下一章　　→ 键：上一章</p><p>　Home：第一章　　End：最后一章</p><br><p><strong>🎯 页面跳转（侧边栏）</strong></p><p>　侧边栏（☰ 目录按钮）最上方的「跳转」面板</p><p>　滑块：拖动预览并跳至任意位置</p><p>　📖 封面 / -10 / +10 / 🏁 末页 四个按钮</p><p>　输入页码（流式排版为章节号）后按 Go 或 Enter</p><p>　跳转前位置自动记录于跳转历史（↩），点击即可返回</p><br><p><strong>🖼️ 漫画・杂志模式（FXL / Fixed Layout）</strong></p><p>　自动检测 pre-paginated ePub，每页单张图片等比缩放显示</p><p>　横向画面自动显示跨页（两页并排）</p><p>　书写方向・字体等设置停用，改以⚙设置「跨页显示」切换自动/单页/跨页</p><p>　漫画（RTL）依右页起始显示，跨页时于画面中央相邻</p><p>　手机可通过☰按钮→跳转面板浏览封面・末页・任意页</p><br><p><strong>🔍 分格阅读缩放（仅 FXL）</strong></p><p>　工具栏🔍按钮 或 双击页面 开启/关闭，键盘 <code>z</code> 也可切换</p><p>　单页划分为 2列×3行=6个区域，Next 按钮逐个切换（5次到达下一页第1区域）</p><p>　顺序于⚙设置「区域顺序」选择：<b>故事型</b>=右上→左上→右中→左中→右下→左下，<b>四格</b>=右列3个→左列3个</p><p>　LTR 书籍会自动左右反转（可于⚙设置「LTR 书籍左右反转」关闭）</p><p>　任意拖动进入🌀自由模式，右下区域胶囊🎯/🌀点击可回到预设/下个区域</p><p>　缩放中边缘再拉（橡皮筋手势）可跳至下一／前一页</p><p>　键盘 <code>1</code>～<code>6</code> 直接跳区域，<code>0</code>/<code>Esc</code> 解除，<code>Space</code>/<code>↑↓</code> 逐个切换</p><p>　⚙设置「缩放倍率」：1.5x / 2.0x / 2.5x</p><br><p><strong>🔍 全文搜索（仅限流式排版）</strong></p><p>　侧边栏（目录按钮）→「搜索」选项卡，输入关键词后按 Enter</p><p>　点击结果即可跳转至该章（同时记录于跳转历史）</p><p>　图片格式书籍（FXL）无法使用全文搜索</p><br><p><strong>🎨 显示设置（⚙图标）</strong></p><p>　字体：22 种（明朝体・黑体・Google Fonts 等）※仅限流式排版</p><p>　主题：8 色（标准・棕褐・白纸・深色・樱花・星空・抹茶・月夜）</p><p>　字体大小・行距・边距・书写方向 ※仅限流式排版</p><p>　跨页显示（仅 FXL）：自动 / 单页 / 跨页</p><br><p><strong>🔖 书签・跳转历史</strong></p><p>　阅读位置自动记录。侧边栏目录选项卡可查看跳转历史</p><p>　📥 本地导入：从已保存的 .json 文件加载书签</p><p>　📤 本地导出：将书签下载为 .json 文件</p><p>　☁↓ 从 Drive 加载：从 Google Drive 加载书签（覆盖本地数据）</p><p>　☁↑ 保存至 Drive：将书签保存至 Google Drive（可跨设备共用）</p><p style="font-size:12px;opacity:.6;">　※ Drive 功能需通过 HTTP 服务器启动并配置 Google Client ID</p><br><p><strong>📚 阅读中列表</strong></p><p>　未打开书籍时，欢迎页面显示正在阅读的书籍列表</p><p>　书卡显示封面、书名、作者、进度条及最后阅读日期</p><p>　点击书卡右下角「打开此文件」，选择文件后从上次位置继续阅读</p><p>　读到最后一章末尾时，画面下方会出现读完提示横幅</p><p>　「回到阅读列表」：关闭书籍并返回列表（标记为已读完并自动移除）</p><p>　「继续阅读」：关闭横幅，继续阅读</p><p>　⚙ 设置面板底部的「关闭书籍」可随时返回列表（自动保存阅读位置）</p><p>　点击列表右上角「编辑」进入编辑模式，点击书卡 × 可从列表中删除</p><br><p><strong>⬛ 全屏</strong></p><p>　按 f 键（或工具栏按钮）隐藏 UI 全屏阅读。按 Esc 或点击顶部退出</p><br><p><strong>支持格式</strong></p><p>　.epub / .kepub（Kobo）。流式排版与固定版式（漫画・杂志）均自动检测</p>',
+    'loading.fetching':     '📂 正在获取文件…',
+    'loading.opening':      '正在打开「{filename}」…',
+    'loading.unzipping':    '📦 正在解压 ePub…',
+    'loading.parsing':      '📖 正在建立目录…',
+    'loading.rendering':    '🎨 正在准备显示…',
     'toast.webFontFile':    '☁ 离线或 file:// 环境下，网络字体可能无法显示',
     'toast.resume':         '📖 从第 {n} 章（共 {total} 章）继续阅读',
     'toast.fileMissing':    '⚠️ 找不到文件：{path}',
@@ -1636,7 +1675,12 @@ const FONT_SAMPLE = {
 // ══════════════════════════════════════════
 document.getElementById('file-input').addEventListener('change', e => {
   if (e.target.files[0]) loadEpub(e.target.files[0]);
+  else hideLoading();
   e.target.value = '';
+});
+// ピッカーキャンセル時の overlay 消去（Chrome 113+ / Safari 16.4+ / Firefox 91+）
+document.getElementById('file-input').addEventListener('cancel', () => {
+  hideLoading();
 });
 document.body.addEventListener('dragover', e => {
   e.preventDefault();
@@ -1662,9 +1706,15 @@ document.body.addEventListener('drop', async e => {
 });
 
 async function loadEpub(file, fileHandle = null) {
+  if (file) {
+    showLoading(file.name, file.size);
+    // ブラウザがオーバーレイを描画する猶予を与えてから重い処理に入る
+    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+  }
   try {
     const zip = await JSZip.loadAsync(file);
     state.epub = zip;
+    updateLoadingStage('loading.parsing');
 
     // container.xml → OPF path
     const containerEntry = zip.file('META-INF/container.xml');
@@ -1729,6 +1779,11 @@ async function loadEpub(file, fileHandle = null) {
     document.body.classList.remove('fxl-zoomed');
     updateFxlNextBtnUI();
     updateFxlRegionPillUI();
+    // 前の本の FXL ページ画像キャッシュを破棄。spineIdx をキーにしているため、
+    // クリアしないと新しい本の同じ spineIdx 要求時に旧本の URL が返り、
+    // 新表紙が表示されない（imgA.src が同値で再代入され再描画が起きない）。
+    revokeAllFxlBlobs();
+    _fxlLastSpreadState = null;
 
     // TOC from nav doc
     state.toc = [];
@@ -1789,6 +1844,7 @@ async function loadEpub(file, fileHandle = null) {
       _originalBookmark = {spineIdx: saved.spineIdx, ratio: typeof saved.ratio === 'number' ? saved.ratio : 0};
     }
     updateJumpHistoryUI();
+    updateLoadingStage('loading.rendering');
     if (saved && saved.spineIdx > 0 && saved.spineIdx < state.spine.length) {
       if (state.sidebarOpen) toggleSidebar();
       await renderPage(saved.spineIdx, typeof saved.ratio === 'number' ? saved.ratio : 'start');
@@ -1802,6 +1858,8 @@ async function loadEpub(file, fileHandle = null) {
   } catch(err) {
     alert(t('err.loadFailed', {msg: err.message}));
     console.error(err);
+  } finally {
+    hideLoading();
   }
 }
 
@@ -3868,6 +3926,7 @@ if (window.showOpenFilePicker) {
 //  File Picker
 // ══════════════════════════════════════════
 async function openFilePicker() {
+  showLoadingPreSelect();
   if (window.showOpenFilePicker) {
     try {
       const [handle] = await window.showOpenFilePicker({
@@ -3876,6 +3935,7 @@ async function openFilePicker() {
       });
       await loadEpub(await handle.getFile(), handle);
     } catch (e) {
+      hideLoading();
       if (e.name !== 'AbortError') showToast(t('err.loadFailed', {msg: e.message}));
     }
   } else {
@@ -4028,6 +4088,7 @@ function doDeleteBook(bookKey) {
 }
 
 async function openFilePickerForBook(bookKey) {
+  showLoadingPreSelect();
   if (window.showOpenFilePicker && _handleKeys.has(bookKey)) {
     try {
       const handle = await fshGet(bookKey);
@@ -4045,6 +4106,7 @@ async function openFilePickerForBook(bookKey) {
       _handleKeys.delete(bookKey);
     }
   }
+  // openFilePicker() が再度 showLoadingPreSelect() を呼ぶが冪等。
   openFilePicker();
 }
 
@@ -4628,6 +4690,48 @@ function showToast(msg) {
   t.classList.add('show');
   clearTimeout(t._timer);
   t._timer = setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+// ══════════════════════════════════════════
+//  Loading overlay — ePub を開く際の進捗表示（クラウドDL中も含めて即時フィードバック）
+// ══════════════════════════════════════════
+let _loadingShown = false;
+function showLoading(filename, sizeBytes) {
+  _loadingShown = true;
+  const ov = document.getElementById('loading-overlay');
+  const msgEl = document.getElementById('loading-file-msg');
+  const fileEl = document.getElementById('loading-file');
+  if (msgEl) msgEl.textContent = filename ? t('loading.opening', {filename}) : '';
+  if (fileEl) {
+    const mb = (sizeBytes / (1024 * 1024)).toFixed(1);
+    fileEl.textContent = `${mb} MB`;
+  }
+  updateLoadingStage('loading.unzipping');
+  ov.classList.add('show');
+}
+// ファイルピッカー起動直前に表示。File オブジェクトが渡される前（クラウド DL 中など）の
+// 体感ハングを防ぐ。change/cancel/AbortError で hideLoading() か、loadEpub の showLoading() に
+// 上書きされる。
+function showLoadingPreSelect() {
+  _loadingShown = true;
+  const ov = document.getElementById('loading-overlay');
+  const msgEl = document.getElementById('loading-file-msg');
+  const fileEl = document.getElementById('loading-file');
+  const stageEl = document.getElementById('loading-stage');
+  if (msgEl) msgEl.textContent = t('loading.fetching');
+  if (fileEl) fileEl.textContent = '';
+  if (stageEl) stageEl.textContent = '';
+  ov.classList.add('show');
+}
+function updateLoadingStage(stageKey) {
+  if (!_loadingShown) return;
+  const stageEl = document.getElementById('loading-stage');
+  if (stageEl) stageEl.textContent = t(stageKey);
+}
+function hideLoading() {
+  if (!_loadingShown) return;
+  _loadingShown = false;
+  document.getElementById('loading-overlay').classList.remove('show');
 }
 
 // ══════════════════════════════════════════

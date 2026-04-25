@@ -46,7 +46,7 @@ There are no automated tests. Manual testing requires a `.epub` or `.kepub` file
 Most features exist in both files. As a rule:
 - **`yomikake.html` only**: drag-and-drop, toolbar mouse-wheel scroll, `SHARED_TAIL` (Chrome `text-combine-upright` fix), `isNeg()` sign detection in horizontal/publisher scroll.
 - **`yomikake_ios.html` only**: CSS-transform scroll mechanism, touch swipe inside iframe, `CLICK_HANDLER` / `INIT_FN` template variables, double-rAF + 500ms `INIT_FN` timing, `will-change:transform` on body.
-- **Both files**: all other features — rendering pipeline, postMessage protocol, i18n, settings, bookmarks, Drive sync, fullscreen, progress bar, full-text search, sidebar tabs, `_renderSeq`, `_isRendering` / `_pendingScrollAfterRender`, `_bookFinished`, chapter-end blank page, `flashOverlay()`, `flashNavButtons()`, `showResumeBanner()`, `showFinishedBanner()`, `showToast()`, `toggleSidebar()`, `buildReadingList()`, `formatRelativeDate()`, `extractCoverThumb()`, `saveBookMeta()`, `closeBook()`, `openFilePickerForBook()`, FXL rendering (`renderFxlPair`, `buildFxlPairs`, `isEffectiveSpread`), **FXL コマ読みズーム** (`applyFxlZoom`, `applyFxlRegionPreset`, `clampFxlPan`, `getTargetPageRect`, `regionCellForIdx`, `resetFxlZoom`, `enableFxlZoom`/`disableFxlZoom`/`toggleFxlZoom`, `advanceFxlZoomStep`/`advanceFxlZoomSpine`, `handleFxlTap`, `regionIdxFromPoint`, `updateFxlNextBtnUI`, `updateFxlRegionPillUI`, `onFxlRegionPillClick`, `changeFxlZoomLevel`, `changeFxlRegionOrder`, `toggleFxlLtrAutoFlip`, `updateFxlLtrAutoFlipUI`, `FXL_REGION_ORDERS`).
+- **Both files**: all other features — rendering pipeline, postMessage protocol, i18n, settings, bookmarks, Drive sync, fullscreen, progress bar, full-text search, sidebar tabs, `_renderSeq`, `_isRendering` / `_pendingScrollAfterRender`, `_bookFinished`, chapter-end blank page, `flashOverlay()`, `flashNavButtons()`, `showResumeBanner()`, `showFinishedBanner()`, `showToast()`, `toggleSidebar()`, `buildReadingList()`, `formatRelativeDate()`, `extractCoverThumb()`, `saveBookMeta()`, `closeBook()`, `openFilePickerForBook()`, **Loading overlay** (`showLoading`, `showLoadingPreSelect`, `updateLoadingStage`, `hideLoading`, `_loadingShown`), FXL rendering (`renderFxlPair`, `buildFxlPairs`, `isEffectiveSpread`), **FXL コマ読みズーム** (`applyFxlZoom`, `applyFxlRegionPreset`, `clampFxlPan`, `getTargetPageRect`, `regionCellForIdx`, `resetFxlZoom`, `enableFxlZoom`/`disableFxlZoom`/`toggleFxlZoom`, `advanceFxlZoomStep`/`advanceFxlZoomSpine`, `handleFxlTap`, `regionIdxFromPoint`, `updateFxlNextBtnUI`, `updateFxlRegionPillUI`, `onFxlRegionPillClick`, `changeFxlZoomLevel`, `changeFxlRegionOrder`, `toggleFxlLtrAutoFlip`, `updateFxlLtrAutoFlipUI`, `FXL_REGION_ORDERS`).
 
 When fixing a bug or adding a feature that is not in the "only" lists above, apply the change to **both files**.
 
@@ -215,6 +215,20 @@ Bookmark key uses OPF title + spine count (not file path), so moving or renaming
 
 **読みかけリスト完読済み除外** — `buildReadingList()` は `val.spineIdx >= spineCount - 1 && (val.ratio || 0) > 0.9` の条件を満たすエントリをリストから除外する。`ratio=1.0` は `closeBook()` または EPUB_EDGE ハンドラで保存される。短い最終章（コンテンツが1画面に収まる `sw <= 2*vw`）では `doScroll` が `reportPos()` を呼ばずに即 `EPUB_EDGE` を発火するため `_intraChapterRatio=0` のまま。この問題を防ぐため `_bookFinished` フラグを使用する: `showFinishedBanner()` で `true` にセット → `closeBook()` で `_bookFinished ? 1.0 : _intraChapterRatio` を `savePos()` に渡す → `_bookFinished` をリセット。`loadEpub()` でも新しい本を開く際にリセットする。
 
+### Loading Overlay（ファイル取り込み待機表示）
+
+ePub を開く際の体感ハングを防ぐためのオーバーレイ。特に OneDrive/Google Drive 等のクラウド同期ファイル選択時、ピッカー閉鎖から `change` イベント発火までの数秒〜数十秒の DL 待ちが無音になる問題に対応する。`#loading-overlay` は `position:fixed; inset:0; z-index:250`（modal=200 と toast=300 の間）。レイアウト: 上から `#loading-file-msg`（ファイル名つきメッセージ）、`#loading-spinner`（CSS keyframe `loading-spin` で回転）、`#loading-stage`（処理段階テキスト）、`#loading-file`（サイズ表示）。
+
+- **`showLoadingPreSelect()`** — ファイルピッカー起動直前に呼ぶ。`#loading-file-msg` に `t('loading.fetching')` （「📂 ファイルを取得しています…」）を表示し、stage / size はクリア。`openFilePicker()` / `openFilePickerForBook()` 冒頭で必ず呼ばれる。`yomikake.html` の `showOpenFilePicker` API 経路と従来の `<input type="file">` 経路の両方で発動する。
+- **`showLoading(filename, sizeBytes)`** — `loadEpub()` 冒頭で呼ばれ、`#loading-file-msg` を `t('loading.opening', {filename})` （「『book.epub』を開いています…」）に上書き。stage は `loading.unzipping`、size は `(N.N MB)` を表示。`textContent` 経由でセットするため XSS 安全。
+- **`updateLoadingStage(key)`** — stage テキストのみ更新。`loadEpub` 内で `JSZip.loadAsync` 完了直後に `loading.parsing`、`renderPage` 直前に `loading.rendering` へ遷移。`_loadingShown` ガードあり。
+- **`hideLoading()`** — `_loadingShown` ガード後にクラス除去。`loadEpub` の `try/finally` で必ず呼ばれる。
+- **キャンセル検出** — `#file-input` に `cancel` イベントリスナー（Chrome 113+ / Safari 16.4+ / Firefox 91+ で標準）。`change` イベントもファイル無し時に `hideLoading()` 呼び出し。`showOpenFilePicker` の `AbortError` も catch して `hideLoading()`。
+- **double rAF** — `loadEpub` 冒頭で `await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))` を入れ、JSZip の重い同期処理に入る前にブラウザに描画機会を与える。
+- **i18n キー** — `loading.fetching` / `loading.opening` / `loading.unzipping` / `loading.parsing` / `loading.rendering`（4 言語分）。`loading.opening` は `{filename}` プレースホルダを持つ。
+- **しきい値なし** — 6MB 等のサイズ判定は撤廃。OneDrive 上の小ファイルでも DL 待ちが発生するため、すべてのファイル取り込みでオーバーレイを出す（PC のローカル小ファイルでは一瞬だけフラッシュするが許容）。
+- **古いブラウザの限界** — `cancel` イベント未対応のブラウザ（iOS Safari < 16.4 等）でユーザーがピッカーをキャンセルすると、オーバーレイが残る。トレードオフとして許容。
+
 ### FXL コマ読みズーム (Phase 3)
 
 固定レイアウト本（マンガ・雑誌）で 1 ページを 2 列 × 3 行 = 6 領域に分割し、Next ボタン連打で順次遷移しながら読むモード。iframe を使わない FXL の直接 DOM 配置を活かし、`#fxl-spread` に CSS `transform: translate()+scale()` を適用するだけの軽量実装。
@@ -235,6 +249,10 @@ Bookmark key uses OPF title + spine count (not file path), so moving or renaming
 - **見開き時のペア跨ぎ**: `advanceFxlZoomSpine()` は `pair.items.indexOf(state.currentSpineIdx)` で現 spine のペア内位置を取得し、同ペア内の移動なら `state.currentSpineIdx` 更新＋`applyFxlRegionPreset` のみ（再描画なし）。ペア境界越えは `renderFxlPair(targetSpine)` で末尾フック経由
 - **キーボード（デスクトップのみ）**: `z`=トグル、`1`-`6`=領域直接、`0`/`Escape`=OFF、`Space`/矢印は既存 `scrollPage` 経由で自動的に ZoomStep へ
 - **永続化しない理由**: ズーム状態（level/tx/ty/regionIdx/mode/enabled）は「本を開くたびに OFF で起動」する方が UX として自然なため、`epub_settings` / `epub_pos_*` / Drive 同期いずれにも入れない。永続するのは「拡大倍率」「領域順」「LTR 反転」の 3 設定のみ
+
+#### FXL Blob URL キャッシュと本切替
+
+`_fxlBlobCache` は `Map<spineIdx, objectURL>` で、`loadFxlPageBlobUrl()` が現在ペア＋前後 1 ペア分（最大 6 枚）の Blob URL を保持する。`renderFxlPair()` の末尾で `trimFxlBlobCache(keepIdxSet)` が範囲外を `URL.revokeObjectURL` する。**本を切り替える際は `loadEpub()` 内で必ず `revokeAllFxlBlobs()` を呼んでキャッシュを全クリアする** — `spineIdx` をキーにしているため、両書とも `spineIdx=0` の表紙が cache hit して旧本の URL が返り、新本の表紙が表示されないバグが起きる（`imgA.src` に同値を再代入してもブラウザは再描画しない）。`closeBook()` でも呼ぶが、本切替時は close を経由しないため両方必要。同タイミングで `_fxlLastSpreadState = null` もリセット。
 
 ### Jump History (セッション内しおり履歴)
 
