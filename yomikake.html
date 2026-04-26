@@ -612,6 +612,7 @@
           <option value="story" data-i18n="region.story">ストーリーまんが</option>
           <option value="yonkoma" data-i18n="region.yonkoma">4コマまんが</option>
           <option value="vfill" data-i18n="region.vfill">縦合わせ・横スクロール</option>
+          <option value="hfill" data-i18n="region.hfill">横合わせ・縦スクロール</option>
         </select>
       </div>
       <div class="set-row fxl-2d-only">
@@ -931,6 +932,7 @@ const I18N = {
     'region.story':              'ストーリーまんが',
     'region.yonkoma':            '4コマまんが',
     'region.vfill':              '縦合わせ・横スクロール',
+    'region.hfill':              '横合わせ・縦スクロール',
     'pill.free':                 '自由',
     'toast.zoomOn':              'ズーム ON',
     'toast.zoomOff':             'ズーム OFF',
@@ -1090,6 +1092,7 @@ const I18N = {
     'region.story':              'Story manga',
     'region.yonkoma':            '4-panel manga',
     'region.vfill':              'Fit height, scroll H',
+    'region.hfill':              'Fit width, scroll V',
     'pill.free':                 'Free',
     'toast.zoomOn':              'Zoom on',
     'toast.zoomOff':             'Zoom off',
@@ -1249,6 +1252,7 @@ const I18N = {
     'region.story':              '故事型漫畫',
     'region.yonkoma':            '四格漫畫',
     'region.vfill':              '配合高度・橫向捲動',
+    'region.hfill':              '配合寬度・縱向捲動',
     'pill.free':                 '自由',
     'toast.zoomOn':              '縮放開啟',
     'toast.zoomOff':             '縮放關閉',
@@ -1408,6 +1412,7 @@ const I18N = {
     'region.story':              '故事型漫画',
     'region.yonkoma':            '四格漫画',
     'region.vfill':              '适合高度·横向滚动',
+    'region.hfill':              '适合宽度·纵向滚动',
     'pill.free':                 '自由',
     'toast.zoomOn':              '缩放开启',
     'toast.zoomOff':             '缩放关闭',
@@ -2603,8 +2608,8 @@ function findPairIdxForSpine(spineIdx) {
 // 有効な見開き表示モード判定（auto の場合はアスペクト比で自動判定）
 function isEffectiveSpread() {
   if (state.renderMode !== 'fxl') return false;
-  // 軸モード（vfill）ズーム ON 中は単ページ強制（見開きでは vfill の意味が消える）
-  if (state.fxlZoomEnabled && state.fxlRegionOrder === 'vfill') return false;
+  // 軸モード（vfill / hfill）ズーム ON 中は単ページ強制（見開きでは軸モードの意味が消える）
+  if (state.fxlZoomEnabled && isFxlAxisMode()) return false;
   if (state.spreadMode === 'single') return false;
   if (state.spreadMode === 'spread') return true;
   // 'auto': 横長画面（幅 >= 高さ × 1.3）なら見開き
@@ -2706,6 +2711,11 @@ function clampFxlPan(tx, ty) {
     const dispWZ = (_fxlAxisCache.displayedW || 0) * L;
     maxX = Math.max(0, (dispWZ - W) / 2);
     maxY = 0;  // 高さは container 一致のため縦移動不可
+  } else if (state.fxlRegionOrder === 'hfill') {
+    // 横合わせ：画像表示高 = displayedH * L、はみ出し片側 = (displayedH*L - H)/2
+    const dispHZ = (_fxlAxisCache.displayedH || 0) * L;
+    maxX = 0;  // 幅は container 一致のため横移動不可
+    maxY = Math.max(0, (dispHZ - H) / 2);
   } else {
     // 既存：画像が container 全域に object-fit:contain でフィット → (L-1)*W/2
     maxX = Math.max(0, (L - 1) * W / 2);
@@ -2716,11 +2726,16 @@ function clampFxlPan(tx, ty) {
   return { tx:cx, ty:cy, excessX: tx - cx, excessY: ty - cy, maxX, maxY };
 }
 
+// 軸モード（vfill / hfill）の真偽判定。複数箇所で参照される共通ヘルパー
+function isFxlAxisMode() {
+  return state.fxlRegionOrder === 'vfill' || state.fxlRegionOrder === 'hfill';
+}
+
 // 現在モードのステップ最大 idx（regionIdx の上限）を返す。
-//   story/yonkoma → 5 （6領域）
-//   vfill         → _fxlAxisCache.n - 1（動的）
+//   story/yonkoma  → 5 （6領域）
+//   vfill / hfill  → _fxlAxisCache.n - 1（動的）
 function getZoomStepMaxIdx() {
-  if (state.fxlRegionOrder === 'vfill') {
+  if (isFxlAxisMode()) {
     return Math.max(0, (_fxlAxisCache.n || 1) - 1);
   }
   return 5;
@@ -2740,8 +2755,8 @@ function applyFxlZoom() {
 
 // regionIdx に対応する領域にズーム（transform-origin:50% 50% 前提で、セル中心が画面中央に来るよう tx/ty を算出）
 function applyFxlRegionPreset() {
-  // 軸モード（vfill）は別ロジックへ委譲
-  if (state.fxlRegionOrder === 'vfill') { applyFxlAxisPreset(); return; }
+  // 軸モード（vfill / hfill）は別ロジックへ委譲
+  if (isFxlAxisMode()) { applyFxlAxisPreset(); return; }
   const z = state.fxlZoom;
   const { col, row } = regionCellForIdx(z.regionIdx);
   const r = getTargetPageRect();
@@ -2758,9 +2773,10 @@ function applyFxlRegionPreset() {
   if (typeof updateFxlNextBtnUI === 'function') updateFxlNextBtnUI();
 }
 
-// 軸モード（vfill）用のステップ表示。
-//   - 縦サイズを container 高に合わせ、横方向のみ regionIdx 個のステップで進む。
-//   - 拡大倍率 / step 数 / tx_init は画像のネイティブ比から動的に決定（_fxlAxisCache に格納）。
+// 軸モード（vfill / hfill）用のステップ表示。
+//   vfill: 縦サイズを container 高に合わせ、横方向のみ regionIdx 個のステップで進む（書字方向に従う）
+//   hfill: 横サイズを container 幅に合わせ、縦方向のみ regionIdx 個のステップで進む（常に上→下）
+//   - 拡大倍率 / step 数 / tx or ty_init は画像のネイティブ比から動的に決定（_fxlAxisCache に格納）。
 //   - 画像未ロードの場合は load を 1 回だけ待って再呼び出し。
 function applyFxlAxisPreset() {
   const z = state.fxlZoom;
@@ -2768,7 +2784,7 @@ function applyFxlAxisPreset() {
   if (!cont) return;
   const W = cont.clientWidth, H = cont.clientHeight;
   if (W <= 0 || H <= 0) return;
-  // vfill では spread 強制 OFF のため imgA のみ参照
+  // 軸モードでは spread 強制 OFF のため imgA のみ参照
   const img = document.getElementById('fxl-page-a');
   if (!img) return;
   if (!img.complete || !img.naturalWidth || !img.naturalHeight) {
@@ -2778,14 +2794,28 @@ function applyFxlAxisPreset() {
   }
   const imgAR  = img.naturalWidth / img.naturalHeight;
   const contAR = W / H;
+  // object-fit:contain 適用後の表示寸法（transform 前）
   let displayedW, displayedH;
   if (imgAR > contAR) { displayedW = W; displayedH = W / imgAR; }
   else                { displayedW = H * imgAR; displayedH = H; }
-  const level = (displayedH > 0) ? (H / displayedH) : 1;
-  const dispWZ = displayedW * level;
-  const n = Math.max(1, Math.ceil(dispWZ / W));
-  const tx_init = W/2 - dispWZ/2;   // RTL: 画像右端を viewport 右端に
-  _fxlAxisCache = { displayedW, displayedH, level, n, tx_init };
+
+  const isVfill = (state.fxlRegionOrder === 'vfill');
+  let level, n, tx_init = 0, ty_init = 0;
+  if (isVfill) {
+    // 縦合わせ：高さを viewport 高に揃える
+    level = (displayedH > 0) ? (H / displayedH) : 1;
+    const dispWZ = displayedW * level;
+    n = Math.max(1, Math.ceil(dispWZ / W));
+    tx_init = W/2 - dispWZ/2;   // RTL: 画像右端を viewport 右端に
+  } else {
+    // 横合わせ（hfill）：幅を viewport 幅に揃える
+    level = (displayedW > 0) ? (W / displayedW) : 1;
+    const dispHZ = displayedH * level;
+    n = Math.max(1, Math.ceil(dispHZ / H));
+    // 画像上端を viewport 上端に: ty = +(dispHZ - H)/2（正＝画像を下方向に translate）
+    ty_init = (dispHZ - H) / 2;
+  }
+  _fxlAxisCache = { displayedW, displayedH, level, n, tx_init, ty_init };
 
   // ページ境界 Back 越え後の「末尾着地」フラグを反映（新ページの実際の n が確定してから消費）
   const maxIdx = Math.max(0, n - 1);
@@ -2793,18 +2823,23 @@ function applyFxlAxisPreset() {
     z.regionIdx = maxIdx;
     _fxlAxisLandAtEnd = false;
   }
-  // regionIdx をクランプ（n が前ページより少なくなるケースに備える）
   if (z.regionIdx > maxIdx) z.regionIdx = maxIdx;
   if (z.regionIdx < 0)      z.regionIdx = 0;
 
   z.level = level;
-  // RTL: i 進むごとに +W、LTR: -W（reading 進行方向）
-  const rtl = (state.fxlPpd === 'rtl');
-  const tx = rtl ? (tx_init + z.regionIdx * W)
-                 : (-tx_init - z.regionIdx * W);
-  // clamp で誤差吸収（端計算の四捨五入による僅かなはみ出し防止）
-  const c = clampFxlPan(tx, 0);
-  z.tx = c.tx; z.ty = 0;
+  if (isVfill) {
+    // RTL: i 進むごとに +W、LTR: -W（reading 進行方向）
+    const rtl = (state.fxlPpd === 'rtl');
+    const tx = rtl ? (tx_init + z.regionIdx * W)
+                   : (-tx_init - z.regionIdx * W);
+    const c = clampFxlPan(tx, 0);
+    z.tx = c.tx; z.ty = 0;
+  } else {
+    // hfill: 常に上→下進行（書字方向に依らず）。i 進むごとに ty -= H で下方向の領域を見せる
+    const ty = ty_init - z.regionIdx * H;
+    const c = clampFxlPan(0, ty);
+    z.tx = 0; z.ty = c.ty;
+  }
   z.mode = 'preset';
   applyFxlZoom();
   if (typeof updateFxlRegionPillUI === 'function') updateFxlRegionPillUI();
@@ -2829,8 +2864,8 @@ function enableFxlZoom(startRegionIdx) {
   const before = isEffectiveSpread();
   state.fxlZoomEnabled = true;
   state.fxlZoom.level = state.fxlZoomLevel;
-  // vfill は step 数が動的なので 0..5 の clamp は story/yonkoma 専用
-  if (state.fxlRegionOrder === 'vfill') {
+  // 軸モード（vfill / hfill）は step 数が動的なので 0..5 の clamp は story/yonkoma 専用
+  if (isFxlAxisMode()) {
     state.fxlZoom.regionIdx = (typeof startRegionIdx === 'number') ? Math.max(0, startRegionIdx) : 0;
   } else {
     state.fxlZoom.regionIdx = (typeof startRegionIdx === 'number') ? Math.max(0, Math.min(5, startRegionIdx)) : 0;
@@ -2903,6 +2938,9 @@ function updateFxlRegionPillUI() {
   } else if (state.fxlRegionOrder === 'vfill') {
     if (icon) icon.textContent = '↔';
     if (lbl)  lbl.textContent  = (z.regionIdx + 1) + ' / ' + total;
+  } else if (state.fxlRegionOrder === 'hfill') {
+    if (icon) icon.textContent = '↕';
+    if (lbl)  lbl.textContent  = (z.regionIdx + 1) + ' / ' + total;
   } else {
     if (icon) icon.textContent = '🎯';
     if (lbl)  lbl.textContent  = (z.regionIdx + 1) + ' / ' + total;
@@ -2968,7 +3006,7 @@ function advanceFxlZoomStep(dir) {
   if (z.mode === 'free') {
     z.regionIdx = dir > 0 ? 0 : maxIdx;
     z.mode = 'preset';
-    if (state.fxlRegionOrder === 'vfill' && dir < 0) _fxlAxisLandAtEnd = true;
+    if (isFxlAxisMode() && dir < 0) _fxlAxisLandAtEnd = true;
     advanceFxlZoomSpine(dir);
     return;
   }
@@ -2979,9 +3017,9 @@ function advanceFxlZoomStep(dir) {
   } else {
     // 次/前ページの冒頭（dir>0 で先頭=0、dir<0 で末尾）。
     // story/yonkoma は n=6 固定で maxIdx=5 が遷移先でも常に正しい。
-    // vfill は遷移先 n が動的なので、Back 方向は flag で「新ページの末尾」へ確定着地させる。
+    // 軸モード（vfill/hfill）は遷移先 n が動的なので、Back 方向は flag で「新ページの末尾」へ確定着地させる。
     z.regionIdx = dir > 0 ? 0 : maxIdx;
-    if (state.fxlRegionOrder === 'vfill' && dir < 0) _fxlAxisLandAtEnd = true;
+    if (isFxlAxisMode() && dir < 0) _fxlAxisLandAtEnd = true;
     advanceFxlZoomSpine(dir);
   }
 }
@@ -3153,8 +3191,9 @@ window.addEventListener('resize', () => {
   function onPointerMove(e) {
     if (!active) return;
     let dx = e.clientX - sx, dy = e.clientY - sy;
-    // 軸モード（vfill）は他軸方向の移動を無効化
+    // 軸モード：他軸方向の移動を無効化
     if (state.fxlRegionOrder === 'vfill') dy = 0;
+    else if (state.fxlRegionOrder === 'hfill') dx = 0;
     if (!dragMoved && Math.hypot(dx, dy) > PAN_TAP_THRESHOLD) {
       dragMoved = true;
       state.fxlZoom.mode = 'free';
@@ -3167,8 +3206,22 @@ window.addEventListener('resize', () => {
     const c = clampFxlPan(ox + dx, oy + dy);
     state.fxlZoom.tx = c.tx; state.fxlZoom.ty = c.ty;
     applyFxlZoom();
-    // rubber-band: 横方向の超過を累積
-    if (Math.abs(c.excessX) > 0) {
+    // rubber-band: hfill は縦超過、それ以外（vfill/2D）は横超過を累積
+    if (state.fxlRegionOrder === 'hfill') {
+      if (Math.abs(c.excessY) > 0) {
+        const dirSign = c.excessY > 0 ? 1 : -1;
+        if (dirSign !== overshootDir) { overshoot = 0; overshootDir = dirSign; }
+        overshoot = Math.max(overshoot, Math.abs(c.excessY));
+        if (overshoot > RUBBER_BAND_PX) {
+          // dirSign>0（下方向超過）= 次ページ、<0（上方向超過）= 前ページ。書字方向に依らず
+          const advDir = dirSign;
+          const el = getEl();
+          try { el && el.releasePointerCapture(e.pointerId); } catch(_) {}
+          endDrag(el);
+          advanceFxlZoomStep(advDir);
+        }
+      }
+    } else if (Math.abs(c.excessX) > 0) {
       const dirSign = c.excessX > 0 ? 1 : -1;
       if (dirSign !== overshootDir) { overshoot = 0; overshootDir = dirSign; }
       overshoot = Math.max(overshoot, Math.abs(c.excessX));
@@ -3226,9 +3279,9 @@ function handleFxlTap(clientX, clientY) {
 
 // タップ座標から現在の領域順に照らしたプリセット idx を逆算
 function regionIdxFromPoint(clientX, clientY) {
-  // 軸モード（vfill）はステップ数が画像比から動的に決まるため、
+  // 軸モード（vfill / hfill）はステップ数が画像比から動的に決まるため、
   // ダブルタップ ON 時は常に先頭（regionIdx=0）でスタート。
-  if (state.fxlRegionOrder === 'vfill') return 0;
+  if (isFxlAxisMode()) return 0;
   const cont = document.getElementById('fxl-container');
   if (!cont) return 0;
   const rect = cont.getBoundingClientRect();
@@ -3449,8 +3502,8 @@ document.addEventListener('keydown', e => {
     if (state.fxlZoomEnabled) {
       if (e.key === '0') { disableFxlZoom(); e.preventDefault(); return; }
       if (e.key === 'Escape') { disableFxlZoom(); e.preventDefault(); return; }
-      // 1-6 直接ジャンプは 6領域モード（story/yonkoma）専用。vfill は n が動的なので無効。
-      if (state.fxlRegionOrder !== 'vfill' && /^[1-6]$/.test(e.key)) {
+      // 1-6 直接ジャンプは 6領域モード（story/yonkoma）専用。軸モードは n が動的なので無効。
+      if (!isFxlAxisMode() && /^[1-6]$/.test(e.key)) {
         state.fxlZoom.regionIdx = parseInt(e.key, 10) - 1;
         applyFxlRegionPreset();
         e.preventDefault(); return;
@@ -3532,7 +3585,7 @@ function loadSettings() {
       state.fxlZoom.level = s.fxlZoomLevel;
       const el = document.getElementById('fxl-zoom-level-select'); if(el) el.value = String(s.fxlZoomLevel.toFixed(1));
     }
-    if (s.fxlRegionOrder === 'story' || s.fxlRegionOrder === 'yonkoma' || s.fxlRegionOrder === 'vfill') {
+    if (s.fxlRegionOrder === 'story' || s.fxlRegionOrder === 'yonkoma' || s.fxlRegionOrder === 'vfill' || s.fxlRegionOrder === 'hfill') {
       state.fxlRegionOrder = s.fxlRegionOrder;
       const el = document.getElementById('fxl-region-order-select'); if(el) el.value = s.fxlRegionOrder;
       if (typeof syncFxlAxisModeUI === 'function') syncFxlAxisModeUI();
@@ -3977,7 +4030,7 @@ function changeFxlZoomLevel(v) {
   }
 }
 function changeFxlRegionOrder(v) {
-  if (v !== 'story' && v !== 'yonkoma' && v !== 'vfill') return;
+  if (v !== 'story' && v !== 'yonkoma' && v !== 'vfill' && v !== 'hfill') return;
   state.fxlRegionOrder = v;
   saveSettings();
   syncFxlAxisModeUI();
@@ -3996,10 +4049,9 @@ function changeFxlRegionOrder(v) {
   }
 }
 
-// 軸モード（vfill）切替時に 2D 専用設定行（拡大倍率・LTR反転）の表示を制御
+// 軸モード（vfill / hfill）切替時に 2D 専用設定行（拡大倍率・LTR反転）の表示を制御
 function syncFxlAxisModeUI() {
-  const isAxis = (state.fxlRegionOrder === 'vfill');
-  document.body.classList.toggle('fxl-axis-mode', isAxis);
+  document.body.classList.toggle('fxl-axis-mode', isFxlAxisMode());
 }
 function toggleFxlLtrAutoFlip() {
   state.fxlLtrAutoFlip = !state.fxlLtrAutoFlip;

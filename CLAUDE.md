@@ -46,7 +46,7 @@ There are no automated tests. Manual testing requires a `.epub` or `.kepub` file
 Most features exist in both files. As a rule:
 - **`yomikake.html` only**: drag-and-drop, toolbar mouse-wheel scroll, `SHARED_TAIL` (Chrome `text-combine-upright` fix), `isNeg()` sign detection in horizontal/publisher scroll.
 - **`yomikake_ios.html` only**: CSS-transform scroll mechanism, touch swipe inside iframe, `CLICK_HANDLER` / `INIT_FN` template variables, double-rAF + 500ms `INIT_FN` timing, `will-change:transform` on body.
-- **Both files**: all other features — rendering pipeline, postMessage protocol, i18n, settings, bookmarks, Drive sync, fullscreen, progress bar, full-text search, sidebar tabs, `_renderSeq`, `_isRendering` / `_pendingScrollAfterRender`, `_bookFinished`, chapter-end blank page, `flashOverlay()`, `flashNavButtons()`, `showResumeBanner()`, `showFinishedBanner()`, `showToast()`, `toggleSidebar()`, `buildReadingList()`, `formatRelativeDate()`, `extractCoverThumb()`, `saveBookMeta()`, `closeBook()`, `openFilePickerForBook()`, **Loading overlay** (`showLoading`, `showLoadingPreSelect`, `updateLoadingStage`, `hideLoading`, `_loadingShown`), FXL rendering (`renderFxlPair`, `buildFxlPairs`, `isEffectiveSpread`), **FXL コマ読みズーム** (`applyFxlZoom`, `applyFxlRegionPreset`, `clampFxlPan`, `getTargetPageRect`, `regionCellForIdx`, `resetFxlZoom`, `enableFxlZoom`/`disableFxlZoom`/`toggleFxlZoom`, `advanceFxlZoomStep`/`advanceFxlZoomSpine`, `handleFxlTap`, `regionIdxFromPoint`, `updateFxlNextBtnUI`, `updateFxlRegionPillUI`, `onFxlRegionPillClick`, `changeFxlZoomLevel`, `changeFxlRegionOrder`, `toggleFxlLtrAutoFlip`, `updateFxlLtrAutoFlipUI`, `FXL_REGION_ORDERS`), **FXL 軸モード（vfill）** (`applyFxlAxisPreset`, `getZoomStepMaxIdx`, `syncFxlAxisModeUI`, `_fxlAxisCache`, `_fxlAxisLandAtEnd`).
+- **Both files**: all other features — rendering pipeline, postMessage protocol, i18n, settings, bookmarks, Drive sync, fullscreen, progress bar, full-text search, sidebar tabs, `_renderSeq`, `_isRendering` / `_pendingScrollAfterRender`, `_bookFinished`, chapter-end blank page, `flashOverlay()`, `flashNavButtons()`, `showResumeBanner()`, `showFinishedBanner()`, `showToast()`, `toggleSidebar()`, `buildReadingList()`, `formatRelativeDate()`, `extractCoverThumb()`, `saveBookMeta()`, `closeBook()`, `openFilePickerForBook()`, **Loading overlay** (`showLoading`, `showLoadingPreSelect`, `updateLoadingStage`, `hideLoading`, `_loadingShown`), FXL rendering (`renderFxlPair`, `buildFxlPairs`, `isEffectiveSpread`), **FXL コマ読みズーム** (`applyFxlZoom`, `applyFxlRegionPreset`, `clampFxlPan`, `getTargetPageRect`, `regionCellForIdx`, `resetFxlZoom`, `enableFxlZoom`/`disableFxlZoom`/`toggleFxlZoom`, `advanceFxlZoomStep`/`advanceFxlZoomSpine`, `handleFxlTap`, `regionIdxFromPoint`, `updateFxlNextBtnUI`, `updateFxlRegionPillUI`, `onFxlRegionPillClick`, `changeFxlZoomLevel`, `changeFxlRegionOrder`, `toggleFxlLtrAutoFlip`, `updateFxlLtrAutoFlipUI`, `FXL_REGION_ORDERS`), **FXL 軸モード（vfill / hfill）** (`isFxlAxisMode`, `applyFxlAxisPreset`, `getZoomStepMaxIdx`, `syncFxlAxisModeUI`, `_fxlAxisCache`, `_fxlAxisLandAtEnd`).
 
 When fixing a bug or adding a feature that is not in the "only" lists above, apply the change to **both files**.
 
@@ -254,24 +254,35 @@ ePub を開く際の体感ハングを防ぐためのオーバーレイ。特に
 
 `_fxlBlobCache` は `Map<spineIdx, objectURL>` で、`loadFxlPageBlobUrl()` が現在ペア＋前後 1 ペア分（最大 6 枚）の Blob URL を保持する。`renderFxlPair()` の末尾で `trimFxlBlobCache(keepIdxSet)` が範囲外を `URL.revokeObjectURL` する。**本を切り替える際は `loadEpub()` 内で必ず `revokeAllFxlBlobs()` を呼んでキャッシュを全クリアする** — `spineIdx` をキーにしているため、両書とも `spineIdx=0` の表紙が cache hit して旧本の URL が返り、新本の表紙が表示されないバグが起きる（`imgA.src` に同値を再代入してもブラウザは再描画しない）。`closeBook()` でも呼ぶが、本切替時は close を経由しないため両方必要。同タイミングで `_fxlLastSpreadState = null` もリセット。
 
-### FXL 軸モード vfill（縦合わせ・横スクロール）
+### FXL 軸モード vfill / hfill（1軸ズーム）
 
-小説など紙本スキャンの自炊 FXL 本を縦持ちスマホで読むときに、ページ画像を縦いっぱいに拡大し横方向のみページ送りで進めるモード（v1.8.4）。`state.fxlRegionOrder` に既存の `'story'` / `'yonkoma'` に加えて `'vfill'` 値を追加した形で実装している（`fxlRegionOrder` の値域拡張、内部変数名は据え置き）。
+紙本スキャンの自炊 FXL 本を端末画面の片軸いっぱいに拡大して読むモード。`state.fxlRegionOrder` に `'story'` / `'yonkoma'` に加えて `'vfill'`（縦合わせ・横スクロール、v1.8.4）と `'hfill'`（横合わせ・縦スクロール、v1.8.5）を追加。`fxlRegionOrder` の値域拡張で実装し、内部変数名は据え置き。
 
-- **`state.fxlRegionOrder = 'vfill'`** — `epub_settings` に永続化。設定ポップオーバーの「ズームモード」セレクトから選択
-- **動的 level 算出** — `applyFxlAxisPreset()` が `imgA.naturalWidth/Height` から `imgAR = nW/nH`、`contAR = W/H` を比較し、`imgAR > contAR` なら `displayedW=W; displayedH=W/imgAR; level=H/displayedH`、`imgAR <= contAR` なら `level=1`（既に高さ fit 済み）
-- **動的ステップ数** — `n = max(1, ceil(displayedW * level / W))`。`getZoomStepMaxIdx()` が story/yonkoma=5、vfill=`n-1` を返す
-- **tx 計算** — `tx_init = W/2 - displayedW*level/2`（RTL: 画像右端を viewport 右端に）。Step `i` の tx は `rtl ? tx_init + i*W : -tx_init - i*W`。ty は常に 0
-- **`_fxlAxisCache`** — `{displayedW, displayedH, level, n, tx_init}` を module-level で保持。`clampFxlPan()` が vfill 時 `maxX = (displayedW*L - W)/2`、`maxY = 0` を返す根拠
+| モード | 用途 | 軸 | ステップ進行 |
+|--------|------|----|-------------|
+| `vfill` | 縦書きスキャン本＋縦持ちスマホ | 横軸 | 書字方向（RTL: 右→左、LTR: 左→右）|
+| `hfill` | 横書きスキャン本＋横倒しスマホ | 縦軸 | 常に上→下（書字方向に依らず）|
+
+- **共通ヘルパー** `isFxlAxisMode()` が `state.fxlRegionOrder === 'vfill' || 'hfill'` を返す。複数の分岐で参照
+- **動的 level 算出** — `applyFxlAxisPreset()` が `imgA.naturalWidth/Height` から `imgAR = nW/nH`、`contAR = W/H` を比較し object-fit:contain 後の `displayedW/H` を求める。
+  - vfill: `level = H / displayedH`（`imgAR > contAR` で >1）
+  - hfill: `level = W / displayedW`（`imgAR < contAR` で >1）
+- **動的ステップ数** — vfill: `n = max(1, ceil(displayedW * level / W))` ／ hfill: `n = max(1, ceil(displayedH * level / H))`。`getZoomStepMaxIdx()` が story/yonkoma=5、軸モード=`n-1` を返す
+- **tx / ty 計算** — transform-origin:50% 50% の `transform: translate(tx,ty) scale(L)` で：
+  - vfill `tx_init = W/2 - displayedW*level/2`（負＝画像を左へ translate＝画像右端を viewport 右端に）。Step `i` の tx は `rtl ? tx_init + i*W : -tx_init - i*W`、ty=0
+  - hfill `ty_init = (displayedH*level - H)/2`（正＝画像を下へ translate＝画像上端を viewport 上端に）。Step `i` の ty は `ty_init - i*H`、tx=0
+- **`_fxlAxisCache`** — `{displayedW, displayedH, level, n, tx_init, ty_init}` を module-level で保持。`clampFxlPan()` が軸モード別に max を計算する根拠
+  - vfill: `maxX = (displayedW*L - W)/2`、`maxY = 0`
+  - hfill: `maxX = 0`、`maxY = (displayedH*L - H)/2`
 - **`_fxlAxisLandAtEnd`** — Back 方向のページ境界跨ぎで「新ページの末尾ステップに着地」させるためのワンショットフラグ。新ページ側の `applyFxlAxisPreset()` が新 n を確定したタイミングで読み・消費する。これがないと、元ページの maxIdx を新ページに持ち込んで誤った位置に着地する
-- **画像未ロード時** — `applyFxlAxisPreset()` 冒頭で `img.complete && naturalWidth` を確認し、未ロードなら `addEventListener('load', ..., {once:true})` で再呼び出し。renderFxlPair 末尾フックの `requestAnimationFrame` 後でもロード前のことがあるため
-- **spread 強制 OFF** — vfill ON 中は `isEffectiveSpread()` が false 強制返却。`enableFxlZoom`/`disableFxlZoom`/`changeFxlRegionOrder` で前後の `isEffectiveSpread()` 結果を比較し、変化があれば `renderFxlPair(state.currentSpineIdx)` で再描画（`width:50%` ↔ `width:100%` を反映するため）
-- **PAN 軸ロック** — `onPointerMove` が vfill 時 `dy = 0` を強制。rubber-band は既存の `excessX` 判定がそのまま機能（縦方向は maxY=0 なので excessY は常に 0）
-- **ダブルタップ ON** — vfill 時は `regionIdxFromPoint()` が常に 0 を返す（n が画像比から動的なので位置→idx 逆算が困難。常に先頭から開始）
-- **キーボード `1-6` 直接ジャンプ** — story/yonkoma 専用。vfill 時はガードで無効化（n が動的のため）。yomikake_ios.html はそもそも z/0/1-6 ショートカット未実装
-- **設定 UI 表示制御** — `body.fxl-axis-mode` クラスで `.fxl-2d-only`（拡大倍率行・LTR反転行）を `display:none`。`syncFxlAxisModeUI()` が `state.fxlRegionOrder === 'vfill'` を見てクラス付与
-- **バッジ/ピル** — vfill 時は `↔ N/total`（領域ピルアイコンが 🎯 → ↔ に変化）。Next/Back バッジは story/yonkoma と同じく `(idx+2)/total` ・ `idx/total`、末尾は ⏭/⏮
-- **永続化スコープ** — `_fxlAxisCache`、`_fxlAxisLandAtEnd`、`fxlZoomEnabled`、`fxlZoom.{tx,ty,level,regionIdx,mode}` は永続化しない（既存 Phase 3 と同じ方針：本を開くたびに OFF で起動）。設定として永続化されるのは `fxlRegionOrder` のみ
+- **画像未ロード時** — `applyFxlAxisPreset()` 冒頭で `img.complete && naturalWidth` を確認し、未ロードなら `addEventListener('load', ..., {once:true})` で再呼び出し
+- **spread 強制 OFF** — 軸モード ON 中は `isEffectiveSpread()` が false 強制返却。`enableFxlZoom`/`disableFxlZoom`/`changeFxlRegionOrder` で前後の `isEffectiveSpread()` 結果を比較し、変化があれば `renderFxlPair(state.currentSpineIdx)` で再描画
+- **PAN 軸ロック** — `onPointerMove` が vfill 時 `dy = 0`、hfill 時 `dx = 0` を強制。rubber-band は hfill 時 `excessY` 判定（dirSign>0=下方向超過＝次ページ。書字方向に依らず）、それ以外は `excessX` 判定（既存挙動：RTL は dirSign を反転）
+- **ダブルタップ ON** — 軸モード時は `regionIdxFromPoint()` が常に 0 を返す（n が画像比から動的なので位置→idx 逆算が困難。常に先頭から開始）
+- **キーボード `1-6` 直接ジャンプ** — story/yonkoma 専用。軸モード時は `isFxlAxisMode()` ガードで無効化（yomikake_ios.html はそもそも z/0/1-6 ショートカット未実装）
+- **設定 UI 表示制御** — `body.fxl-axis-mode` クラスで `.fxl-2d-only`（拡大倍率行・LTR反転行）を `display:none`。`syncFxlAxisModeUI()` が `isFxlAxisMode()` を見てクラス付与
+- **バッジ/ピル** — vfill 時 `↔ N/total`、hfill 時 `↕ N/total`（領域ピルアイコンが 🎯 → ↔ / ↕ に変化）。Next/Back バッジは `(idx+2)/total` ・ `idx/total`、末尾は ⏭/⏮
+- **永続化スコープ** — `_fxlAxisCache`、`_fxlAxisLandAtEnd`、`fxlZoomEnabled`、`fxlZoom.{tx,ty,level,regionIdx,mode}` は永続化しない（本を開くたびに OFF で起動）。設定として永続化されるのは `fxlRegionOrder` のみ
 
 ### Jump History (セッション内しおり履歴)
 
