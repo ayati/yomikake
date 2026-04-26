@@ -2189,6 +2189,10 @@ function buildScrollScript(scrollTarget, writingMode, readySeq) {
 
   function vh(){ return window.innerHeight; }
   function maxS(){ return Math.max(0, body.offsetHeight - vh()); }
+  // 行高 (horizontal-tb では line-height が 1行高さ) を解決済み px で取得
+  function lineSize(){ var lh = parseFloat(getComputedStyle(body).lineHeight); return (lh > 0) ? lh : 0; }
+  function pageStep(vp){ var ls = lineSize(); return (ls > 0 && ls < vp) ? Math.floor(vp/ls)*ls : Math.round(vp*STEP); }
+  function snapLine(p){ var ls = lineSize(); return (ls > 0) ? Math.round(p/ls)*ls : p; }
 
   function postEdge(d){ window.parent.postMessage({type:'EPUB_EDGE',direction:d},'*'); }
   function postPos(r){  window.parent.postMessage({type:'EPUB_POS', ratio:r},  '*'); }
@@ -2227,13 +2231,16 @@ function buildScrollScript(scrollTarget, writingMode, readySeq) {
   function doScroll(dir){
     var ms = maxS();
     if(ms <= 0){ postEdge(dir); return; }
-    var step = vh() * STEP;
+    var step = pageStep(vh());
     if(dir === 1){
       if(ty >= ms + 2){ postEdge(1); return; }
-      setTy(Math.min(ty + step, ms + step));
+      var newY = ty + step;
+      // ms 超えは blank zone — スナップ対象外
+      setTy((newY > ms) ? Math.min(newY, ms + step) : snapLine(newY));
     } else {
       if(ty <= 2){ postEdge(-1); return; }
-      setTy(Math.max(ty - step, 0));
+      var newY = ty - step;
+      setTy((newY <= 0) ? 0 : snapLine(newY));
     }
   }
 
@@ -2271,6 +2278,10 @@ ${INIT_FN}
 
   function vw(){ return window.innerWidth; }
   function vh(){ return window.innerHeight; }
+  // 行サイズ — h軸: line-height がコラム幅 / v軸: 1行高 — どちらも body の line-height で取得
+  function lineSize(){ var lh = parseFloat(getComputedStyle(body).lineHeight); return (lh > 0) ? lh : 0; }
+  function pageStep(vp){ var ls = lineSize(); return (ls > 0 && ls < vp) ? Math.floor(vp/ls)*ls : Math.round(vp*STEP); }
+  function snapLine(p){ var ls = lineSize(); return (ls > 0) ? Math.round(p/ls)*ls : p; }
 
   function detectAxis(){
     if(_axis) return _axis;
@@ -2358,24 +2369,28 @@ ${INIT_FN}
     if(ax === 'h'){
       ms = Math.max(0, body.offsetWidth - vw());
       if(ms <= 0){ postEdge(dir); return; }
-      step = vw() * STEP;
+      step = pageStep(vw());
       if(dir === 1){
         if(tx >= 2){ postEdge(1); return; }
-        setTx(Math.min(tx + step, step));
+        var newTx = tx + step;
+        setTx((newTx > 0) ? Math.min(newTx, step) : -snapLine(-newTx));
       } else {
         if(tx <= -(ms - 2)){ postEdge(-1); return; }
-        setTx(Math.max(tx - step, -ms));
+        var newTx = tx - step;
+        setTx((newTx <= -ms) ? -ms : -snapLine(-newTx));
       }
     } else {
       ms = Math.max(0, body.offsetHeight - vh());
       if(ms <= 0){ postEdge(dir); return; }
-      step = vh() * STEP;
+      step = pageStep(vh());
       if(dir === 1){
         if(ty >= ms + 2){ postEdge(1); return; }
-        setTy(Math.min(ty + step, ms + step));
+        var newY = ty + step;
+        setTy((newY > ms) ? Math.min(newY, ms + step) : snapLine(newY));
       } else {
         if(ty <= 2){ postEdge(-1); return; }
-        setTy(Math.max(ty - step, 0));
+        var newY = ty - step;
+        setTy((newY <= 0) ? 0 : snapLine(newY));
       }
     }
   }
@@ -2415,6 +2430,10 @@ ${INIT_FN}
 
   function vw(){ return window.innerWidth; }
   function maxS(){ return Math.max(0, body.offsetWidth - vw()); }
+  // 行幅 (vertical-rl では line-height がコラム幅) を解決済み px で取得
+  function lineSize(){ var lh = parseFloat(getComputedStyle(body).lineHeight); return (lh > 0) ? lh : 0; }
+  function pageStep(vp){ var ls = lineSize(); return (ls > 0 && ls < vp) ? Math.floor(vp/ls)*ls : Math.round(vp*STEP); }
+  function snapLine(p){ var ls = lineSize(); return (ls > 0) ? Math.round(p/ls)*ls : p; }
 
   function postEdge(d){ window.parent.postMessage({type:'EPUB_EDGE',direction:d},'*'); }
   function postPos(r){  window.parent.postMessage({type:'EPUB_POS', ratio:r},  '*'); }
@@ -2454,13 +2473,16 @@ ${INIT_FN}
   function doScroll(dir){
     var ms = maxS();
     if(ms <= 0){ postEdge(dir); return; }
-    var step = vw() * STEP;
+    var step = pageStep(vw());
     if(dir === 1){ // 前進: tx → 0 → blank zone (tx > 0)
       if(tx >= 2){ postEdge(1); return; }
-      setTx(Math.min(tx + step, step)); // blank zone 上限 = 1 step 分
+      // 論理 x = -tx （0=右端, 増加=読み進め）。0 を越える blank zone はスナップ対象外。
+      var newTx = tx + step;
+      setTx((newTx > 0) ? Math.min(newTx, step) : -snapLine(-newTx));
     } else {       // 後退: tx → -ms
       if(tx <= -(ms - 2)){ postEdge(-1); return; }
-      setTx(Math.max(tx - step, -ms));
+      var newTx = tx - step;
+      setTx((newTx <= -ms) ? -ms : -snapLine(-newTx));
     }
   }
 
