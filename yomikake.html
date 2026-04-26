@@ -2788,7 +2788,13 @@ function applyFxlAxisPreset() {
   const img = document.getElementById('fxl-page-a');
   if (!img) return;
   if (!img.complete || !img.naturalWidth || !img.naturalHeight) {
-    const once = () => { img.removeEventListener('load', once); applyFxlAxisPreset(); };
+    // ロード待ち。コールバック発火時にズームが OFF になっていたり別モードへ切替えられていたら何もしない
+    // （これがないと、未ロード状態でズーム ON→OFF した直後に load が走って勝手に zoom が戻る）
+    const once = () => {
+      if (state.fxlZoomEnabled && state.renderMode === 'fxl' && isFxlAxisMode()) {
+        applyFxlAxisPreset();
+      }
+    };
     img.addEventListener('load', once, { once: true });
     return;
   }
@@ -2853,6 +2859,8 @@ function resetFxlZoom() {
   state.fxlZoom.ty = 0;
   state.fxlZoom.regionIdx = 0;
   state.fxlZoom.mode = 'preset';
+  // 軸モードの「末尾着地」フラグも消費されないまま残ると次回 ON 時に誤発火するため明示的にクリア
+  _fxlAxisLandAtEnd = false;
   const el = document.getElementById('fxl-spread');
   if (el) { el.style.transform = ''; el.classList.remove('panning'); }
 }
