@@ -267,6 +267,8 @@
   body.mode-fxl .fxl-hide-group { display:none !important; }
   /* 非FXL時は FXL ズーム用ボタン・設定グループを非表示 */
   body:not(.mode-fxl) .fxl-only { display:none !important; }
+  /* 軸モード（vfill）選択時は 2Dズーム専用の設定行（拡大倍率・LTR反転）を非表示 */
+  body.fxl-axis-mode .fxl-2d-only { display:none !important; }
 
   /* ── FXL ズーム（Phase 3）── */
   #fxl-spread { transform-origin:50% 50%; transition:transform .22s cubic-bezier(0.16,1,0.3,1); }
@@ -575,7 +577,7 @@
           <option value="spread" data-i18n="spread.spread">見開き</option>
         </select>
       </div>
-      <div class="set-row">
+      <div class="set-row fxl-2d-only">
         <span class="set-label" data-i18n="settings.fxlZoomLevel">拡大倍率</span>
         <select class="modern-select" id="fxl-zoom-level-select" onchange="changeFxlZoomLevel(this.value)">
           <option value="1.5">1.5x</option>
@@ -584,13 +586,14 @@
         </select>
       </div>
       <div class="set-row">
-        <span class="set-label" data-i18n="settings.fxlRegionOrder">領域順</span>
+        <span class="set-label" data-i18n="settings.fxlRegionOrder">ズームモード</span>
         <select class="modern-select" id="fxl-region-order-select" onchange="changeFxlRegionOrder(this.value)">
-          <option value="story" data-i18n="region.story">ストーリー</option>
-          <option value="yonkoma" data-i18n="region.yonkoma">4コマ</option>
+          <option value="story" data-i18n="region.story">ストーリーまんが</option>
+          <option value="yonkoma" data-i18n="region.yonkoma">4コマまんが</option>
+          <option value="vfill" data-i18n="region.vfill">縦合わせ・横スクロール</option>
         </select>
       </div>
-      <div class="set-row">
+      <div class="set-row fxl-2d-only">
         <span class="set-label" data-i18n="settings.fxlLtrAutoFlip">LTR書籍で反転</span>
         <button id="fxl-ltr-flip-toggle" onclick="toggleFxlLtrAutoFlip()"
                 style="border:1px solid var(--ui-border);border-radius:8px;padding:6px 16px;min-width:60px;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;">ON</button>
@@ -901,10 +904,11 @@ const I18N = {
     'fxl.unsupportedPage':       'FXLモードでは表示できないページです',
     'btn.zoom':                  '🔍 ズーム',
     'settings.fxlZoomLevel':     '拡大倍率',
-    'settings.fxlRegionOrder':   '領域順',
+    'settings.fxlRegionOrder':   'ズームモード',
     'settings.fxlLtrAutoFlip':   'LTR書籍で反転',
-    'region.story':              'ストーリー',
-    'region.yonkoma':            '4コマ',
+    'region.story':              'ストーリーまんが',
+    'region.yonkoma':            '4コマまんが',
+    'region.vfill':              '縦合わせ・横スクロール',
     'pill.free':                 '自由',
     'toast.zoomOn':              'ズーム ON',
     'toast.zoomOff':             'ズーム OFF',
@@ -1058,10 +1062,11 @@ const I18N = {
     'fxl.unsupportedPage':       'This page cannot be displayed in FXL mode',
     'btn.zoom':                  '🔍 Zoom',
     'settings.fxlZoomLevel':     'Zoom level',
-    'settings.fxlRegionOrder':   'Region order',
+    'settings.fxlRegionOrder':   'Zoom mode',
     'settings.fxlLtrAutoFlip':   'Flip for LTR books',
-    'region.story':              'Story',
-    'region.yonkoma':            '4-panel',
+    'region.story':              'Story manga',
+    'region.yonkoma':            '4-panel manga',
+    'region.vfill':              'Fit height, scroll H',
     'pill.free':                 'Free',
     'toast.zoomOn':              'Zoom on',
     'toast.zoomOff':             'Zoom off',
@@ -1215,10 +1220,11 @@ const I18N = {
     'fxl.unsupportedPage':       'FXL 模式無法顯示此頁面',
     'btn.zoom':                  '🔍 縮放',
     'settings.fxlZoomLevel':     '縮放倍率',
-    'settings.fxlRegionOrder':   '區域順序',
+    'settings.fxlRegionOrder':   '縮放模式',
     'settings.fxlLtrAutoFlip':   'LTR 書籍左右反轉',
-    'region.story':              '故事型',
-    'region.yonkoma':            '四格',
+    'region.story':              '故事型漫畫',
+    'region.yonkoma':            '四格漫畫',
+    'region.vfill':              '配合高度・橫向捲動',
     'pill.free':                 '自由',
     'toast.zoomOn':              '縮放開啟',
     'toast.zoomOff':             '縮放關閉',
@@ -1372,10 +1378,11 @@ const I18N = {
     'fxl.unsupportedPage':       'FXL 模式无法显示此页面',
     'btn.zoom':                  '🔍 缩放',
     'settings.fxlZoomLevel':     '缩放倍率',
-    'settings.fxlRegionOrder':   '区域顺序',
+    'settings.fxlRegionOrder':   '缩放模式',
     'settings.fxlLtrAutoFlip':   'LTR 书籍左右反转',
-    'region.story':              '故事型',
-    'region.yonkoma':            '四格',
+    'region.story':              '故事型漫画',
+    'region.yonkoma':            '四格漫画',
+    'region.vfill':              '适合高度·横向滚动',
     'pill.free':                 '自由',
     'toast.zoomOn':              '缩放开启',
     'toast.zoomOff':             '缩放关闭',
@@ -1513,6 +1520,11 @@ const FXL_REGION_ORDERS = {
 
 // FXL 画像 Blob URL キャッシュ (spineIdx → objectURL)。renderFxlPair で前後ペア分のみ保持
 const _fxlBlobCache = new Map();
+
+// FXL 軸モード（vfill）用のページ別ズーム計算キャッシュ。applyFxlAxisPreset 内で更新。
+let _fxlAxisCache = { displayedW:0, displayedH:0, level:1, n:1, tx_init:0 };
+// 軸モードでページ境界 Back 越え後、新ページの末尾ステップにランドさせるためのフラグ
+let _fxlAxisLandAtEnd = false;
 
 // テーマ別 ePub 本文エリアの色（iframe 内に直接注入）
 const THEME_CONTENT = {
@@ -2567,6 +2579,8 @@ function findPairIdxForSpine(spineIdx) {
 // 有効な見開き表示モード判定（auto の場合はアスペクト比で自動判定）
 function isEffectiveSpread() {
   if (state.renderMode !== 'fxl') return false;
+  // 軸モード（vfill）ズーム ON 中は単ページ強制
+  if (state.fxlZoomEnabled && state.fxlRegionOrder === 'vfill') return false;
   if (state.spreadMode === 'single') return false;
   if (state.spreadMode === 'spread') return true;
   return window.innerWidth >= window.innerHeight * 1.3;
@@ -2650,8 +2664,15 @@ function clampFxlPan(tx, ty) {
   const cont = document.getElementById('fxl-container');
   const W = cont ? cont.clientWidth : 0;
   const H = cont ? cont.clientHeight : 0;
-  const maxX = Math.max(0, (L - 1) * W / 2);
-  const maxY = Math.max(0, (L - 1) * H / 2);
+  let maxX, maxY;
+  if (state.fxlRegionOrder === 'vfill') {
+    const dispWZ = (_fxlAxisCache.displayedW || 0) * L;
+    maxX = Math.max(0, (dispWZ - W) / 2);
+    maxY = 0;
+  } else {
+    maxX = Math.max(0, (L - 1) * W / 2);
+    maxY = Math.max(0, (L - 1) * H / 2);
+  }
   const cx = Math.max(-maxX, Math.min(maxX, tx));
   const cy = Math.max(-maxY, Math.min(maxY, ty));
   return { tx:cx, ty:cy, excessX: tx - cx, excessY: ty - cy, maxX, maxY };
@@ -2668,7 +2689,16 @@ function applyFxlZoom() {
   }
 }
 
+// 現在モードのステップ最大 idx（regionIdx の上限）。story/yonkoma=5、vfill=動的
+function getZoomStepMaxIdx() {
+  if (state.fxlRegionOrder === 'vfill') {
+    return Math.max(0, (_fxlAxisCache.n || 1) - 1);
+  }
+  return 5;
+}
+
 function applyFxlRegionPreset() {
+  if (state.fxlRegionOrder === 'vfill') { applyFxlAxisPreset(); return; }
   const z = state.fxlZoom;
   const { col, row } = regionCellForIdx(z.regionIdx);
   const r = getTargetPageRect();
@@ -2679,6 +2709,51 @@ function applyFxlRegionPreset() {
   const cellCy = r.y + r.h * (row + 0.5) / 3;
   const raw = clampFxlPan(-(cellCx - W/2) * z.level, -(cellCy - H/2) * z.level);
   z.tx = raw.tx; z.ty = raw.ty;
+  z.mode = 'preset';
+  applyFxlZoom();
+  if (typeof updateFxlRegionPillUI === 'function') updateFxlRegionPillUI();
+  if (typeof updateFxlNextBtnUI === 'function') updateFxlNextBtnUI();
+}
+
+// 軸モード（vfill）：縦サイズを container 高に合わせて横方向のみステップ進行
+function applyFxlAxisPreset() {
+  const z = state.fxlZoom;
+  const cont = document.getElementById('fxl-container');
+  if (!cont) return;
+  const W = cont.clientWidth, H = cont.clientHeight;
+  if (W <= 0 || H <= 0) return;
+  const img = document.getElementById('fxl-page-a');
+  if (!img) return;
+  if (!img.complete || !img.naturalWidth || !img.naturalHeight) {
+    const once = () => { img.removeEventListener('load', once); applyFxlAxisPreset(); };
+    img.addEventListener('load', once, { once: true });
+    return;
+  }
+  const imgAR  = img.naturalWidth / img.naturalHeight;
+  const contAR = W / H;
+  let displayedW, displayedH;
+  if (imgAR > contAR) { displayedW = W; displayedH = W / imgAR; }
+  else                { displayedW = H * imgAR; displayedH = H; }
+  const level = (displayedH > 0) ? (H / displayedH) : 1;
+  const dispWZ = displayedW * level;
+  const n = Math.max(1, Math.ceil(dispWZ / W));
+  const tx_init = W/2 - dispWZ/2;
+  _fxlAxisCache = { displayedW, displayedH, level, n, tx_init };
+
+  const maxIdx = Math.max(0, n - 1);
+  if (_fxlAxisLandAtEnd) {
+    z.regionIdx = maxIdx;
+    _fxlAxisLandAtEnd = false;
+  }
+  if (z.regionIdx > maxIdx) z.regionIdx = maxIdx;
+  if (z.regionIdx < 0)      z.regionIdx = 0;
+
+  z.level = level;
+  const rtl = (state.fxlPpd === 'rtl');
+  const tx = rtl ? (tx_init + z.regionIdx * W)
+                 : (-tx_init - z.regionIdx * W);
+  const c = clampFxlPan(tx, 0);
+  z.tx = c.tx; z.ty = 0;
   z.mode = 'preset';
   applyFxlZoom();
   if (typeof updateFxlRegionPillUI === 'function') updateFxlRegionPillUI();
@@ -2697,24 +2772,39 @@ function resetFxlZoom() {
 
 function enableFxlZoom(startRegionIdx) {
   if (state.renderMode !== 'fxl' || !state.fxlPairs) return;
+  const before = isEffectiveSpread();
   state.fxlZoomEnabled = true;
   state.fxlZoom.level = state.fxlZoomLevel;
-  state.fxlZoom.regionIdx = (typeof startRegionIdx === 'number') ? Math.max(0, Math.min(5, startRegionIdx)) : 0;
+  if (state.fxlRegionOrder === 'vfill') {
+    state.fxlZoom.regionIdx = (typeof startRegionIdx === 'number') ? Math.max(0, startRegionIdx) : 0;
+  } else {
+    state.fxlZoom.regionIdx = (typeof startRegionIdx === 'number') ? Math.max(0, Math.min(5, startRegionIdx)) : 0;
+  }
   state.fxlZoom.mode = 'preset';
   document.body.classList.add('fxl-zoomed');
   const btn = document.getElementById('btn-fxl-zoom');
   if (btn) btn.setAttribute('aria-pressed', 'true');
-  applyFxlRegionPreset();
+  const after = isEffectiveSpread();
+  if (before !== after) {
+    renderFxlPair(state.currentSpineIdx);
+  } else {
+    applyFxlRegionPreset();
+  }
   if (typeof updateFxlRegionPillUI === 'function') updateFxlRegionPillUI();
   if (typeof updateFxlNextBtnUI === 'function') updateFxlNextBtnUI();
 }
 
 function disableFxlZoom() {
+  const before = isEffectiveSpread();
   state.fxlZoomEnabled = false;
   resetFxlZoom();
   document.body.classList.remove('fxl-zoomed');
   const btn = document.getElementById('btn-fxl-zoom');
   if (btn) btn.setAttribute('aria-pressed', 'false');
+  const after = isEffectiveSpread();
+  if (before !== after && state.fxlPairs) {
+    renderFxlPair(state.currentSpineIdx);
+  }
   if (typeof updateFxlNextBtnUI === 'function') updateFxlNextBtnUI();
 }
 
@@ -2732,10 +2822,12 @@ function updateFxlNextBtnUI() {
     return;
   }
   const z = state.fxlZoom;
-  if (z.mode === 'preset' && z.regionIdx < 5) fwd.textContent = (z.regionIdx + 2) + '/6';
-  else                                         fwd.textContent = '⏭';
-  if (z.mode === 'preset' && z.regionIdx > 0) back.textContent = z.regionIdx + '/6';
-  else                                         back.textContent = '⏮';
+  const maxIdx = getZoomStepMaxIdx();
+  const total = maxIdx + 1;
+  if (z.mode === 'preset' && z.regionIdx < maxIdx) fwd.textContent = (z.regionIdx + 2) + '/' + total;
+  else                                              fwd.textContent = '⏭';
+  if (z.mode === 'preset' && z.regionIdx > 0)      back.textContent = z.regionIdx + '/' + total;
+  else                                              back.textContent = '⏮';
 }
 
 function updateFxlRegionPillUI() {
@@ -2744,12 +2836,16 @@ function updateFxlRegionPillUI() {
   const icon = document.getElementById('fxl-region-pill-icon');
   const lbl  = document.getElementById('fxl-region-pill-label');
   const z = state.fxlZoom;
+  const total = getZoomStepMaxIdx() + 1;
   if (z.mode === 'free') {
     if (icon) icon.textContent = '🌀';
     if (lbl)  lbl.textContent  = t('pill.free');
+  } else if (state.fxlRegionOrder === 'vfill') {
+    if (icon) icon.textContent = '↔';
+    if (lbl)  lbl.textContent  = (z.regionIdx + 1) + ' / ' + total;
   } else {
     if (icon) icon.textContent = '🎯';
-    if (lbl)  lbl.textContent  = (z.regionIdx + 1) + ' / 6';
+    if (lbl)  lbl.textContent  = (z.regionIdx + 1) + ' / ' + total;
   }
 }
 
@@ -2798,18 +2894,21 @@ function advanceFxlZoomSpine(dir) {
 
 function advanceFxlZoomStep(dir) {
   const z = state.fxlZoom;
+  const maxIdx = getZoomStepMaxIdx();
   if (z.mode === 'free') {
-    z.regionIdx = dir > 0 ? 0 : 5;
+    z.regionIdx = dir > 0 ? 0 : maxIdx;
     z.mode = 'preset';
+    if (state.fxlRegionOrder === 'vfill' && dir < 0) _fxlAxisLandAtEnd = true;
     advanceFxlZoomSpine(dir);
     return;
   }
   const next = z.regionIdx + dir;
-  if (next >= 0 && next <= 5) {
+  if (next >= 0 && next <= maxIdx) {
     z.regionIdx = next;
     applyFxlRegionPreset();
   } else {
-    z.regionIdx = dir > 0 ? 0 : 5;
+    z.regionIdx = dir > 0 ? 0 : maxIdx;
+    if (state.fxlRegionOrder === 'vfill' && dir < 0) _fxlAxisLandAtEnd = true;
     advanceFxlZoomSpine(dir);
   }
 }
@@ -2984,7 +3083,9 @@ function advanceFxlPage(dir) {
   }
   function onPointerMove(e) {
     if (!active) return;
-    const dx = e.clientX - sx, dy = e.clientY - sy;
+    let dx = e.clientX - sx, dy = e.clientY - sy;
+    // 軸モード（vfill）は他軸方向の移動を無効化
+    if (state.fxlRegionOrder === 'vfill') dy = 0;
     if (!dragMoved && Math.hypot(dx, dy) > PAN_TAP_THRESHOLD) {
       dragMoved = true;
       state.fxlZoom.mode = 'free';
@@ -3042,6 +3143,8 @@ function handleFxlTap(clientX, clientY) {
 }
 
 function regionIdxFromPoint(clientX, clientY) {
+  // 軸モード（vfill）はステップ数が画像比から動的に決まるため、ダブルタップ ON 時は常に先頭から
+  if (state.fxlRegionOrder === 'vfill') return 0;
   const cont = document.getElementById('fxl-container');
   if (!cont) return 0;
   const rect = cont.getBoundingClientRect();
@@ -3337,9 +3440,10 @@ function loadSettings() {
       state.fxlZoom.level = s.fxlZoomLevel;
       const el = document.getElementById('fxl-zoom-level-select'); if(el) el.value = String(s.fxlZoomLevel.toFixed(1));
     }
-    if (s.fxlRegionOrder === 'story' || s.fxlRegionOrder === 'yonkoma') {
+    if (s.fxlRegionOrder === 'story' || s.fxlRegionOrder === 'yonkoma' || s.fxlRegionOrder === 'vfill') {
       state.fxlRegionOrder = s.fxlRegionOrder;
       const el = document.getElementById('fxl-region-order-select'); if(el) el.value = s.fxlRegionOrder;
+      if (typeof syncFxlAxisModeUI === 'function') syncFxlAxisModeUI();
     }
     if (typeof s.fxlLtrAutoFlip === 'boolean') {
       state.fxlLtrAutoFlip = s.fxlLtrAutoFlip;
@@ -3770,10 +3874,26 @@ function changeFxlZoomLevel(v) {
   }
 }
 function changeFxlRegionOrder(v) {
-  if (v !== 'story' && v !== 'yonkoma') return;
+  if (v !== 'story' && v !== 'yonkoma' && v !== 'vfill') return;
   state.fxlRegionOrder = v;
   saveSettings();
-  if (state.fxlZoomEnabled) applyFxlRegionPreset();
+  syncFxlAxisModeUI();
+  if (state.fxlZoomEnabled) {
+    const before = _fxlLastSpreadState;
+    const after  = isEffectiveSpread();
+    if (before !== after && state.fxlPairs) {
+      state.fxlZoom.regionIdx = 0;
+      renderFxlPair(state.currentSpineIdx);
+    } else {
+      state.fxlZoom.regionIdx = 0;
+      applyFxlRegionPreset();
+    }
+  }
+}
+
+function syncFxlAxisModeUI() {
+  const isAxis = (state.fxlRegionOrder === 'vfill');
+  document.body.classList.toggle('fxl-axis-mode', isAxis);
 }
 function toggleFxlLtrAutoFlip() {
   state.fxlLtrAutoFlip = !state.fxlLtrAutoFlip;
