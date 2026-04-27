@@ -20,6 +20,7 @@ Two-file ePub 3 vertical-text viewer for reading Japanese publications. No build
 **Feature differences between files:**
 - Drag-and-drop file open: `yomikake.html` only
 - File System Access API (direct file-reopen from reading list without new picker): `yomikake.html` only
+- IndexedDB ePub cache (iOS-only代替: 直近の ePub Blob を IDB に保存しピッカー無しで再開): `yomikake_ios.html` only
 - Keyboard shortcuts (Space/arrows/Home/End): both files support Bluetooth keyboard; `yomikake_ios.html` also handles touch swipe inside the iframe
 - Toolbar mouse-wheel scroll: `yomikake.html` only
 - Google Drive bookmark sync: both files (requires HTTP server — Google Identity Services does not work on `file://`)
@@ -304,7 +305,26 @@ When `window.showOpenFilePicker` is available (Chrome/Edge), the viewer stores `
 - **`fshPut(bookKey, handle)`** — stores the handle under `bookKey` after `loadEpub()` succeeds.
 - **`fshGetAllKeys()`** — returns all keys with stored handles; called at init to populate `_handleKeys` (module-level `Set`).
 - **`_handleKeys`** — tracks which bookKeys have a cached handle; used by `buildReadingList()` to render "このファイルを開く（直接）" instead of the normal picker button.
-- **`openFilePickerForBook(bookKey)`** — if `_handleKeys.has(bookKey)`, calls `handle.getFile()` directly and passes the result to `loadEpub()`; on `NotAllowedError` or `NotFoundError`, falls back to `showOpenFilePicker()` and removes the stale handle. In `yomikake_ios.html`, this function always falls back to `showOpenFilePicker()`.
+- **`openFilePickerForBook(bookKey)`** — if `_handleKeys.has(bookKey)`, calls `handle.getFile()` directly and passes the result to `loadEpub()`; on `NotAllowedError` or `NotFoundError`, falls back to `showOpenFilePicker()` and removes the stale handle. In `yomikake_ios.html`, this function uses the IDB ePub cache instead (see next section).
+
+### IndexedDB ePub Cache (`yomikake_ios.html` only)
+
+iOS Safari does not implement the File System Access API, so v1.8.8 introduces an alternative: cache the entire ePub Blob in IndexedDB (`epub_viewer_files` DB, `files` object store) keyed by `bookKey`. The reading list can then reopen the book without showing a file picker, even after the page reload.
+
+- **Storage value**: `{ blob: Blob, name: string, size: number, savedAt: ISO }`. JSZip accepts `Blob` directly, so the file can be passed to `loadEpub()` after wrapping in `new File([blob], name, {type:'application/epub+zip'})`.
+- **`EPUB_CACHE_LIMIT = 3`** — LRU cap. Adding a 4th book evicts the oldest by `lastOpenedAt` (read from existing `epub_pos_*` localStorage entries — no extra metadata store needed).
+- **`_cachedKeys: Set<bookKey>`** — module-level set populated at init via `_idbGetAllKeys()`. Refresh `buildReadingList()` once it loads so the UI badge reflects cache state without flicker on slow IDB.
+- **`_idbAvailable`** — flips to `false` if `indexedDB.open()` throws (Private Browsing, ITP block, etc.). All cache functions become no-ops; reading list falls back to picker.
+- **Quota handling** — `cacheEpubFile()` catches `QuotaExceededError`, calls `evictOldestEpubCache()` once, then retries. Further failure is logged via `console.warn` and silently ignored. The user can still read the book; only persistence is lost.
+- **Persistence request** — `navigator.storage.persist()` is called once at init. iOS Safari 16.4+ honors this when the page is added to the Home Screen (PWA-like). Otherwise it returns `false` silently.
+- **`cacheEpubFile(file, bookKey)`** — fire-and-forget call from `loadEpub()` after `saveBookMeta()`. Uses `instanceof Blob` (covers File too) to gate the write.
+- **`loadEpubFromCache(bookKey)`** — entry from reading list cards / `resumeBook()`. Calls `_idbGet(bookKey)`, wraps the Blob into a synthesized `File`, passes to `loadEpub()`. On miss or load failure, deletes the stale cache entry and falls back to `openFilePicker()`. `showLoadingPreSelect()` is called first so the overlay shows immediately; `loadEpub()` then overwrites the message via `showLoading()`.
+- **`openFilePickerForBook(bookKey)`** — branches on `_cachedKeys.has(bookKey)`: cache → `loadEpubFromCache()`, miss → `openFilePicker()`. The `onclick` handler in the reading list card stays the same.
+- **Visual badge** — `.rl-cached` CSS class on `.rl-open-btn` flips the button to filled-accent style and changes label to `t('readingList.openCached')` ("📂 続きから（直接）"). Implemented inline in `buildReadingList()`'s template literal — the same key-driven render as the non-cached button.
+- **Settings panel UI** — `#cache-group` inserts above `#close-book-group`. Shows count + approximate origin storage usage from `navigator.storage.estimate()` (close enough — localStorage usage is ~5MB max), and a "クリア" button that calls `clearEpubCache()` after `confirm()`. Reading positions are NOT touched (only the Blob cache is cleared).
+- **`updateCacheGroupUI()`** — refresh trigger called from: init's `_idbGetAllKeys()` resolution, `cacheEpubFile()` success, `doDeleteBook()` cache eviction, `clearEpubCache()` completion, and `toggleSettings()` opening.
+- **List deletion** — `doDeleteBook()` calls `_idbDelete(bookKey)` and removes from `_cachedKeys` so a removed book stops occupying cache space immediately.
+- **`resumeBook()`** — when called (legacy entry from welcome banner), prefers `loadEpubFromCache()` if `epub_last_book.bookKey` is in `_cachedKeys`; otherwise falls back to existing toast + picker.
 
 ### Google Drive Bookmark Sync
 

@@ -204,6 +204,9 @@
   .rl-date { font-size:12px; opacity:.5; white-space:nowrap; }
   .rl-open-btn { font-size:13px; font-weight:600; color:var(--accent); background:transparent; border:1.5px solid var(--accent); border-radius:9px; padding:6px 14px; cursor:pointer; white-space:nowrap; transition:all .15s; flex-shrink:0; }
   .rl-open-btn:hover { background:var(--accent); color:#fff; }
+  /* キャッシュ済み: 強調塗りつぶし。ピッカー不要で直接開けるサインとして区別する */
+  .rl-open-btn.rl-cached { background:var(--accent); color:#fff; }
+  .rl-open-btn.rl-cached:hover { filter:brightness(1.08); }
   #reading-list-edit-btn { margin-left:auto; font-size:12px; font-weight:600; color:var(--accent); background:transparent; border:1.5px solid var(--accent); border-radius:8px; padding:4px 12px; cursor:pointer; flex-shrink:0; transition:all .15s; }
   .rl-delete-btn { display:none; position:absolute; top:10px; right:10px; width:28px; height:28px; border-radius:50%; background:#e53e3e; border:none; color:#fff; font-size:18px; line-height:1; cursor:pointer; align-items:center; justify-content:center; z-index:2; }
   #reading-list.edit-mode .rl-delete-btn { display:flex; }
@@ -609,6 +612,16 @@
                 style="border:1px solid var(--ui-border);border-radius:8px;padding:6px 16px;min-width:60px;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;">OFF</button>
       </div>
     </div>
+    <div class="set-group" id="cache-group">
+      <h4 data-i18n="cache.group">📂 ePub キャッシュ</h4>
+      <div class="set-row" style="align-items:flex-start;flex-direction:column;gap:6px;">
+        <span class="set-label" id="cache-summary" style="font-size:12px;opacity:.85;">—</span>
+        <span style="font-size:11px;opacity:.6;line-height:1.5;" data-i18n="cache.help">直近の ePub をローカルに保存し、ピッカー無しで再開できます</span>
+        <button id="cache-clear-btn" onclick="clearEpubCache()"
+                style="margin-top:4px;width:100%;border:1px solid var(--ui-border);border-radius:8px;padding:7px 14px;font-size:13px;font-weight:600;cursor:pointer;background:var(--ui-bg);color:var(--ui-text);transition:all .15s;"
+                data-i18n="cache.clearBtn">クリア</button>
+      </div>
+    </div>
     <div class="set-group set-close-group" id="close-book-group" style="display:none">
       <button id="close-book-btn" onclick="closeBook()" data-i18n="btn.closeBook">📚 この本を閉じる</button>
     </div>
@@ -934,6 +947,7 @@ const I18N = {
     'readingList.count':    '{n}冊',
     'readingList.chapter':  '第{n}章 / 全{total}章',
     'readingList.openThis': 'このファイルを開く',
+    'readingList.openCached':'📂 続きから（直接）',
     'readingList.openNew':  '別の ePub を開く',
     'readingList.today':    '今日',
     'readingList.yesterday':'昨日',
@@ -949,6 +963,14 @@ const I18N = {
     'finished.dismiss':     '閉じない',
     'btn.closeBook':        '📚 この本を閉じる',
     'btn.closeBook.title':  'この本を閉じて読みかけリストへ',
+    'cache.group':          '📂 ePub キャッシュ',
+    'cache.summary':        '{count}冊 / {size}',
+    'cache.summaryEmpty':   'キャッシュ無し',
+    'cache.help':           '直近の ePub をローカルに保存し、ピッカー無しで再開できます',
+    'cache.clearBtn':       'クリア',
+    'cache.confirmClear':   'ePub キャッシュを全て削除します。読書位置・しおりは保持されます。続行しますか？',
+    'cache.cleared':        '🗑 キャッシュを削除しました',
+    'toast.cacheLoadFailed':'キャッシュの読み込みに失敗しました。ファイルを選択してください',
   },
   en: {
     'btn.open':             'Open',
@@ -1093,6 +1115,7 @@ const I18N = {
     'readingList.count':    '{n} book(s)',
     'readingList.chapter':  'Ch.{n} / {total}',
     'readingList.openThis': 'Open this file',
+    'readingList.openCached':'📂 Resume (cached)',
     'readingList.openNew':  'Open another ePub',
     'readingList.today':    'Today',
     'readingList.yesterday':'Yesterday',
@@ -1108,6 +1131,14 @@ const I18N = {
     'finished.dismiss':     'Stay',
     'btn.closeBook':        '📚 Close this book',
     'btn.closeBook.title':  'Close book and return to reading list',
+    'cache.group':          '📂 ePub cache',
+    'cache.summary':        '{count} book(s) / {size}',
+    'cache.summaryEmpty':   'No cached files',
+    'cache.help':           'Stores recent ePub files locally so you can resume without the picker',
+    'cache.clearBtn':       'Clear',
+    'cache.confirmClear':   'Remove all cached ePub files? Reading positions and bookmarks are kept. Continue?',
+    'cache.cleared':        '🗑 Cache cleared',
+    'toast.cacheLoadFailed':'Cache load failed. Please pick the file.',
   },
   'zh-TW': {
     'btn.open':             '開啟',
@@ -1252,6 +1283,7 @@ const I18N = {
     'readingList.count':    '{n}本',
     'readingList.chapter':  '第{n}章 / 共{total}章',
     'readingList.openThis': '開啟此檔案',
+    'readingList.openCached':'📂 從快取繼續',
     'readingList.openNew':  '開啟其他 ePub',
     'readingList.today':    '今天',
     'readingList.yesterday':'昨天',
@@ -1267,6 +1299,14 @@ const I18N = {
     'finished.dismiss':     '繼續閱讀',
     'btn.closeBook':        '📚 關閉此書',
     'btn.closeBook.title':  '關閉此書並回到閱讀清單',
+    'cache.group':          '📂 ePub 快取',
+    'cache.summary':        '{count} 本 / {size}',
+    'cache.summaryEmpty':   '無快取',
+    'cache.help':           '將近期 ePub 儲存於本地，無需檔案選擇器即可重新開啟',
+    'cache.clearBtn':       '清除',
+    'cache.confirmClear':   '將清除所有快取的 ePub 檔案。閱讀位置與書籤會保留。是否繼續？',
+    'cache.cleared':        '🗑 已清除快取',
+    'toast.cacheLoadFailed':'快取讀取失敗，請選擇檔案',
   },
   'zh-CN': {
     'btn.open':             '打开',
@@ -1411,6 +1451,7 @@ const I18N = {
     'readingList.count':    '{n}本',
     'readingList.chapter':  '第{n}章 / 共{total}章',
     'readingList.openThis': '打开此文件',
+    'readingList.openCached':'📂 从缓存继续',
     'readingList.openNew':  '打开其他 ePub',
     'readingList.today':    '今天',
     'readingList.yesterday':'昨天',
@@ -1426,6 +1467,14 @@ const I18N = {
     'finished.dismiss':     '继续阅读',
     'btn.closeBook':        '📚 关闭本书',
     'btn.closeBook.title':  '关闭本书并回到阅读列表',
+    'cache.group':          '📂 ePub 缓存',
+    'cache.summary':        '{count} 本 / {size}',
+    'cache.summaryEmpty':   '无缓存',
+    'cache.help':           '将近期 ePub 保存在本地，无需文件选择器即可重新打开',
+    'cache.clearBtn':       '清除',
+    'cache.confirmClear':   '将清除所有缓存的 ePub 文件。阅读位置与书签会保留。是否继续？',
+    'cache.cleared':        '🗑 已清除缓存',
+    'toast.cacheLoadFailed':'缓存读取失败，请选择文件',
   },
 };
 
@@ -1661,6 +1710,182 @@ const FONT_SAMPLE = {
 };
 
 // ══════════════════════════════════════════
+//  ePub File Cache (IndexedDB) — iOS 専用の File System Access API 代替
+//  開いた ePub Blob を IDB に保存し、次回ピッカーなしで再開できるようにする。
+//  LRU で件数を制限、クォータ超過時は最古を 1 件削除してリトライ。
+//  読書動作に影響しない opportunistic キャッシュ（失敗は silent fallback）。
+// ══════════════════════════════════════════
+const EPUB_CACHE_DB    = 'epub_viewer_files';
+const EPUB_CACHE_STORE = 'files';
+const EPUB_CACHE_LIMIT = 3;             // 保持する最大件数
+let _cachedKeys   = new Set();          // bookKey → IDB に Blob あり
+let _idbAvailable = true;               // false なら全関数 no-op（Private Browsing 等）
+
+function _idbOpenCache() {
+  return new Promise((resolve, reject) => {
+    if (!_idbAvailable || !window.indexedDB) { _idbAvailable = false; reject(new Error('idb unavailable')); return; }
+    let req;
+    try { req = indexedDB.open(EPUB_CACHE_DB, 1); }
+    catch(e) { _idbAvailable = false; reject(e); return; }
+    req.onupgradeneeded = ev => {
+      const db = ev.target.result;
+      if (!db.objectStoreNames.contains(EPUB_CACHE_STORE)) db.createObjectStore(EPUB_CACHE_STORE);
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror   = () => { _idbAvailable = false; reject(req.error); };
+  });
+}
+function _idbGet(bookKey) {
+  return _idbOpenCache().then(db => new Promise((resolve, reject) => {
+    const tx = db.transaction(EPUB_CACHE_STORE, 'readonly');
+    const req = tx.objectStore(EPUB_CACHE_STORE).get(bookKey);
+    req.onsuccess = () => resolve(req.result || null);
+    req.onerror   = () => reject(req.error);
+  })).catch(() => null);
+}
+function _idbPut(bookKey, value) {
+  return _idbOpenCache().then(db => new Promise((resolve, reject) => {
+    const tx = db.transaction(EPUB_CACHE_STORE, 'readwrite');
+    const req = tx.objectStore(EPUB_CACHE_STORE).put(value, bookKey);
+    req.onsuccess = () => resolve();
+    req.onerror   = () => reject(req.error);
+    tx.onerror    = () => reject(tx.error);
+  }));
+}
+function _idbDelete(bookKey) {
+  return _idbOpenCache().then(db => new Promise((resolve, reject) => {
+    const tx = db.transaction(EPUB_CACHE_STORE, 'readwrite');
+    const req = tx.objectStore(EPUB_CACHE_STORE).delete(bookKey);
+    req.onsuccess = () => resolve();
+    req.onerror   = () => reject(req.error);
+  })).catch(() => {});
+}
+function _idbGetAllKeys() {
+  return _idbOpenCache().then(db => new Promise((resolve, reject) => {
+    const tx = db.transaction(EPUB_CACHE_STORE, 'readonly');
+    const req = tx.objectStore(EPUB_CACHE_STORE).getAllKeys();
+    req.onsuccess = () => resolve(req.result || []);
+    req.onerror   = () => reject(req.error);
+  })).catch(() => []);
+}
+function _idbClear() {
+  return _idbOpenCache().then(db => new Promise((resolve, reject) => {
+    const tx = db.transaction(EPUB_CACHE_STORE, 'readwrite');
+    const req = tx.objectStore(EPUB_CACHE_STORE).clear();
+    req.onsuccess = () => resolve();
+    req.onerror   = () => reject(req.error);
+  })).catch(() => {});
+}
+
+// 起動時に IDB の既存キーを取り込み、persistent storage を要求
+_idbGetAllKeys().then(keys => {
+  _cachedKeys = new Set(keys);
+  // 既に welcome 画面にリストが描画済みの場合はバッジ反映のため再描画
+  if (!state.epub && document.getElementById('reading-list')) buildReadingList();
+  updateCacheGroupUI();
+}).catch(() => {});
+if (navigator.storage && navigator.storage.persist) {
+  navigator.storage.persist().catch(() => {});
+}
+
+// LRU: excludeKey 以外で lastOpenedAt が最古のエントリを 1 件削除し、その bookKey を返す。
+async function evictOldestEpubCache(excludeKey) {
+  let oldestKey = null;
+  let oldestT   = '￿';
+  for (const k of _cachedKeys) {
+    if (k === excludeKey) continue;
+    let t = '0';
+    try {
+      const meta = JSON.parse(localStorage.getItem(k) || '{}');
+      if (meta && meta.lastOpenedAt) t = meta.lastOpenedAt;
+    } catch (e) {}
+    if (t < oldestT) { oldestT = t; oldestKey = k; }
+  }
+  if (oldestKey) {
+    await _idbDelete(oldestKey);
+    _cachedKeys.delete(oldestKey);
+    return oldestKey;
+  }
+  return null;
+}
+
+// loadEpub 成功後に呼び出される非同期キャッシュ書込み（fire-and-forget）。
+// 失敗してもユーザー操作には一切影響しない。
+async function cacheEpubFile(file, bookKey) {
+  if (!_idbAvailable || !file || !bookKey) return;
+  try {
+    // 上限超過なら先に LRU 削除
+    if (!_cachedKeys.has(bookKey)) {
+      while (_cachedKeys.size >= EPUB_CACHE_LIMIT) {
+        const evicted = await evictOldestEpubCache(bookKey);
+        if (!evicted) break;
+      }
+    }
+    const value = {
+      blob:    file,                                  // File は Blob のサブクラス
+      name:    file.name || (bookKey + '.epub'),
+      size:    file.size || 0,
+      savedAt: new Date().toISOString(),
+    };
+    try {
+      await _idbPut(bookKey, value);
+      _cachedKeys.add(bookKey);
+    } catch (e) {
+      if (e && e.name === 'QuotaExceededError') {
+        // 1 件削除してリトライ
+        const evicted = await evictOldestEpubCache(bookKey);
+        if (evicted) {
+          await _idbPut(bookKey, value);
+          _cachedKeys.add(bookKey);
+        }
+      } else {
+        throw e;
+      }
+    }
+    updateCacheGroupUI();
+  } catch (e) {
+    console.warn('[cache] save failed:', e);
+  }
+}
+
+// 設定パネル「ePub キャッシュ」グループの件数・サイズ表示を更新
+async function updateCacheGroupUI() {
+  const summaryEl = document.getElementById('cache-summary');
+  const clearBtn  = document.getElementById('cache-clear-btn');
+  if (!summaryEl) return;
+  const count = _cachedKeys.size;
+  if (count === 0) {
+    summaryEl.textContent = t('cache.summaryEmpty');
+    if (clearBtn) { clearBtn.disabled = true; clearBtn.style.opacity = '.45'; clearBtn.style.cursor = 'default'; }
+    return;
+  }
+  if (clearBtn) { clearBtn.disabled = false; clearBtn.style.opacity = '1'; clearBtn.style.cursor = 'pointer'; }
+  // navigator.storage.estimate() で全 origin の usage を概算表示
+  // （cache 以外の使用は localStorage 5MB 程度なので EPUB ファイル容量が支配的）
+  let sizeStr = '—';
+  try {
+    if (navigator.storage && navigator.storage.estimate) {
+      const est = await navigator.storage.estimate();
+      const bytes = est && typeof est.usage === 'number' ? est.usage : 0;
+      const mb = bytes / (1024 * 1024);
+      sizeStr = mb >= 100 ? Math.round(mb) + ' MB' : mb.toFixed(1) + ' MB';
+    }
+  } catch (e) {}
+  summaryEl.textContent = t('cache.summary', { count, size: sizeStr });
+}
+
+// 全キャッシュを削除（ユーザー操作のため confirm を介する）
+async function clearEpubCache() {
+  if (!_cachedKeys.size) return;
+  if (!confirm(t('cache.confirmClear'))) return;
+  await _idbClear();
+  _cachedKeys.clear();
+  showToast(t('cache.cleared'));
+  updateCacheGroupUI();
+  if (!state.epub) buildReadingList();
+}
+
+// ══════════════════════════════════════════
 //  File Open（iOS Safari: ファイルピッカーのみ、ドラッグ＆ドロップなし）
 // ══════════════════════════════════════════
 document.getElementById('file-input').addEventListener('change', e => {
@@ -1778,6 +2003,12 @@ async function loadEpub(file) {
     state.bookCoverDataUri = '';
     try { state.bookCoverDataUri = await extractCoverThumb(opfDoc) || ''; } catch(e) {}
     saveBookMeta();
+
+    // ePub Blob を IDB にキャッシュ（次回ピッカー無しで再開できるように）。
+    // ファイルピッカー経由で渡された File のみ対象。失敗しても読書には影響しない。
+    if (file && (file instanceof Blob)) {
+      cacheEpubFile(file, state.bookKey).catch(() => {});
+    }
 
     document.getElementById('welcome').style.display = 'none';
     document.getElementById('page-container').classList.add('visible');
@@ -3544,6 +3775,7 @@ function toggleSettings() {
     overlay.classList.add('show');
     document.getElementById('settings-btn').classList.add('active');
     updateThemeBtnUI();
+    updateCacheGroupUI();
   }
 }
 
@@ -3564,6 +3796,10 @@ changeTheme = function(v) {
 function resumeBook() {
   try {
     const data = JSON.parse(localStorage.getItem('epub_last_book'));
+    if (data && data.bookKey && _cachedKeys.has(data.bookKey)) {
+      loadEpubFromCache(data.bookKey);
+      return;
+    }
     if (data && data.title) {
       showToast(t('toast.resumeHint', {title: data.title}));
       openFilePicker();
@@ -4086,6 +4322,9 @@ function buildReadingList() {
       : BOOK_ICON;
     const creatorHtml = item.creator
       ? `<div class="rl-creator">${esc(item.creator)}</div>` : '';
+    const isCached = _cachedKeys.has(item.key);
+    const openLabel = isCached ? t('readingList.openCached') : t('readingList.openThis');
+    const openClass = isCached ? 'rl-open-btn rl-cached' : 'rl-open-btn';
     return `<div class="rl-card${isLast ? ' rl-last' : ''}" data-key="${esc(item.key)}">
   <button class="rl-delete-btn" onclick="confirmDeleteBook('${esc(item.key)}','${esc(item.title)}')" aria-label="${t('readingList.deleteTitle')}">×</button>
   <div class="rl-thumb">${thumbHtml}</div>
@@ -4099,7 +4338,7 @@ function buildReadingList() {
     </div>
     <div class="rl-meta">
       <span class="rl-date">${formatRelativeDate(item.lastOpenedAt)}</span>
-      <button class="rl-open-btn" data-key="${esc(item.key)}" onclick="openFilePickerForBook(this.dataset.key)">${t('readingList.openThis')}</button>
+      <button class="${openClass}" data-key="${esc(item.key)}" onclick="openFilePickerForBook(this.dataset.key)">${openLabel}</button>
     </div>
   </div>
 </div>`;
@@ -4135,11 +4374,54 @@ function confirmDeleteBook(bookKey, title) {
 function doDeleteBook(bookKey) {
   closeModal(true);
   markAsFinished(bookKey);
+  // リストから消えるので IDB のキャッシュも破棄
+  if (_cachedKeys.has(bookKey)) {
+    _idbDelete(bookKey).catch(() => {});
+    _cachedKeys.delete(bookKey);
+    updateCacheGroupUI();
+  }
   buildReadingList();
 }
 
 function openFilePickerForBook(bookKey) {
-  openFilePicker();
+  if (_cachedKeys.has(bookKey)) {
+    loadEpubFromCache(bookKey);
+  } else {
+    openFilePicker();
+  }
+}
+
+// IDB から ePub Blob を取り出し loadEpub() に渡す。miss / 失敗時はピッカーへフォールバック。
+async function loadEpubFromCache(bookKey) {
+  if (!_idbAvailable || !_cachedKeys.has(bookKey)) { openFilePicker(); return; }
+  showLoadingPreSelect();
+  try {
+    const cached = await _idbGet(bookKey);
+    if (!cached || !cached.blob) {
+      _cachedKeys.delete(bookKey);
+      hideLoading();
+      showToast(t('toast.cacheLoadFailed'));
+      openFilePicker();
+      return;
+    }
+    const fname = cached.name || (bookKey + '.epub');
+    let file;
+    try {
+      file = new File([cached.blob], fname, { type: 'application/epub+zip' });
+    } catch (e) {
+      // 古い iOS Safari では File constructor が失敗することがあるため Blob で代替
+      file = cached.blob;
+      try { Object.defineProperty(file, 'name', { value: fname, configurable: true }); } catch (e2) {}
+    }
+    await loadEpub(file);
+  } catch (e) {
+    console.warn('[cache] load failed:', e);
+    hideLoading();
+    showToast(t('toast.cacheLoadFailed'));
+    _cachedKeys.delete(bookKey);
+    _idbDelete(bookKey).catch(() => {});
+    if (!state.epub) openFilePicker();
+  }
 }
 
 function updateCloseBookBtnVisibility() {
