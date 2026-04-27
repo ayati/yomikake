@@ -2353,7 +2353,7 @@ function buildScrollScript(scrollTarget, writingMode, readySeq) {
       '    var ax = axis();',
       '    // Inject blank-end-page padding (same pattern as dedicated vertical / horizontal modes).',
       '    var pad = document.createElement("style");',
-      '    pad.textContent = ax === "h" ? "html{padding-left:100vw!important}body{overflow-y:hidden!important;box-sizing:border-box!important;padding-bottom:' + pubVertPad + '!important;}" : "html{padding-bottom:100vh!important}";',
+      '    pad.textContent = ax === "h" ? "html{padding-left:100vw!important}body{margin:0!important;overflow-y:hidden!important;box-sizing:border-box!important;padding-bottom:' + pubVertPad + '!important;}" : "html{padding-bottom:100vh!important}";',
       '    document.head.appendChild(pad);',
       '    var _flush = e.scrollWidth; // force reflow so padding takes effect',
       '    _neg = null; // reset sign cache — scrollWidth changed after padding injection',
