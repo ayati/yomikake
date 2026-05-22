@@ -11,7 +11,7 @@ Two-file ePub 3 vertical-text viewer for reading Japanese publications. No build
 | `yomikake.html` | Chrome / Firefox / Edge (Windows, macOS, Android) and macOS Safari |
 | `yomikake_ios.html` | iOS Safari (iPhone / iPad) only — uses CSS transform scroll instead of scroll APIs |
 
-**External dependency:** JSZip 3.10.1 loaded via CDN (`cdnjs.cloudflare.com`).
+**External dependency:** JSZip 3.10.1, **inlined directly in both files** (a `<script>` block, v1.8.12+) so ePub unzip works fully offline / on `file://` — the cdnjs `<script src>` was removed from both. To update the inlined copy: replace the inline script body (just below the `<!-- JSZip v3.10.1 inlined ... -->` comment near the top of each file) with a freshly downloaded `jszip.min.js`; verify with `openssl dgst -sha512 -binary jszip.min.js | openssl base64 -A` against the SRI hash recorded in that comment. Keep the two files' inlined copies on the same JSZip version.
 
 **Public deployment:** `https://www.ayati.com/book/yomikake.html` / `yomikake_ios.html` — this origin must be listed in the Google Cloud Console OAuth client's "Authorized JavaScript origins" for Drive sync to work in production.
 
@@ -20,7 +20,7 @@ Two-file ePub 3 vertical-text viewer for reading Japanese publications. No build
 **Feature differences between files:**
 - Drag-and-drop file open: `yomikake.html` only
 - File System Access API (direct file-reopen from reading list without new picker): `yomikake.html` only
-- IndexedDB ePub cache (iOS-only代替: 直近の ePub Blob を IDB に保存しピッカー無しで再開): `yomikake_ios.html` only
+- IndexedDB ePub Blob cache (直近の ePub 実体を IDB に保存し、オフライン／クラウド実体なしでもピッカー無しで再開): **both files** (v1.8.12+). `yomikake_ios.html` uses it as the sole reopen mechanism (no FSA); `yomikake.html` uses it as a **complement** to the File System Access handle — both are stored on open, and `openFilePickerForBook()` falls back handle.getFile() → IDB Blob → picker.
 - Keyboard shortcuts (Space/arrows/Home/End): both files support Bluetooth keyboard; `yomikake_ios.html` also handles touch swipe inside the iframe
 - Toolbar mouse-wheel scroll: `yomikake.html` only
 - Google Drive bookmark sync: both files (requires HTTP server — Google Identity Services does not work on `file://`)
@@ -319,9 +319,14 @@ When `window.showOpenFilePicker` is available (Chrome/Edge), the viewer stores `
 - **`_handleKeys`** — tracks which bookKeys have a cached handle; used by `buildReadingList()` to render "このファイルを開く（直接）" instead of the normal picker button.
 - **`openFilePickerForBook(bookKey)`** — if `_handleKeys.has(bookKey)`, calls `handle.getFile()` directly and passes the result to `loadEpub()`; on `NotAllowedError` or `NotFoundError`, falls back to `showOpenFilePicker()` and removes the stale handle. In `yomikake_ios.html`, this function uses the IDB ePub cache instead (see next section).
 
-### IndexedDB ePub Cache (`yomikake_ios.html` only)
+### IndexedDB ePub Cache (both files)
 
-iOS Safari does not implement the File System Access API, so v1.8.8 introduces an alternative: cache the entire ePub Blob in IndexedDB (`epub_viewer_files` DB, `files` object store) keyed by `bookKey`. The reading list can then reopen the book without showing a file picker, even after the page reload.
+iOS Safari does not implement the File System Access API, so v1.8.8 introduced this for `yomikake_ios.html`: cache the entire ePub Blob in IndexedDB (`epub_viewer_files` DB, `files` object store) keyed by `bookKey`. The reading list can then reopen the book without showing a file picker, even after the page reload. **v1.8.12 ports the same cache to `yomikake.html`** to fix offline reading (e.g. multi-day ferry trips): the previous FSA-handle-only approach stored a *reference* to the file, so `handle.getFile()` failed when the source lived on cloud storage (OneDrive/Drive) whose bytes were not synced locally. The IDB cache stores the actual bytes, so reopen works offline. The function set below is identical in both files; the differences are:
+
+- **`yomikake.html` complements the FSA handle**: `loadEpub()` stores *both* the handle (`fshPut`) and the Blob (`cacheEpubFile`) on every open. `openFilePickerForBook()` chains **handle.getFile() → IDB Blob (`loadEpubFromCache`) → picker** — handle is preferred online (zero extra storage), IDB Blob covers offline; a failed `getFile()` does **not** delete the handle (the failure may just be transient/offline). The reading-list card shows `rl-open-direct` styling + `readingList.openDirect` label when *either* handle or cache is present, and a separate **`✈ オフラインOK` badge** (`readingList.offline`, in `.rl-meta-left`) only when `_cachedKeys.has(key)` (handle alone is not offline-safe).
+- **`yomikake_ios.html` uses the cache as the sole reopen mechanism** (no FSA): `openFilePickerForBook()` branches cache → picker.
+
+**Origin caveat (both files):** IndexedDB is per-origin. The cache only helps when reopening the *same URL* you read on while online (e.g. `https://www.ayati.com/book/yomikake.html`). A downloaded `file://` copy is a different (and unreliable) origin and will not see a cache written under the https deployment — though with JSZip inlined, a `file://` copy can still open locally-saved ePubs via the picker.
 
 - **Storage value**: `{ blob: Blob, name: string, size: number, savedAt: ISO }`. JSZip accepts `Blob` directly, so the file can be passed to `loadEpub()` after wrapping in `new File([blob], name, {type:'application/epub+zip'})`.
 - **`EPUB_CACHE_LIMIT = 3`** — LRU cap. Adding a 4th book evicts the oldest by `lastOpenedAt` (read from existing `epub_pos_*` localStorage entries — no extra metadata store needed).
@@ -360,7 +365,7 @@ Both files support syncing `epub_pos_*` / `epub_last_book` keys to/from Google D
 
 - ePub `<script>` tags stripped in `buildSrcdoc()` (XSS — iframe has no `sandbox` attribute).
 - ePub `<base>` replaced with `<base href="about:blank">` to prevent `file://` URL leakage.
-- JSZip loaded with SRI (`integrity` + `crossorigin`).
+- JSZip: **both files** inline a SRI-verified copy of `jszip.min.js` (no network fetch, so no runtime SRI; integrity is checked once at update time against the hash recorded in the inline-block comment).
 - `postMessage` origin is `"*"` (required for `file://`); receiver validates `e.source === iframe.contentWindow` to reject messages from other windows/extensions, plus `e.data.type`.
 - All `<a>` clicks inside the iframe are intercepted: external URLs → `window.open(_blank, noopener)`, internal epub links → `EPUB_LINK` postMessage to parent (prevents X-Frame-Options errors). `javascript:` scheme URIs are rejected in `handleIframeLink()`.
 - Inline `on*` event handlers in ePub content are **not** stripped — intentional trade-off (low risk, high removal cost).
