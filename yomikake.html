@@ -1102,6 +1102,11 @@ const I18N = {
     'readingList.clearFilter':  '絞り込みを解除',
     'readingList.viewList':     'リスト表示',
     'readingList.viewGrid':     'グリッド表示',
+    'readingList.purgeTitle':   '読書記録の完全削除',
+    'readingList.purgeMsg':     '「{title}」の読書記録を完全に削除しますか？',
+    'readingList.purgeDetail':  '読書位置・表紙・読了の記録がこの端末から消去されます。元に戻すことはできず、再度 ePub ファイルを開くまでリストに復活しません。',
+    'readingList.purgeNote':    '※ 削除後に Drive へ保存すると、他の端末にも次回の Drive 読込時に削除が反映されます。エクスポート済みのしおりファイルには削除は及びません。',
+    'readingList.purgeOk':      '完全に削除する',
     'finished.msg':         '📖 最後まで読みました',
     'finished.backToList':  '読みかけリストへ',
     'finished.dismiss':     '閉じない',
@@ -1286,6 +1291,11 @@ const I18N = {
     'readingList.clearFilter':  'Clear filters',
     'readingList.viewList':     'List view',
     'readingList.viewGrid':     'Grid view',
+    'readingList.purgeTitle':   'Permanently delete record',
+    'readingList.purgeMsg':     'Permanently delete the reading record for "{title}"?',
+    'readingList.purgeDetail':  'Reading position, cover, and finished status will be erased from this device. This cannot be undone; the book will not reappear until you open its ePub file again.',
+    'readingList.purgeNote':    'Note: if you save to Drive after deleting, the deletion is also applied on your other devices the next time they load from Drive. Previously exported bookmark files are not affected.',
+    'readingList.purgeOk':      'Delete permanently',
     'finished.msg':         '📖 Finished reading',
     'finished.backToList':  'Back to reading list',
     'finished.dismiss':     'Stay',
@@ -1470,6 +1480,11 @@ const I18N = {
     'readingList.clearFilter':  '清除篩選',
     'readingList.viewList':     '清單檢視',
     'readingList.viewGrid':     '網格檢視',
+    'readingList.purgeTitle':   '完全刪除閱讀記錄',
+    'readingList.purgeMsg':     '要完全刪除「{title}」的閱讀記錄嗎？',
+    'readingList.purgeDetail':  '閱讀位置、封面與讀完記錄將從此裝置刪除，無法復原；重新開啟 ePub 檔案前不會再出現在清單中。',
+    'readingList.purgeNote':    '※ 刪除後儲存到 Drive，其他裝置在下次讀取 Drive 時也會套用此刪除。先前匯出的書籤檔不受影響。',
+    'readingList.purgeOk':      '完全刪除',
     'finished.msg':         '📖 已讀完全書',
     'finished.backToList':  '回到閱讀清單',
     'finished.dismiss':     '繼續閱讀',
@@ -1654,6 +1669,11 @@ const I18N = {
     'readingList.clearFilter':  '清除筛选',
     'readingList.viewList':     '列表视图',
     'readingList.viewGrid':     '网格视图',
+    'readingList.purgeTitle':   '完全删除阅读记录',
+    'readingList.purgeMsg':     '要完全删除「{title}」的阅读记录吗？',
+    'readingList.purgeDetail':  '阅读位置、封面与读完记录将从此设备删除，无法恢复；重新打开 ePub 文件前不会再出现在列表中。',
+    'readingList.purgeNote':    '※ 删除后保存到 Drive，其他设备在下次读取 Drive 时也会应用此删除。先前导出的书签文件不受影响。',
+    'readingList.purgeOk':      '完全删除',
     'finished.msg':         '📖 已读完全书',
     'finished.backToList':  '回到阅读列表',
     'finished.dismiss':     '继续阅读',
@@ -4926,31 +4946,60 @@ function markAsFinished(bookKey) {
   fshDelete(bookKey).then(() => _handleKeys.delete(bookKey)).catch(() => {});
 }
 
-let _rlPendingDeleteKey = null;  // confirmDeleteBook → doDeleteBook 間で受け渡す削除対象キー
+let _rlPendingDeleteKey  = null;  // confirmDeleteBook → doDeleteBook 間で受け渡す削除対象キー
+let _rlPendingDeleteMode = null;  // 'hide'（論理削除＝読了扱い）| 'purge'（完全削除）
 
 function confirmDeleteBook(bookKey) {
   // タイトルはキーから復元し、キーはモジュール変数で受け渡す。
   // inline onclick への文字列埋め込みは「'」を含むタイトルで JS が壊れるため使わない
   const parsed = parseBookKey(bookKey);
   const title = parsed ? parsed.title : bookKey;
+  // 読了済みカード（「✓読了も表示」ON時のみ表示される）の削除は物理削除（purge）。
+  // 判定は描画結果でなく localStorage エントリから _rlCollect と同一条件で再計算する。
+  // エントリが読めない場合は安全側（論理削除）に倒す
+  let finished = false;
+  try {
+    const val = JSON.parse(localStorage.getItem(bookKey)) || {};
+    const spineCount = (typeof val.spineCount === 'number' && val.spineCount > 0)
+      ? val.spineCount : (parsed ? parsed.spineCount : null);
+    if (spineCount > 0)
+      finished = (val.spineIdx || 0) >= spineCount - 1 && (val.ratio || 0) > 0.9;
+  } catch (e) {}
   _rlPendingDeleteKey = bookKey;
-  document.getElementById('modal-title').textContent = t('readingList.deleteTitle');
-  document.getElementById('modal-close').style.display = 'none';
-  document.getElementById('modal-body').innerHTML =
-    `<p>${t('readingList.deleteMsg', {title: esc(title)})}</p>
-     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:24px;">
+  _rlPendingDeleteMode = finished ? 'purge' : 'hide';
+  const isPurge = finished;
+  const btnRow = (okLabel) =>
+    `<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:24px;">
        <button onclick="closeModal(true)" style="font-size:14px;font-weight:600;padding:10px 20px;border-radius:8px;border:1px solid var(--ui-border);background:var(--ui-bg);color:var(--ui-text);cursor:pointer;">${t('readingList.deleteCancel')}</button>
-       <button onclick="doDeleteBook()" style="font-size:14px;font-weight:600;padding:10px 20px;border-radius:8px;border:none;background:#e53e3e;color:#fff;cursor:pointer;">${t('readingList.deleteOk')}</button>
+       <button onclick="doDeleteBook()" style="font-size:14px;font-weight:600;padding:10px 20px;border-radius:8px;border:none;background:#e53e3e;color:#fff;cursor:pointer;">${okLabel}</button>
      </div>`;
+  document.getElementById('modal-title').textContent =
+    t(isPurge ? 'readingList.purgeTitle' : 'readingList.deleteTitle');
+  document.getElementById('modal-close').style.display = 'none';
+  document.getElementById('modal-body').innerHTML = isPurge
+    ? `<p>${t('readingList.purgeMsg', {title: esc(title)})}</p>
+       <p>${t('readingList.purgeDetail')}</p>
+       <p style="font-size:12px;opacity:.65;">${t('readingList.purgeNote')}</p>` + btnRow(t('readingList.purgeOk'))
+    : `<p>${t('readingList.deleteMsg', {title: esc(title)})}</p>` + btnRow(t('readingList.deleteOk'));
   document.getElementById('modal-overlay').classList.add('show');
+}
+
+// 読書記録の完全削除。墓標を記録してからローカル実体を消す。
+// 墓標はエクスポート/Drive 保存に同梱され、他端末の読込時にも削除が反映される
+function _rlPurgeBook(bookKey) {
+  _rlAddTombstone(bookKey);
+  _rlPurgeLocalData(bookKey);
 }
 
 function doDeleteBook() {
   const bookKey = _rlPendingDeleteKey;
+  const mode = _rlPendingDeleteMode;
   _rlPendingDeleteKey = null;
+  _rlPendingDeleteMode = null;
   closeModal(true);
   if (!bookKey) return;
-  markAsFinished(bookKey);
+  if (mode === 'purge') _rlPurgeBook(bookKey);
+  else markAsFinished(bookKey);
   // リストから消えるので IDB の ePub キャッシュも破棄
   if (_cachedKeys.has(bookKey)) {
     _idbDelete(bookKey).catch(() => {});
@@ -5118,6 +5167,10 @@ async function extractCoverThumb(opfDoc) {
 // ── saveBookMeta: 本を開いたときにメタデータをしおりエントリに保存 ──
 function saveBookMeta() {
   if (!state.bookKey) return;
+  // 完全削除済みの本を開き直した場合は墓標を除去（開き直し＝意図的な復活）
+  const hk = _rlHashKey(state.bookKey);
+  const purgedList = _rlLoadPurged();
+  if (purgedList.some(en => en.h === hk)) _rlSavePurged(purgedList.filter(en => en.h !== hk));
   let meta = null;
   try {
     const existing = JSON.parse(localStorage.getItem(state.bookKey)) || {};
@@ -5323,18 +5376,113 @@ function updateJumpHistoryUI() {
 // ══════════════════════════════════════════
 //  Bookmark Export / Import
 // ══════════════════════════════════════════
-function exportBookmarks() {
-  const data = {};
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (key.startsWith('epub_pos_') || key === 'epub_last_book') {
-      try { data[key] = JSON.parse(localStorage.getItem(key)); } catch(e) { data[key] = localStorage.getItem(key); }
-    }
+
+// ── 削除墓標（tombstone）— 完全削除の端末間伝播 ──
+// 完全削除した本を「キーのハッシュ＋削除時刻」だけで記録し（タイトルは残さない）、
+// エクスポート/Drive 保存の "purged" フィールドに同梱して他端末へ伝える。
+// インポート/Drive 読込時は墓標より古いしおりを取り込まず、ローカル残存分も削除する。
+// 本を開き直すと墓標は除去される（＝意図的な復活。saveBookMeta 参照）。
+const _PURGED_KEY = 'epub_purged';
+const _PURGED_MAX = 200;              // 墓標の上限件数
+const _PURGED_TTL = 365 * 86400000;   // 保持期間（1年）
+
+function _rlHashKey(key) {
+  // FNV-1a 32bit を seed 違いで2本 → 16進16桁。タイトルへ逆引きできない識別子
+  let h1 = 0x811c9dc5, h2 = 0x7ee36d51;
+  for (let i = 0; i < key.length; i++) {
+    const c = key.charCodeAt(i);
+    h1 = Math.imul(h1 ^ c, 0x01000193) >>> 0;
+    h2 = Math.imul(h2 ^ c, 0x01000193) >>> 0;
   }
-  const count = Object.keys(data).filter(k => k.startsWith('epub_pos_')).length;
+  return h1.toString(16).padStart(8, '0') + h2.toString(16).padStart(8, '0');
+}
+
+function _rlLoadPurged() {
+  try {
+    const arr = JSON.parse(localStorage.getItem(_PURGED_KEY));
+    if (!Array.isArray(arr)) return [];
+    return arr.filter(e => e && typeof e.h === 'string' && typeof e.t === 'string');
+  } catch (e) { return []; }
+}
+
+function _rlSavePurged(list) {
+  // 期限切れを剪定し、新しい順に上限件数まで保持
+  const cutoff = Date.now() - _PURGED_TTL;
+  const pruned = list
+    .filter(e => { const ms = Date.parse(e.t); return !isNaN(ms) && ms >= cutoff; })
+    .sort((a, b) => Date.parse(b.t) - Date.parse(a.t))
+    .slice(0, _PURGED_MAX);
+  try {
+    if (pruned.length) localStorage.setItem(_PURGED_KEY, JSON.stringify(pruned));
+    else localStorage.removeItem(_PURGED_KEY);
+  } catch (e) {}
+}
+
+function _rlAddTombstone(bookKey) {
+  const h = _rlHashKey(bookKey);
+  const list = _rlLoadPurged().filter(e => e.h !== h);
+  list.push({ h, t: new Date().toISOString() });
+  _rlSavePurged(list);
+}
+
+// 端末ローカルのデータ実体（しおり・FSAハンドル・ePubキャッシュ・epub_last_book）を消す。
+// 墓標には触らない
+function _rlPurgeLocalData(bookKey) {
+  try { localStorage.removeItem(bookKey); } catch (e) {}
+  fshDelete(bookKey).then(() => _handleKeys.delete(bookKey)).catch(() => {});
+  if (_cachedKeys.has(bookKey)) {
+    _idbDelete(bookKey).catch(() => {});
+    _cachedKeys.delete(bookKey);
+    updateCacheGroupUI();
+  }
+  try {
+    const lb = JSON.parse(localStorage.getItem('epub_last_book'));
+    if (lb && lb.bookKey === bookKey) localStorage.removeItem('epub_last_book');
+  } catch (e) {}
+}
+
+// ローカル墓標と受信墓標をマージし、ローカルの残存しおりへ適用する。
+// 戻り値: Map(hash → 削除時刻ms)。呼び出し元のしおり取込判定に使う
+function _rlApplyTombstones(importedPurged) {
+  const map = new Map();
+  const add = (e) => {
+    const ms = Date.parse(e.t);
+    if (isNaN(ms)) return;
+    const cur = map.get(e.h);
+    if (cur === undefined || ms > cur) map.set(e.h, ms);
+  };
+  _rlLoadPurged().forEach(add);
+  if (Array.isArray(importedPurged))
+    importedPurged.filter(e => e && typeof e.h === 'string' && typeof e.t === 'string').forEach(add);
+  // 墓標が lastOpenedAt より新しいローカルしおりは完全削除（他端末で削除済みの残存分）
+  for (let i = localStorage.length - 1; i >= 0; i--) {
+    const key = localStorage.key(i);
+    if (!key || !key.startsWith('epub_pos_')) continue;
+    const ms = map.get(_rlHashKey(key));
+    if (ms === undefined) continue;
+    let opened = 0;
+    try { opened = Date.parse((JSON.parse(localStorage.getItem(key)) || {}).lastOpenedAt) || 0; } catch (e) {}
+    if (ms > opened) _rlPurgeLocalData(key);
+  }
+  _rlSavePurged([...map.entries()].map(([h, ms]) => ({ h, t: new Date(ms).toISOString() })));
+  return map;
+}
+
+// epub_last_book が実在しないしおりを指していたら除去（墓標適用・取込スキップ後の整合）
+function _rlCleanupLastBook() {
+  try {
+    const lb = JSON.parse(localStorage.getItem('epub_last_book'));
+    if (lb && lb.bookKey && localStorage.getItem(lb.bookKey) === null)
+      localStorage.removeItem('epub_last_book');
+  } catch (e) {}
+}
+
+function exportBookmarks() {
+  const payload = collectBookmarks();
+  const count = Object.keys(payload.bookmarks).filter(k => k.startsWith('epub_pos_')).length;
   if (count === 0) { showToast(t('toast.noBookmarks')); return; }
   const blob = new Blob(
-    [JSON.stringify({ version: 1, exportedAt: new Date().toISOString(), bookmarks: data }, null, 2)],
+    [JSON.stringify(payload, null, 2)],
     { type: 'application/json' }
   );
   const url = URL.createObjectURL(blob);
@@ -5356,6 +5504,8 @@ document.getElementById('bookmark-input').addEventListener('change', e => {
     try {
       const json = JSON.parse(ev.target.result);
       if (!json.bookmarks || typeof json.bookmarks !== 'object') throw new Error(t('err.invalidFormat'));
+      // 削除墓標をマージし、ローカル残存分へ適用（完全削除の端末間伝播）
+      const tomb = _rlApplyTombstones(json.purged);
       let count = 0;
       for (const [key, val] of Object.entries(json.bookmarks)) {
         if (!key.startsWith('epub_pos_') && key !== 'epub_last_book') continue;
@@ -5364,6 +5514,11 @@ document.getElementById('bookmark-input').addEventListener('change', e => {
         if (!obj || typeof obj !== 'object') continue;
         if (key === 'epub_last_book' && typeof obj.title !== 'string') continue;
         if (key.startsWith('epub_pos_') && (typeof obj.spineIdx !== 'number' || typeof obj.ratio !== 'number')) continue;
+        // 墓標が lastOpenedAt 以降のしおりは取り込まない（削除済みの復活防止）
+        if (key.startsWith('epub_pos_')) {
+          const tms = tomb.get(_rlHashKey(key));
+          if (tms !== undefined && tms >= (Date.parse(obj.lastOpenedAt) || 0)) continue;
+        }
         try {
           localStorage.setItem(key, typeof val === 'string' ? val : JSON.stringify(val));
           if (key.startsWith('epub_pos_')) count++;
@@ -5372,6 +5527,7 @@ document.getElementById('bookmark-input').addEventListener('change', e => {
       // 旧形式キーが取り込まれた場合に備え再統合（state.bookKey は新形式なので統合後にヒットする）
       try { localStorage.removeItem('epub_consolidate_v1'); } catch(e) {}
       consolidateBookmarks();
+      _rlCleanupLastBook();
       let jumped = false;
       if (state.epub && state.bookKey) {
         let newVal = json.bookmarks[state.bookKey];
@@ -5487,7 +5643,9 @@ function collectBookmarks() {
       try { data[key] = JSON.parse(localStorage.getItem(key)); } catch(e) { data[key] = localStorage.getItem(key); }
     }
   }
-  return { version: 1, exportedAt: new Date().toISOString(), bookmarks: data };
+  const purged = _rlLoadPurged();
+  return { version: 1, exportedAt: new Date().toISOString(), bookmarks: data,
+           ...(purged.length ? { purged } : {}) };
 }
 
 // しおりを Drive に保存（Driveにしおりを保存ボタン）
@@ -5652,9 +5810,18 @@ async function driveDownload() {
     if (hasLocal && !confirm(t('confirm.driveOverwrite'))) return;
     btn.disabled = true;
 
+    // 削除墓標をマージし、ローカル残存分へ適用（完全削除の端末間伝播）
+    const tomb = _rlApplyTombstones(json.purged);
     let count = 0;
     for (const [key, val] of Object.entries(json.bookmarks)) {
       if (!key.startsWith('epub_pos_') && key !== 'epub_last_book') continue;
+      // 墓標が lastOpenedAt 以降のしおりは取り込まない（削除済みの復活防止）
+      if (key.startsWith('epub_pos_')) {
+        let opened = 0;
+        try { const o = typeof val === 'string' ? JSON.parse(val) : val; opened = Date.parse(o && o.lastOpenedAt) || 0; } catch(e) {}
+        const tms = tomb.get(_rlHashKey(key));
+        if (tms !== undefined && tms >= opened) continue;
+      }
       try {
         localStorage.setItem(key, typeof val === 'string' ? val : JSON.stringify(val));
         if (key.startsWith('epub_pos_')) count++;
@@ -5663,6 +5830,7 @@ async function driveDownload() {
     // Drive 上の旧形式キーが取り込まれた場合に備え再統合
     try { localStorage.removeItem('epub_consolidate_v1'); } catch(e) {}
     consolidateBookmarks();
+    _rlCleanupLastBook();
     let jumped = false;
     if (state.epub && state.bookKey) {
       let newVal = json.bookmarks[state.bookKey];

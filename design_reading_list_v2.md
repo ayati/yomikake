@@ -465,3 +465,235 @@ DevTools で `localStorage.epub_rl_prefs` の保存値確認。
   `esc()` が `'` を escape しないため「'」入りタイトルで削除が壊れる機能バグと、
   タイトル経由の JS 文字列脱出（XSS）パターンを同時に解消。
   「Don't Stop "Me" Now」での削除・キャンセルフローを両ファイルで Playwright 検証済み。
+
+---
+
+# v3 設計: 読了タイトルの完全削除（2段階削除モデル）
+
+対象: yomikake.html / yomikake_ios.html 両方。バージョン: v1.11.0 予定。
+
+## 0. 仕様サマリ
+
+| 対象カード | × ボタンの動作 | ダイアログ | データ |
+|---|---|---|---|
+| 未読了（通常リスト） | 論理削除＝読了扱い（現行通り） | 現行の削除確認 | 保持・「✓読了も表示」で復活可 |
+| 読了（✓読了も表示 ON 時） | **物理削除（purge）** | **完全削除の強い確認** | `removeItem`・復活不可 |
+
+現行の「読了カードの × が実質 no-op」問題もこれで解消される。
+
+## 1. 状態とモード判定
+
+### 1-1. モジュール変数（`_rlPendingDeleteKey` の隣に追加・両ファイル）
+
+```js
+let _rlPendingDeleteMode = null;  // 'hide'（論理削除）| 'purge'（完全削除）
+```
+
+### 1-2. 読了判定は confirmDeleteBook 内でエントリから再計算
+
+カード DOM やレンダリング結果に依存せず、`_rlCollect()` と同一条件で判定する
+（編集モード中に他タブでデータが変わっても安全）：
+
+```js
+const parsed = parseBookKey(bookKey);
+let finished = false;
+try {
+  const val = JSON.parse(localStorage.getItem(bookKey)) || {};
+  const spineCount = (typeof val.spineCount === 'number' && val.spineCount > 0)
+    ? val.spineCount : (parsed ? parsed.spineCount : null);
+  if (spineCount > 0)
+    finished = (val.spineIdx || 0) >= spineCount - 1 && (val.ratio || 0) > 0.9;
+} catch (e) {}
+```
+
+注意: 「✓読了も表示」OFF のとき読了カードはそもそも描画されないため、
+「未読了カードなのに purge ダイアログが出る」逆転は起こらない。判定が
+finished=true になるのは読了カード経由のクリックだけ。
+
+## 2. confirmDeleteBook の変更（両ファイル同一）
+
+```js
+function confirmDeleteBook(bookKey) {
+  // …§1-2 の finished 判定…
+  const title = parsed ? parsed.title : bookKey;
+  _rlPendingDeleteKey = bookKey;
+  _rlPendingDeleteMode = finished ? 'purge' : 'hide';
+  const isPurge = finished;
+  document.getElementById('modal-title').textContent =
+    t(isPurge ? 'readingList.purgeTitle' : 'readingList.deleteTitle');
+  document.getElementById('modal-close').style.display = 'none';
+  document.getElementById('modal-body').innerHTML = isPurge
+    ? `<p>${t('readingList.purgeMsg', {title: esc(title)})}</p>
+       <p>${t('readingList.purgeDetail')}</p>
+       <p style="font-size:12px;opacity:.65;">${t('readingList.purgeNote')}</p>
+       <div style="（現行と同じ flex 行）">
+         <button onclick="closeModal(true)" style="（現行キャンセルと同一）">${t('readingList.deleteCancel')}</button>
+         <button onclick="doDeleteBook()" style="（現行赤ボタンと同一）">${t('readingList.purgeOk')}</button>
+       </div>`
+    : `（現行の deleteMsg ブロックをそのまま）`;
+  document.getElementById('modal-overlay').classList.add('show');
+}
+```
+
+- キャンセルボタンは現行と同じく左側・既定スタイル。purge 実行ボタンのみ
+  ラベルを「完全に削除する」に変える（赤 #e53e3e は現行流用）。
+- キャンセル時に `_rlPendingDeleteMode` が残るが、`doDeleteBook` 冒頭で
+  必ず両方クリアするため実害なし（次回 confirmDeleteBook で上書きされる）。
+
+## 3. doDeleteBook の変更（両ファイル同一）
+
+```js
+function doDeleteBook() {
+  const bookKey = _rlPendingDeleteKey;
+  const mode = _rlPendingDeleteMode;
+  _rlPendingDeleteKey = null;
+  _rlPendingDeleteMode = null;
+  closeModal(true);
+  if (!bookKey) return;
+  if (mode === 'purge') _rlPurgeBook(bookKey);
+  else markAsFinished(bookKey);
+  // IDB の ePub キャッシュ破棄は両モード共通（現行コードのまま）
+  if (_cachedKeys.has(bookKey)) {
+    _idbDelete(bookKey).catch(() => {});
+    _cachedKeys.delete(bookKey);
+    updateCacheGroupUI();
+  }
+  buildReadingList();
+}
+```
+
+## 4. _rlPurgeBook（新規）
+
+### yomikake.html（PC: FSA ハンドルも破棄）
+
+```js
+// 読書記録の完全削除。localStorage エントリ・FSAハンドル・epub_last_book を消す。
+// IDB ePub キャッシュは呼び出し元 doDeleteBook の共通処理で破棄される。
+function _rlPurgeBook(bookKey) {
+  try { localStorage.removeItem(bookKey); } catch (e) {}
+  fshDelete(bookKey).then(() => _handleKeys.delete(bookKey)).catch(() => {});
+  try {
+    const lb = JSON.parse(localStorage.getItem('epub_last_book'));
+    if (lb && lb.bookKey === bookKey) localStorage.removeItem('epub_last_book');
+  } catch (e) {}
+}
+```
+
+### yomikake_ios.html（FSA 非対応なので fshDelete 行なし）
+
+```js
+function _rlPurgeBook(bookKey) {
+  try { localStorage.removeItem(bookKey); } catch (e) {}
+  try {
+    const lb = JSON.parse(localStorage.getItem('epub_last_book'));
+    if (lb && lb.bookKey === bookKey) localStorage.removeItem('epub_last_book');
+  } catch (e) {}
+}
+```
+
+`epub_last_book` も消す理由: タイトル文字列を含む（プライバシー）、かつ起動時の
+レジュームバナー（showResumeBanner）が削除済みの本を指し続けるのを防ぐ。
+ランタイム参照は起動時のみなので実行中の削除は安全（確認済み）。
+
+## 5. i18n 追加キー（4言語 × 両ファイル）
+
+| キー | ja | en | zh-TW | zh-CN |
+|---|---|---|---|---|
+| `readingList.purgeTitle` | 読書記録の完全削除 | Permanently delete record | 完全刪除閱讀記錄 | 完全删除阅读记录 |
+| `readingList.purgeMsg` | 「{title}」の読書記録を完全に削除しますか？ | Permanently delete the reading record for "{title}"? | 要完全刪除「{title}」的閱讀記錄嗎？ | 要完全删除「{title}」的阅读记录吗？ |
+| `readingList.purgeDetail` | 読書位置・表紙・読了の記録がこの端末から消去されます。元に戻すことはできず、再度 ePub ファイルを開くまでリストに復活しません。 | Reading position, cover, and finished status will be erased from this device. This cannot be undone; the book will not reappear until you open its ePub file again. | 閱讀位置、封面與讀完記錄將從此裝置刪除，無法復原；重新開啟 ePub 檔案前不會再出現在清單中。 | 阅读位置、封面与读完记录将从此设备删除，无法恢复；重新打开 ePub 文件前不会再出现在列表中。 |
+| `readingList.purgeNote` | ※ エクスポート済みのしおりファイルや Google Drive 上のコピーには削除は及びません。完全に消すには削除後に Drive へ上書き保存してください。 | Note: exported bookmark files and copies on Google Drive are not affected. To erase those too, re-save to Drive after deleting. | ※ 已匯出的書籤檔與 Google Drive 上的副本不受影響。如需一併清除，請在刪除後重新儲存到 Drive。 | ※ 已导出的书签文件与 Google Drive 上的副本不受影响。如需一并清除，请在删除后重新保存到 Drive。 |
+| `readingList.purgeOk` | 完全に削除する | Delete permanently | 完全刪除 | 完全删除 |
+
+挿入位置: 各言語ブロックの `readingList.viewGrid` の直後（v2 キー群の末尾）。
+iOS にも Drive しおり同期があるため purgeNote の文言は両ファイル共通で良い。
+
+## 6. ドキュメント更新
+
+- **README.md「リストから削除」節**: 2段階削除の説明に書き換え。
+  「未読了の本の × → リストから外れる（読了扱い・復活可）」
+  「✓読了も表示 ON で読了の本の × → 完全削除（強い確認ダイアログ・復活不可）」
+  ＋ エクスポート/Drive コピーに削除が及ばない注意。
+- **CLAUDE.md v2 セクション**: 完読済み判定段落の「既知挙動」記述を更新
+  （『削除』した本も読了表示に現れる → そこから完全削除できる、に変わる）。
+  `_rlPurgeBook` / `_rlPendingDeleteMode` をインラインハンドラ規約の段落に追記。
+
+## 7. エッジケース
+
+1. **全カード purge で所蔵ゼロ** → `buildReadingList` の既存分岐でドロップゾーンへ
+   （編集モードフラグも既存コードがリセット）
+2. **purge 後に古いしおり JSON をインポート / Drive ダウンロード** → 記録復活
+   （仕様。purgeNote で開示済み）
+3. **レガシー旧形式キー**（`epub_pos_title_N`）→ `parseBookKey` が spineCount を
+   返すので判定・削除とも動作
+4. **エントリが壊れて JSON.parse 失敗** → finished=false → hide 側にフォールバック
+   （安全側: 完全削除はしない）
+5. **consolidateBookmarks との干渉なし**（フラグ起動時のみ・キー消滅は単に対象外）
+6. **編集モード中のチップ切替**: 編集モードのまま「✓読了も表示」を ON/OFF しても
+   `buildReadingList` が edit-mode クラスを維持するため一貫動作（現行と同じ）
+
+## 8. テスト計画（Playwright・両ファイル）
+
+1. 未読了カード ×: 従来文言・confirm 後に finished 化（**回帰: 挙動不変**）
+2. ✓読了も表示 ON → 読了カード ×: purge 文言（タイトル・詳細・注記・赤ボタン
+   「完全に削除する」）を textContent で検証
+3. confirm → `localStorage.getItem(key) === null`・カード消滅・
+   `epub_last_book` も該当時は消滅
+4. キャンセル → キー残存・`_rlPendingDeleteMode` クリア（次の未読了×が hide で動く）
+5. 読了1冊だけを purge → 残り未読了のみ表示継続／全冊 purge → ドロップゾーン
+6. 「'」入りタイトルの読了本で purge フロー（v2 修正の回帰）
+7. ページエラーゼロ
+
+## 9. 実装手順
+
+1. 両ファイル: モジュール変数追加 → `confirmDeleteBook` 差し替え →
+   `doDeleteBook` 差し替え → `_rlPurgeBook` 追加（iOS は fshDelete 行なし）
+2. i18n 5キー × 4言語 × 2ファイル
+3. 構文チェック（node --check）・CRLF 正規化（yomikake.html のみ）
+4. Playwright テスト（§8）
+5. README / CLAUDE.md 更新 → コミット「読了タイトルの完全削除（2段階削除）を追加 (v1.11.0)」
+
+---
+
+# v3.1 設計: 削除墓標（tombstone）— 完全削除の端末間伝播（実装済み）
+
+問題: Drive 読込/インポートは和集合マージのため、他端末の localStorage に残った
+完全削除済みエントリが次のアップロードで Drive に再混入し、削除が「復活」して見える。
+
+解決: 完全削除時に「キーのハッシュ＋削除時刻」だけの墓標を `epub_purged` に記録し、
+エクスポート/Drive 保存の `purged` フィールドに同梱。読込/インポート側で適用する。
+
+## データ・定数
+
+- `epub_purged` = `[{h: "16進16桁", t: ISO8601}]`
+- `h` = `_rlHashKey(bookKey)`（FNV-1a 32bit × seed違い2本。**タイトルを残さない**）
+- 上限 `_PURGED_MAX=200` 件・保持 `_PURGED_TTL=365日`（`_rlSavePurged` が剪定）
+
+## 関数（Bookmark Export/Import セクション冒頭・両ファイル）
+
+- `_rlHashKey` / `_rlLoadPurged` / `_rlSavePurged` / `_rlAddTombstone`
+- `_rlPurgeLocalData(key)` — しおり・FSAハンドル(PC版のみ)・IDBキャッシュ・
+  epub_last_book を消す（墓標は触らない）。`_rlPurgeBook` = 墓標記録＋これ
+- `_rlApplyTombstones(importedPurged)` — ローカル墓標と受信墓標を h ごとに新しい t で
+  マージ → **墓標 > lastOpenedAt のローカルしおりを完全削除** → 剪定保存 →
+  Map(h→ms) を返す
+- `_rlCleanupLastBook()` — epub_last_book が実在しないキーを指していたら除去
+
+## 組み込み箇所
+
+| 場所 | 処理 |
+|---|---|
+| `collectBookmarks()` | `purged` を同梱（exportBookmarks は collectBookmarks を使う形に統一） |
+| インポートリスナー / `driveDownload` | 検証直後に `_rlApplyTombstones(json.purged)` → 各しおり取込時に「墓標 t >= lastOpenedAt なら skip」→ consolidate 後に `_rlCleanupLastBook()` |
+| `saveBookMeta()` | 冒頭で該当墓標を除去（**開き直し＝意図的な復活**。purge ダイアログの「再度 ePub を開くまで復活しません」と整合） |
+| `readingList.purgeNote` | 「Drive 保存すると他端末にも削除が反映される」文言へ更新（4言語） |
+
+## 不変条件・エッジ
+
+- 取込 skip は `>=`（同時刻は削除優先）、ローカル削除は `>`（開いた事実と同時刻なら温存）
+- `lastOpenedAt` 欠落エントリは epoch 扱い → 墓標が勝つ（安全側）
+- 旧ビルドは `purged` を無視して動作（後方互換、削除が伝播しないだけ）
+- 1年超の古いバックアップ JSON 手動インポートでは復活し得る（仕様・許容）
+- 検証: 2コンテキストで端末1 purge → export → 端末2（残存+epub_last_book）へ
+  実ファイル経由インポート → 残存削除・last_book掃除・再アップロードに墓標同梱・
+  開き直し復活・saveBookMeta 墓標解除、を両ファイルで Playwright 確認済み
