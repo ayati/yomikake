@@ -218,6 +218,64 @@
   #reading-list-done-btn:hover { background:var(--accent); color:#fff; }
   #reading-list.edit-mode #reading-list-done-btn { display:inline-block; }
 
+  /* ── 読みかけリスト v2: ツール行（検索・ソート・チップ・表示切替）── */
+  #reading-list-tools { display:flex; flex-direction:column; gap:8px; margin-bottom:14px; }
+  #rl-search { width:100%; font-size:13px; padding:8px 12px; border:1px solid var(--ui-border);
+               border-radius:10px; background:var(--ui-bg); color:var(--ui-text); outline:none; box-sizing:border-box; }
+  #rl-search:focus { border-color:var(--accent); }
+  #rl-tools-row { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  #rl-sort-wrap { position:relative; }
+  #rl-sort-btn, .rl-chip { font-size:12px; font-weight:600; padding:5px 10px; border-radius:8px;
+    border:1px solid var(--ui-border); background:var(--ui-bg); color:var(--ui-text);
+    cursor:pointer; transition:all .15s; white-space:nowrap; }
+  #rl-sort-btn:hover, .rl-chip:hover { border-color:var(--accent); color:var(--accent); }
+  .rl-chip.active { background:var(--accent); border-color:var(--accent); color:#fff; }
+  .rl-chip.active:hover { color:#fff; filter:brightness(1.1); }
+  #rl-sort-menu { display:none; position:absolute; top:calc(100% + 4px); left:0; z-index:60;
+    min-width:160px; background:var(--backdrop); backdrop-filter:blur(16px);
+    -webkit-backdrop-filter:blur(16px); border:1px solid var(--glass-border);
+    border-radius:12px; box-shadow:0 8px 24px var(--shadow); padding:6px; flex-direction:column; }
+  #rl-sort-menu.show { display:flex; }
+  #rl-sort-menu button { font-size:13px; text-align:left; padding:8px 12px; border:none;
+    background:transparent; color:var(--ui-text); border-radius:8px; cursor:pointer; white-space:nowrap; }
+  #rl-sort-menu button:hover { background:var(--hover-bg); }
+  #rl-sort-menu button.checked::before { content:'✓ '; color:var(--accent); font-weight:700; }
+  #rl-view-toggle { margin-left:auto; display:flex; border:1px solid var(--ui-border);
+    border-radius:8px; overflow:hidden; }
+  #rl-view-toggle button { font-size:14px; padding:4px 11px; border:none; background:transparent;
+    color:var(--ui-text); opacity:.55; cursor:pointer; transition:all .15s; }
+  #rl-view-toggle button.active { background:var(--accent); color:#fff; opacity:1; }
+
+  /* ── 読みかけリスト v2: グリッド表示（案A改: 表紙上・タイトル4行）── */
+  #reading-list.view-grid { max-width:1080px; }
+  /* 最小列幅は min(150px, 50%-ギャップ半分)：狭幅端末（実効360px未満・表示拡大設定等）でも必ず2列を確保 */
+  #reading-list-items.view-grid { display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(min(150px, calc(50% - 7px)), 1fr)); gap:16px 14px; }
+  .view-grid .rl-card { flex-direction:column; gap:8px; padding:10px; min-height:0; cursor:pointer; }
+  .view-grid .rl-thumb { width:100%; height:auto; aspect-ratio:5/7; align-self:stretch; position:relative; }
+  .view-grid .rl-title { font-size:12.5px; -webkit-line-clamp:4; line-height:1.45; }
+  .view-grid .rl-creator { font-size:11px; }
+  .view-grid .rl-chapter, .view-grid .rl-open-btn { display:none; }
+  .view-grid .rl-meta { margin-top:0; }
+  .view-grid .rl-card.rl-last::before { content:none; }
+  .view-grid .rl-card.rl-last { border-color:var(--accent); box-shadow:0 0 0 1px var(--accent); }
+  /* 表紙バッジ（グリッド時のみ表示） */
+  .rl-thumb-offline, .rl-thumb-direct { display:none; }
+  .view-grid .rl-thumb-offline { display:flex; position:absolute; top:5px; left:5px;
+    font-size:10px; padding:2px 6px; border-radius:8px; background:rgba(0,0,0,.55); color:#fff; }
+  .view-grid .rl-thumb-direct { display:flex; position:absolute; bottom:5px; right:5px;
+    width:24px; height:24px; border-radius:50%; background:var(--accent); color:#fff;
+    font-size:11px; align-items:center; justify-content:center; box-shadow:0 1px 4px var(--shadow); }
+  /* 読了カード */
+  .rl-card.rl-finished .rl-thumb { opacity:.75; }
+  .rl-finished-badge { font-size:12px; font-weight:700; color:var(--accent); white-space:nowrap; flex-shrink:0; }
+  /* 絞り込み0件メッセージ */
+  #rl-no-match { text-align:center; padding:32px 0 8px; font-size:13px; opacity:.75;
+    display:flex; flex-direction:column; gap:14px; align-items:center; grid-column:1/-1; }
+  #rl-no-match button { font-size:13px; font-weight:600; color:var(--accent); background:transparent;
+    border:1.5px solid var(--accent); border-radius:9px; padding:6px 14px; cursor:pointer; }
+  #rl-no-match button:hover { background:var(--accent); color:#fff; }
+
   /* ── 読了バナー ── */
   #finished-banner { display:none; position:absolute; bottom:20px; left:50%; transform:translateX(-50%); z-index:50; background:var(--backdrop); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); border:1px solid var(--glass-border); border-radius:16px; padding:14px 20px; box-shadow:0 8px 32px var(--shadow); white-space:nowrap; align-items:center; gap:12px; animation:fadeIn .3s ease; }
   #finished-banner.show { display:flex; }
@@ -684,6 +742,31 @@
           <span id="reading-list-count"></span>
           <button id="reading-list-edit-btn" onclick="toggleEditMode()">編集</button>
         </div>
+        <div id="reading-list-tools">
+          <input id="rl-search" type="search" autocomplete="off"
+                 data-i18n-placeholder="readingList.searchPlaceholder"
+                 placeholder="タイトル・著者で絞り込み">
+          <div id="rl-tools-row">
+            <div id="rl-sort-wrap">
+              <button id="rl-sort-btn" onclick="toggleRlSortMenu(event)"></button>
+              <div id="rl-sort-menu">
+                <button data-sort="recent"       onclick="setRlSort('recent')"></button>
+                <button data-sort="title"        onclick="setRlSort('title')"></button>
+                <button data-sort="author"       onclick="setRlSort('author')"></button>
+                <button data-sort="progressHigh" onclick="setRlSort('progressHigh')"></button>
+                <button data-sort="progressLow"  onclick="setRlSort('progressLow')"></button>
+              </div>
+            </div>
+            <button id="rl-chip-ready"    class="rl-chip" onclick="toggleRlFilter('filterReady')"
+                    data-i18n="readingList.filterReady">⚡ すぐ開ける</button>
+            <button id="rl-chip-finished" class="rl-chip" onclick="toggleRlFilter('showFinished')"
+                    data-i18n="readingList.showFinished">✓ 読了も表示</button>
+            <div id="rl-view-toggle">
+              <button id="rl-view-list" onclick="setRlView('list')" data-i18n-title="readingList.viewList">≡</button>
+              <button id="rl-view-grid" onclick="setRlView('grid')" data-i18n-title="readingList.viewGrid">⊞</button>
+            </div>
+          </div>
+        </div>
         <div id="reading-list-items"></div>
         <div id="reading-list-footer">
           <button id="reading-list-new-btn" onclick="openFilePicker()" data-i18n="readingList.openNew">別の ePub を開く</button>
@@ -974,6 +1057,21 @@ const I18N = {
     'readingList.deleteMsg':    '「{title}」を読みかけリストから削除しますか？',
     'readingList.deleteOk':     '削除する',
     'readingList.deleteCancel': 'キャンセル',
+    'readingList.searchPlaceholder': 'タイトル・著者で絞り込み',
+    'readingList.sortLabel':    '並べ替え: {mode}',
+    'readingList.sort.recent':  '最近開いた順',
+    'readingList.sort.title':   'タイトル順',
+    'readingList.sort.author':  '著者順',
+    'readingList.sort.progressHigh': '進捗率が高い順',
+    'readingList.sort.progressLow':  '進捗率が低い順',
+    'readingList.filterReady':  '⚡ すぐ開ける',
+    'readingList.showFinished': '✓ 読了も表示',
+    'readingList.finishedBadge':'✓ 読了',
+    'readingList.countFiltered':'{total}冊中 {n}冊',
+    'readingList.noMatch':      '該当する本がありません',
+    'readingList.clearFilter':  '絞り込みを解除',
+    'readingList.viewList':     'リスト表示',
+    'readingList.viewGrid':     'グリッド表示',
     'finished.msg':         '📖 最後まで読みました',
     'finished.backToList':  '読みかけリストへ',
     'finished.dismiss':     '閉じない',
@@ -1142,6 +1240,21 @@ const I18N = {
     'readingList.deleteMsg':    'Remove "{title}" from the reading list?',
     'readingList.deleteOk':     'Remove',
     'readingList.deleteCancel': 'Cancel',
+    'readingList.searchPlaceholder': 'Filter by title or author',
+    'readingList.sortLabel':    'Sort: {mode}',
+    'readingList.sort.recent':  'Recently opened',
+    'readingList.sort.title':   'Title',
+    'readingList.sort.author':  'Author',
+    'readingList.sort.progressHigh': 'Most progress',
+    'readingList.sort.progressLow':  'Least progress',
+    'readingList.filterReady':  '⚡ Ready to open',
+    'readingList.showFinished': '✓ Show finished',
+    'readingList.finishedBadge':'✓ Finished',
+    'readingList.countFiltered':'{n} of {total}',
+    'readingList.noMatch':      'No matching books',
+    'readingList.clearFilter':  'Clear filters',
+    'readingList.viewList':     'List view',
+    'readingList.viewGrid':     'Grid view',
     'finished.msg':         '📖 Finished reading',
     'finished.backToList':  'Back to reading list',
     'finished.dismiss':     'Stay',
@@ -1310,6 +1423,21 @@ const I18N = {
     'readingList.deleteMsg':    '從閱讀清單移除「{title}」？',
     'readingList.deleteOk':     '移除',
     'readingList.deleteCancel': '取消',
+    'readingList.searchPlaceholder': '依書名或作者篩選',
+    'readingList.sortLabel':    '排序：{mode}',
+    'readingList.sort.recent':  '最近開啟',
+    'readingList.sort.title':   '書名',
+    'readingList.sort.author':  '作者',
+    'readingList.sort.progressHigh': '進度高至低',
+    'readingList.sort.progressLow':  '進度低至高',
+    'readingList.filterReady':  '⚡ 可立即開啟',
+    'readingList.showFinished': '✓ 顯示已讀完',
+    'readingList.finishedBadge':'✓ 讀完',
+    'readingList.countFiltered':'{total}本中{n}本',
+    'readingList.noMatch':      '沒有符合的書',
+    'readingList.clearFilter':  '清除篩選',
+    'readingList.viewList':     '清單檢視',
+    'readingList.viewGrid':     '網格檢視',
     'finished.msg':         '📖 已讀完全書',
     'finished.backToList':  '回到閱讀清單',
     'finished.dismiss':     '繼續閱讀',
@@ -1478,6 +1606,21 @@ const I18N = {
     'readingList.deleteMsg':    '从阅读列表移除「{title}」？',
     'readingList.deleteOk':     '移除',
     'readingList.deleteCancel': '取消',
+    'readingList.searchPlaceholder': '按书名或作者筛选',
+    'readingList.sortLabel':    '排序：{mode}',
+    'readingList.sort.recent':  '最近打开',
+    'readingList.sort.title':   '书名',
+    'readingList.sort.author':  '作者',
+    'readingList.sort.progressHigh': '进度高至低',
+    'readingList.sort.progressLow':  '进度低至高',
+    'readingList.filterReady':  '⚡ 可立即打开',
+    'readingList.showFinished': '✓ 显示已读完',
+    'readingList.finishedBadge':'✓ 读完',
+    'readingList.countFiltered':'{total}本中{n}本',
+    'readingList.noMatch':      '没有符合的书',
+    'readingList.clearFilter':  '清除筛选',
+    'readingList.viewList':     '列表视图',
+    'readingList.viewGrid':     '网格视图',
     'finished.msg':         '📖 已读完全书',
     'finished.backToList':  '回到阅读列表',
     'finished.dismiss':     '继续阅读',
@@ -1519,6 +1662,7 @@ function setLang(lang) {
   _lang = lang;
   try { localStorage.setItem('epub_lang', lang); } catch(e) {}
   applyI18n();
+  if (!state.epub) buildReadingList();  // 読みかけリストのカード内文言・ソートラベルを言語に追従
   if (document.getElementById('modal-overlay').classList.contains('show')) {
     updateHelpContent();
   }
@@ -2774,6 +2918,10 @@ let _originalBookmark  = null;     // {spineIdx, ratio} | null — 開いた時�
 let _jumpHistory       = [];       // [{spineIdx, ratio}] 直近4件のジャンプ前位置（新しい順）
 let _bookFinished      = false;    // 最終章末尾到達フラグ（closeBook で ratio=0 上書き防止）
 let _editMode          = false;    // 読みかけリスト編集モード
+const _RL_SORTS        = ['recent', 'title', 'author', 'progressHigh', 'progressLow'];
+let _rlPrefs           = _rlLoadPrefs(); // 読みかけリスト表示設定 {view, sort, filterReady, showFinished}
+let _rlQuery           = '';       // 読みかけリスト検索文字列（非永続・セッション内のみ）
+let _rlSearchTimer     = null;     // 読みかけリスト検索入力のデバウンスタイマー
 let _mobileProgressTimer = null;  // モバイル進捗ピル 非表示タイマー
 let _sidebarTab        = 'toc';    // 'toc' | 'search' — サイドバーの現在タブ
 let _searching         = false;    // 検索実行中
@@ -4282,7 +4430,29 @@ function formatRelativeDate(isoStr) {
   return m + '/' + day;
 }
 
-function buildReadingList() {
+// ── 読みかけリスト v2: 表示設定の永続化（epub_rl_prefs）──
+// _RL_SORTS は _rlLoadPrefs が変数宣言部（let _rlPrefs = _rlLoadPrefs()）から
+// 呼ばれるため、TDZ を避けて変数宣言部で const 定義している。
+function _rlLoadPrefs() {
+  const def = { view: 'list', sort: 'recent', filterReady: false, showFinished: false };
+  try {
+    const p = JSON.parse(localStorage.getItem('epub_rl_prefs'));
+    if (!p) return def;
+    return {
+      view: p.view === 'grid' ? 'grid' : 'list',
+      sort: _RL_SORTS.includes(p.sort) ? p.sort : 'recent',
+      filterReady: !!p.filterReady,
+      showFinished: !!p.showFinished,
+    };
+  } catch (e) { return def; }
+}
+
+function _rlSavePrefs() {
+  try { localStorage.setItem('epub_rl_prefs', JSON.stringify(_rlPrefs)); } catch (e) {}
+}
+
+// ── 収集：localStorage 走査。読了本も finished フラグ付きで含める ──
+function _rlCollect() {
   const items = [];
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
@@ -4295,32 +4465,83 @@ function buildReadingList() {
       const title = parsed.title;
       const spineCount = (typeof val.spineCount === 'number' && val.spineCount > 0) ? val.spineCount : parsed.spineCount;
       if (!title || !spineCount || spineCount <= 0) continue;
-      if (val.spineIdx >= spineCount - 1 && (val.ratio || 0) > 0.9) continue;
-      items.push({key, title, spineCount,
-        spineIdx: val.spineIdx || 0, ratio: val.ratio || 0,
+      const spineIdx = val.spineIdx || 0;
+      const ratio = val.ratio || 0;
+      items.push({key, title, spineCount, spineIdx, ratio,
+        finished: spineIdx >= spineCount - 1 && ratio > 0.9,  // 最終章かつ ratio > 0.9
         lastOpenedAt: val.lastOpenedAt || null,
         creator: val.creator || '',
         cover: val.cover || '',
       });
     } catch(e) {}
   }
-  items.sort((a, b) => {
+  return items;
+}
+
+// ── ソートキー正規化：先頭の記号プレフィックス（【書籍化】[著者名] 等）を読み飛ばす ──
+function _rlSortKey(title) {
+  let s = String(title).replace(/^[\uFEFF\s_]+/, '');
+  let prev;
+  do {
+    prev = s;
+    // 中身20文字以内の閉じ括弧ペアのみ除去（タイトル自体が括弧で始まる作品を括弧ごと削らない保険）
+    s = s.replace(/^[【\[（(][^】\]）)]{0,20}[】\]）)]\s*/, '');
+    s = s.replace(/^[\uFEFF\s_]+/, '');
+  } while (s !== prev && s.length > 0);
+  s = s.replace(/^[「『]/, '');  // かぎ括弧は開きだけ除去（中身はタイトル本体）
+  return s || String(title);     // 全部削れたら原文（安全弁）
+}
+
+const _rlCollator = new Intl.Collator('ja', { numeric: true, sensitivity: 'base' });
+
+// ── 検索正規化：NFKC（全角英数→半角）・小文字化・カタカナ→ひらがな ──
+function _rlNorm(s) {
+  return String(s).normalize('NFKC').toLowerCase()
+    .replace(/[ァ-ヶ]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0x60));
+}
+
+// ── フィルタ（読了 → すぐ開ける → 検索 AND）→ ソート。total は件数表示の分母 ──
+function _rlFilterSort(items) {
+  let arr = _rlPrefs.showFinished ? items : items.filter(it => !it.finished);
+  const total = arr.length;
+  if (_rlPrefs.filterReady)
+    arr = arr.filter(it => _cachedKeys.has(it.key));
+  const terms = _rlNorm(_rlQuery).split(/[\s　]+/).filter(Boolean);
+  if (terms.length)
+    arr = arr.filter(it => {
+      const hay = _rlNorm(it.title + ' ' + it.creator);
+      return terms.every(tm => hay.includes(tm));
+    });
+  const pct = it => (it.spineIdx + it.ratio) / it.spineCount;
+  const byRecent = (a, b) => {
     if (!a.lastOpenedAt && !b.lastOpenedAt) return 0;
     if (!a.lastOpenedAt) return 1;
     if (!b.lastOpenedAt) return -1;
     return new Date(b.lastOpenedAt) - new Date(a.lastOpenedAt);
-  });
+  };
+  const cmp = {
+    recent: byRecent,
+    title:  (a, b) => _rlCollator.compare(_rlSortKey(a.title), _rlSortKey(b.title)),
+    author: (a, b) => {
+      if (!a.creator && !b.creator) return _rlCollator.compare(_rlSortKey(a.title), _rlSortKey(b.title));
+      if (!a.creator) return 1;   // 著者なしは末尾
+      if (!b.creator) return -1;
+      return _rlCollator.compare(a.creator, b.creator)
+          || _rlCollator.compare(_rlSortKey(a.title), _rlSortKey(b.title));
+    },
+    progressHigh: (a, b) => pct(b) - pct(a) || byRecent(a, b),
+    progressLow:  (a, b) => pct(a) - pct(b) || byRecent(a, b),
+  }[_rlPrefs.sort] || byRecent;
+  arr.sort(cmp);
+  return { shown: arr, total };
+}
 
-  let lastReadKey = '';
-  try {
-    const lb = JSON.parse(localStorage.getItem('epub_last_book'));
-    if (lb && lb.bookKey) lastReadKey = lb.bookKey;
-  } catch(e) {}
-
+function buildReadingList() {
+  const items = _rlCollect();
   const listEl = document.getElementById('reading-list');
   const dropEl = document.getElementById('drop-zone');
   const welcomeEl = document.getElementById('welcome');
-  if (!items.length) {
+  if (!items.length) {  // 所蔵ゼロ（読了含め何もない）→ ドロップゾーン表示
     _editMode = false;
     listEl.style.display = 'none';
     listEl.classList.remove('edit-mode');
@@ -4330,44 +4551,130 @@ function buildReadingList() {
   }
   listEl.style.display = 'flex';
   listEl.classList.toggle('edit-mode', _editMode);
+  listEl.classList.toggle('view-grid', _rlPrefs.view === 'grid');
+  document.getElementById('reading-list-items').classList.toggle('view-grid', _rlPrefs.view === 'grid');
   dropEl.style.display = 'none';
   welcomeEl.classList.add('has-list');
-  document.getElementById('reading-list-count').textContent = t('readingList.count', {n: items.length});
-  const editBtn = document.getElementById('reading-list-edit-btn');
-  if (editBtn) editBtn.textContent = _editMode ? t('readingList.editDone') : t('readingList.edit');
-  const doneBtn = document.getElementById('reading-list-done-btn');
-  if (doneBtn) doneBtn.textContent = t('readingList.editDone');
+  const { shown, total } = _rlFilterSort(items);
+  _rlRender(shown, total);
+  _rlSyncToolsUI();
+}
 
+function _rlRender(shown, total) {
+  document.getElementById('reading-list-count').textContent =
+    shown.length === total ? t('readingList.count', {n: total})
+                           : t('readingList.countFiltered', {n: shown.length, total: total});
+  const itemsEl = document.getElementById('reading-list-items');
+  if (!shown.length) {  // 絞り込み結果ゼロ（所蔵はある）
+    itemsEl.innerHTML =
+      `<div id="rl-no-match"><span>${t('readingList.noMatch')}</span>` +
+      `<button onclick="clearRlFilters()">${t('readingList.clearFilter')}</button></div>`;
+    return;
+  }
+  let lastReadKey = '';
+  try {
+    const lb = JSON.parse(localStorage.getItem('epub_last_book'));
+    if (lb && lb.bookKey) lastReadKey = lb.bookKey;
+  } catch(e) {}
+
+  const isGrid = _rlPrefs.view === 'grid';
   const BOOK_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>';
-  document.getElementById('reading-list-items').innerHTML = items.map(item => {
+  itemsEl.innerHTML = shown.map(item => {
     const isLast = item.key === lastReadKey;
-    const pct = Math.min(100, ((item.spineIdx + item.ratio) / item.spineCount * 100)).toFixed(0);
+    const pct = item.finished ? '100' : Math.min(100, ((item.spineIdx + item.ratio) / item.spineCount * 100)).toFixed(0);
+    const isCached = _cachedKeys.has(item.key);  // iOS は File System Access API 非対応のため cache のみが直接オープン手段
+    const chapterStr = t('readingList.chapter', {n: item.spineIdx + 1, total: item.spineCount});
+    // ツールチップ（タイトル全文＋著者＋章数）。&#10; は属性値内の改行
+    const tip = esc(item.title) + (item.creator ? '&#10;' + esc(item.creator) : '') + '&#10;' + esc(chapterStr);
+    // グリッド時のみカード全体をボタン化（リスト時は Tab 順を汚さない）
+    const gridAttrs = isGrid
+      ? ` role="button" tabindex="0" onclick="rlCardActivate(this)" onkeydown="if(event.key==='Enter')rlCardActivate(this)"`
+      : '';
     const thumbHtml = item.cover
       ? `<img src="${esc(item.cover)}" width="48" height="68" alt="" loading="lazy">`
       : BOOK_ICON;
     const creatorHtml = item.creator
       ? `<div class="rl-creator">${esc(item.creator)}</div>` : '';
-    const isCached = _cachedKeys.has(item.key);
+    const pctHtml = item.finished
+      ? `<span class="rl-finished-badge">${t('readingList.finishedBadge')}</span>`
+      : `<span class="rl-pct">${pct}%</span>`;
     const openLabel = isCached ? t('readingList.openCached') : t('readingList.openThis');
     const openClass = isCached ? 'rl-open-btn rl-cached' : 'rl-open-btn';
-    return `<div class="rl-card${isLast ? ' rl-last' : ''}" data-key="${esc(item.key)}">
-  <button class="rl-delete-btn" onclick="confirmDeleteBook('${esc(item.key)}','${esc(item.title)}')" aria-label="${t('readingList.deleteTitle')}">×</button>
-  <div class="rl-thumb">${thumbHtml}</div>
+    return `<div class="rl-card${isLast ? ' rl-last' : ''}${item.finished ? ' rl-finished' : ''}" data-key="${esc(item.key)}" title="${tip}"${gridAttrs}>
+  <button class="rl-delete-btn" onclick="event.stopPropagation();confirmDeleteBook(this.closest('.rl-card').dataset.key)" aria-label="${t('readingList.deleteTitle')}">×</button>
+  <div class="rl-thumb">${thumbHtml}${isCached ? '<span class="rl-thumb-offline">✈</span><span class="rl-thumb-direct">▶</span>' : ''}</div>
   <div class="rl-info">
     <div class="rl-title">${esc(item.title)}</div>
     ${creatorHtml}
     <div class="rl-progress-row">
       <div class="rl-bar"><div class="rl-fill" style="width:${pct}%"></div></div>
-      <span class="rl-chapter">${t('readingList.chapter', {n: item.spineIdx + 1, total: item.spineCount})}</span>
-      <span class="rl-pct">${pct}%</span>
+      <span class="rl-chapter">${chapterStr}</span>
+      ${pctHtml}
     </div>
     <div class="rl-meta">
       <span class="rl-date">${formatRelativeDate(item.lastOpenedAt)}</span>
-      <button class="${openClass}" data-key="${esc(item.key)}" onclick="openFilePickerForBook(this.dataset.key)">${openLabel}</button>
+      <button class="${openClass}" data-key="${esc(item.key)}" onclick="event.stopPropagation();openFilePickerForBook(this.dataset.key)">${openLabel}</button>
     </div>
   </div>
 </div>`;
   }).join('');
+}
+
+// ── ツール行 UI の状態同期（ラベル・✓・active）──
+function _rlSyncToolsUI() {
+  const sortBtn = document.getElementById('rl-sort-btn');
+  if (sortBtn) sortBtn.textContent =
+    t('readingList.sortLabel', { mode: t('readingList.sort.' + _rlPrefs.sort) }) + ' ▾';
+  document.querySelectorAll('#rl-sort-menu button').forEach(b => {
+    b.textContent = t('readingList.sort.' + b.dataset.sort);
+    b.classList.toggle('checked', b.dataset.sort === _rlPrefs.sort);
+  });
+  document.getElementById('rl-chip-ready').classList.toggle('active', _rlPrefs.filterReady);
+  document.getElementById('rl-chip-finished').classList.toggle('active', _rlPrefs.showFinished);
+  document.getElementById('rl-view-list').classList.toggle('active', _rlPrefs.view === 'list');
+  document.getElementById('rl-view-grid').classList.toggle('active', _rlPrefs.view === 'grid');
+  const editBtn = document.getElementById('reading-list-edit-btn');
+  if (editBtn) editBtn.textContent = _editMode ? t('readingList.editDone') : t('readingList.edit');
+  const doneBtn = document.getElementById('reading-list-done-btn');
+  if (doneBtn) doneBtn.textContent = t('readingList.editDone');
+}
+
+// ── 操作ハンドラ群 ──
+function setRlView(v) { _rlPrefs.view = v === 'grid' ? 'grid' : 'list'; _rlSavePrefs(); buildReadingList(); }
+
+function setRlSort(s) {
+  if (_RL_SORTS.includes(s)) _rlPrefs.sort = s;
+  _rlSavePrefs();
+  document.getElementById('rl-sort-menu').classList.remove('show');
+  buildReadingList();
+}
+
+function toggleRlFilter(name) {
+  if (name !== 'filterReady' && name !== 'showFinished') return;
+  _rlPrefs[name] = !_rlPrefs[name];
+  _rlSavePrefs();
+  buildReadingList();
+}
+
+function toggleRlSortMenu(ev) {
+  ev.stopPropagation();
+  document.getElementById('rl-sort-menu').classList.toggle('show');
+}
+
+function rlCardActivate(el) {
+  if (_rlPrefs.view !== 'grid' || _editMode) return;
+  openFilePickerForBook(el.dataset.key);
+}
+
+function clearRlFilters() {
+  _rlQuery = '';
+  const inp = document.getElementById('rl-search');
+  if (inp) inp.value = '';
+  _rlPrefs.filterReady = false;
+  // 検索・チップ解除後もまだ0件（=全冊読了）なら読了表示を自動でON
+  if (!_rlFilterSort(_rlCollect()).shown.length) _rlPrefs.showFinished = true;
+  _rlSavePrefs();
+  buildReadingList();
 }
 
 function toggleEditMode() {
@@ -4388,20 +4695,30 @@ function markAsFinished(bookKey) {
   } catch(e) {}
 }
 
-function confirmDeleteBook(bookKey, title) {
+let _rlPendingDeleteKey = null;  // confirmDeleteBook → doDeleteBook 間で受け渡す削除対象キー
+
+function confirmDeleteBook(bookKey) {
+  // タイトルはキーから復元し、キーはモジュール変数で受け渡す。
+  // inline onclick への文字列埋め込みは「'」を含むタイトルで JS が壊れるため使わない
+  const parsed = parseBookKey(bookKey);
+  const title = parsed ? parsed.title : bookKey;
+  _rlPendingDeleteKey = bookKey;
   document.getElementById('modal-title').textContent = t('readingList.deleteTitle');
   document.getElementById('modal-close').style.display = 'none';
   document.getElementById('modal-body').innerHTML =
     `<p>${t('readingList.deleteMsg', {title: esc(title)})}</p>
      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:24px;">
        <button onclick="closeModal(true)" style="font-size:14px;font-weight:600;padding:10px 20px;border-radius:8px;border:1px solid var(--ui-border);background:var(--ui-bg);color:var(--ui-text);cursor:pointer;">${t('readingList.deleteCancel')}</button>
-       <button onclick="doDeleteBook('${esc(bookKey)}')" style="font-size:14px;font-weight:600;padding:10px 20px;border-radius:8px;border:none;background:#e53e3e;color:#fff;cursor:pointer;">${t('readingList.deleteOk')}</button>
+       <button onclick="doDeleteBook()" style="font-size:14px;font-weight:600;padding:10px 20px;border-radius:8px;border:none;background:#e53e3e;color:#fff;cursor:pointer;">${t('readingList.deleteOk')}</button>
      </div>`;
   document.getElementById('modal-overlay').classList.add('show');
 }
 
-function doDeleteBook(bookKey) {
+function doDeleteBook() {
+  const bookKey = _rlPendingDeleteKey;
+  _rlPendingDeleteKey = null;
   closeModal(true);
+  if (!bookKey) return;
   markAsFinished(bookKey);
   // リストから消えるので IDB のキャッシュも破棄
   if (_cachedKeys.has(bookKey)) {
@@ -4544,15 +4861,24 @@ async function extractCoverThumb(opfDoc) {
     const img = new Image();
     img.onload = () => {
       try {
-        const TW = 48, TH = 68;
+        // グリッド表示のカード幅（約150〜175px）に合わせた解像度。リスト（48px枠）は縮小表示
+        const TW = 160, TH = 224;
         const ir = img.width / img.height, tr = TW / TH;
         let sw, sh, sx, sy;
         if (ir > tr) { sh = img.height; sw = sh * tr; sx = (img.width - sw) / 2; sy = 0; }
         else         { sw = img.width; sh = sw / tr; sx = 0; sy = (img.height - sh) / 2; }
         const canvas = document.createElement('canvas');
         canvas.width = TW; canvas.height = TH;
-        canvas.getContext('2d').drawImage(img, sx, sy, sw, sh, 0, 0, TW, TH);
-        resolve(canvas.toDataURL('image/jpeg', 0.65));
+        const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, sx, sy, sw, sh, 0, 0, TW, TH);
+        // 適応エンコード: 写真調の表紙で肥大化したら品質を段階的に下げる
+        // （上限 約28000文字 ≒ バイナリ21KB。localStorage 圧迫を防ぐ）
+        let uri = canvas.toDataURL('image/jpeg', 0.72);
+        if (uri.length > 28000) uri = canvas.toDataURL('image/jpeg', 0.55);
+        if (uri.length > 28000) uri = canvas.toDataURL('image/jpeg', 0.4);
+        resolve(uri);
       } catch(e) { resolve(null); }
     };
     img.onerror = () => resolve(null);
@@ -4562,16 +4888,26 @@ async function extractCoverThumb(opfDoc) {
 
 function saveBookMeta() {
   if (!state.bookKey) return;
+  let meta = null;
   try {
     const existing = JSON.parse(localStorage.getItem(state.bookKey)) || {};
-    localStorage.setItem(state.bookKey, JSON.stringify({
+    meta = {
       ...existing,
       lastOpenedAt: new Date().toISOString(),
       creator: state.bookCreator,
       spineCount: state.spine.length,
       ...(state.bookCoverDataUri ? {cover: state.bookCoverDataUri} : {}),
-    }));
-  } catch(e) {}
+    };
+    localStorage.setItem(state.bookKey, JSON.stringify(meta));
+  } catch(e) {
+    // 容量超過時は表紙を捨て、読書位置・メタデータの保存を優先する
+    if (meta) {
+      try {
+        delete meta.cover;
+        localStorage.setItem(state.bookKey, JSON.stringify(meta));
+      } catch(e2) {}
+    }
+  }
 }
 
 // ══════════════════════════════════════════
@@ -4683,7 +5019,18 @@ function savePos(ratio) {
       ratio,
     }));
   } catch(e) {
-    notifyStorageError();
+    // 容量超過時は表紙を捨てて読書位置の保存を優先する
+    try {
+      const existing = JSON.parse(localStorage.getItem(state.bookKey)) || {};
+      delete existing.cover;
+      localStorage.setItem(state.bookKey, JSON.stringify({
+        ...existing,
+        spineIdx: state.currentSpineIdx,
+        ratio,
+      }));
+    } catch(e2) {
+      notifyStorageError();
+    }
   }
   scheduleAutoSave();
 }
@@ -5263,6 +5610,17 @@ loadPreviewFonts();
 
 document.getElementById('search-input').addEventListener('keydown', e => {
   if (e.key === 'Enter') { e.preventDefault(); startSearch(); }
+});
+
+// 読みかけリスト v2: 検索入力（120msデバウンス）・ソートメニューの外側クリック閉じ
+document.getElementById('rl-search').addEventListener('input', e => {
+  clearTimeout(_rlSearchTimer);
+  _rlSearchTimer = setTimeout(() => { _rlQuery = e.target.value; buildReadingList(); }, 120);
+});
+document.addEventListener('click', e => {
+  const menu = document.getElementById('rl-sort-menu');
+  if (menu && menu.classList.contains('show') && !e.target.closest('#rl-sort-wrap'))
+    menu.classList.remove('show');
 });
 document.getElementById('search-input').disabled = true;
 document.getElementById('search-btn').disabled = true;
