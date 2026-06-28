@@ -418,6 +418,36 @@
   #modal-body { max-height:calc(80vh - 120px); overflow-y:auto; }
   #modal-close { margin-top:24px; background:var(--accent); border:none; color:#fff; padding:10px 24px; border-radius:8px; cursor:pointer; font-size:14px; font-weight:600; float:right; transition:filter .15s; }
   #modal-close:hover { filter:brightness(1.1); }
+  /* ── 読書データ画面 ── */
+  #reading-data-overlay { position:fixed; inset:0; background:rgba(0,0,0,.6); backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px); z-index:210; display:none; align-items:center; justify-content:center; opacity:0; transition:opacity .2s; padding:16px; }
+  #reading-data-overlay.show { display:flex; opacity:1; }
+  #reading-data-box { background:var(--ui-bg); border:1px solid var(--ui-border); border-radius:16px; padding:24px 28px; width:100%; max-width:560px; max-height:85vh; overflow-y:auto; color:var(--ui-text); box-shadow:0 16px 48px rgba(0,0,0,.3); transform:translateY(20px) scale(0.97); transition:all .3s cubic-bezier(0.16,1,0.3,1); }
+  #reading-data-overlay.show #reading-data-box { transform:translateY(0) scale(1); }
+  #reading-data-box .rd-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+  #reading-data-box .rd-head h3 { font-size:19px; font-weight:600; }
+  .rd-section { margin-top:22px; }
+  .rd-section > h4 { font-size:13px; font-weight:600; opacity:.6; margin-bottom:12px; letter-spacing:.02em; }
+  .rd-stat-row { display:flex; align-items:center; gap:18px; }
+  .rd-donut { width:84px; height:84px; border-radius:50%; flex-shrink:0; display:flex; align-items:center; justify-content:center; }
+  .rd-donut > div { width:60px; height:60px; border-radius:50%; background:var(--ui-bg); display:flex; align-items:center; justify-content:center; font-size:18px; font-weight:700; }
+  .rd-tiles { display:flex; gap:24px; flex:1; }
+  .rd-tile { text-align:center; }
+  .rd-tile .rd-num { font-size:30px; font-weight:700; line-height:1.1; }
+  .rd-tile .rd-lbl { font-size:12px; opacity:.65; margin-top:4px; }
+  .rd-author-row { display:flex; align-items:center; gap:10px; margin-bottom:8px; font-size:13px; }
+  .rd-author-name { width:38%; flex-shrink:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .rd-author-bar-wrap { flex:1; background:var(--ui-border); border-radius:5px; height:14px; overflow:hidden; }
+  .rd-author-bar { height:100%; background:var(--accent); border-radius:5px; min-width:2px; }
+  .rd-author-cnt { width:28px; text-align:right; flex-shrink:0; opacity:.75; font-variant-numeric:tabular-nums; }
+  .rd-author-more { font-size:12px; opacity:.55; margin-top:2px; }
+  .rd-recent-row { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:9px 4px; border-bottom:1px solid var(--ui-border); cursor:pointer; font-size:13px; }
+  .rd-recent-row:last-child { border-bottom:none; }
+  .rd-recent-row:hover { background:var(--ui-border); border-radius:6px; }
+  .rd-recent-title { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .rd-recent-date { flex-shrink:0; opacity:.6; font-variant-numeric:tabular-nums; }
+  .rd-empty { text-align:center; opacity:.6; padding:32px 0; font-size:14px; }
+  #welcome-rd-btn { background:var(--ui-bg); border:1px solid var(--ui-border); color:var(--ui-text); padding:8px 16px; border-radius:8px; cursor:pointer; font-size:13px; font-weight:500; transition:filter .15s; }
+  #welcome-rd-btn:hover { filter:brightness(1.05); }
   #file-input { display:none; }
   #toast { position:fixed; top:72px; left:50%; transform:translateX(-50%) translateY(-10px); background:var(--text); color:var(--bg); padding:10px 24px; border-radius:24px; font-size:13px; font-weight:500; z-index:300; opacity:0; visibility:hidden; transition:all .3s cubic-bezier(0.16,1,0.3,1); pointer-events:none; white-space:nowrap; box-shadow:0 8px 24px rgba(0,0,0,0.15); }
   #toast.show { opacity:1; visibility:visible; transform:translateX(-50%) translateY(0); }
@@ -546,6 +576,10 @@
 
   <button class="icon-btn" onclick="showHelp()" data-i18n-title="btn.help">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+  </button>
+
+  <button class="icon-btn" id="reading-data-btn" onclick="openReadingData()" data-i18n-title="readingData.title">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="21" x2="21" y2="21"/><rect x="5" y="11" width="3.5" height="8"/><rect x="10.25" y="6" width="3.5" height="13"/><rect x="15.5" y="14" width="3.5" height="5"/></svg>
   </button>
 
   <button class="icon-btn" id="fs-btn" onclick="toggleFullscreen()" data-i18n-title="btn.fullscreen">
@@ -789,6 +823,7 @@
         </div>
         <div id="reading-list-items"></div>
         <div id="reading-list-footer">
+          <button id="welcome-rd-btn" onclick="openReadingData()" data-i18n="readingData.title">📊 読書データ</button>
           <button id="reading-list-new-btn" onclick="openFilePicker()" data-i18n="readingList.openNew">別の ePub を開く</button>
           <button id="reading-list-done-btn" onclick="toggleEditMode()">完了</button>
         </div>
@@ -869,6 +904,16 @@
     <h3 id="modal-title">操作ガイド</h3>
     <div id="modal-body"></div>
     <button id="modal-close" onclick="closeModal()" data-i18n="modal.close">閉じる</button>
+  </div>
+</div>
+
+<div id="reading-data-overlay" onclick="if(event.target===this)closeReadingData()">
+  <div id="reading-data-box">
+    <div class="rd-head">
+      <h3 data-i18n="readingData.title">📊 読書データ</h3>
+      <button class="icon-btn" onclick="closeReadingData()" data-i18n-title="readingData.close" style="padding:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <div id="reading-data-body"></div>
   </div>
 </div>
 
@@ -1112,6 +1157,17 @@ const I18N = {
     'finished.dismiss':     '閉じない',
     'btn.closeBook':        '📚 この本を閉じる',
     'btn.closeBook.title':  'この本を閉じて読みかけリストへ',
+    'readingData.title':          '📊 読書データ',
+    'readingData.allBooks':       'すべての本',
+    'readingData.completionRate': '読了率',
+    'readingData.finishedCount':  '読了',
+    'readingData.readingCount':   '読みかけ',
+    'readingData.booksUnit':      '冊',
+    'readingData.topAuthors':     'よく読む著者',
+    'readingData.othersN':        '他 {n} 人',
+    'readingData.recentFinished': '最近読了',
+    'readingData.empty':          'まだ読書記録がありません',
+    'readingData.close':          '閉じる',
   },
   en: {
     'btn.open':             'Open',
@@ -1301,6 +1357,17 @@ const I18N = {
     'finished.dismiss':     'Stay',
     'btn.closeBook':        '📚 Close this book',
     'btn.closeBook.title':  'Close book and return to reading list',
+    'readingData.title':          '📊 Reading Data',
+    'readingData.allBooks':       'All books',
+    'readingData.completionRate': 'Completion',
+    'readingData.finishedCount':  'Finished',
+    'readingData.readingCount':   'In progress',
+    'readingData.booksUnit':      '',
+    'readingData.topAuthors':     'Most-read authors',
+    'readingData.othersN':        '{n} more',
+    'readingData.recentFinished': 'Recently finished',
+    'readingData.empty':          'No reading records yet',
+    'readingData.close':          'Close',
   },
   'zh-TW': {
     'btn.open':             '開啟',
@@ -1490,6 +1557,17 @@ const I18N = {
     'finished.dismiss':     '繼續閱讀',
     'btn.closeBook':        '📚 關閉此書',
     'btn.closeBook.title':  '關閉此書並回到閱讀清單',
+    'readingData.title':          '📊 閱讀數據',
+    'readingData.allBooks':       '所有書籍',
+    'readingData.completionRate': '完成率',
+    'readingData.finishedCount':  '已讀完',
+    'readingData.readingCount':   '閱讀中',
+    'readingData.booksUnit':      '本',
+    'readingData.topAuthors':     '常讀作者',
+    'readingData.othersN':        '其他 {n} 人',
+    'readingData.recentFinished': '最近讀完',
+    'readingData.empty':          '尚無閱讀記錄',
+    'readingData.close':          '關閉',
   },
   'zh-CN': {
     'btn.open':             '打开',
@@ -1679,6 +1757,17 @@ const I18N = {
     'finished.dismiss':     '继续阅读',
     'btn.closeBook':        '📚 关闭本书',
     'btn.closeBook.title':  '关闭本书并回到阅读列表',
+    'readingData.title':          '📊 阅读数据',
+    'readingData.allBooks':       '所有书籍',
+    'readingData.completionRate': '完成率',
+    'readingData.finishedCount':  '已读完',
+    'readingData.readingCount':   '阅读中',
+    'readingData.booksUnit':      '本',
+    'readingData.topAuthors':     '常读作者',
+    'readingData.othersN':        '其他 {n} 人',
+    'readingData.recentFinished': '最近读完',
+    'readingData.empty':          '尚无阅读记录',
+    'readingData.close':          '关闭',
   },
 };
 
@@ -1742,7 +1831,7 @@ const state = {
   epub:null, opfPath:'', opfDir:'',
   spine:[], manifest:{}, toc:[],
   currentSpineIdx:0,
-  bookTitle:'', bookCreator:'', bookCoverDataUri:'',
+  bookTitle:'', bookCreator:'', bookCreators:[], bookCoverDataUri:'',
   fontMode:'publisher', fontSize:100, lineHeight:2.0, theme:'', margin:'full',
   writingMode:'vertical',  // 'vertical' | 'horizontal' | 'publisher'
   fwdBtnSize:'small',      // 'small' | 'medium' | 'large'
@@ -2060,8 +2149,9 @@ async function loadEpub(file, fileHandle = null) {
     const titleEl = opfDoc.querySelector('metadata > *|title, metadata > title');
     const titleText = titleEl ? titleEl.textContent : file.name;
     state.bookTitle = titleText;
-    state.bookCreator = [...opfDoc.querySelectorAll('metadata > *|creator, metadata > creator')]
-      .map(el => el.textContent.trim()).filter(Boolean).join('・');
+    state.bookCreators = [...opfDoc.querySelectorAll('metadata > *|creator, metadata > creator')]
+      .map(el => el.textContent.trim()).filter(Boolean);
+    state.bookCreator = state.bookCreators.join('・');
     document.getElementById('book-title').textContent = titleText;
     state.bookKey = makeBookKey(titleText, state.bookCreator);
     // 旧形式エントリ (epub_pos_{title}_{spineCount}) からのワンショット移行
@@ -2803,6 +2893,8 @@ let _editMode          = false;    // 読みかけリスト編集モード
 const _RL_SORTS        = ['recent', 'title', 'author', 'progressHigh', 'progressLow'];
 let _rlPrefs           = _rlLoadPrefs(); // 読みかけリスト表示設定 {view, sort, filterReady, showFinished}
 let _rlQuery           = '';       // 読みかけリスト検索文字列（非永続・セッション内のみ）
+const _RD_DEFAULTS     = { authorScope: 'finished', authorLimit: 8 };
+let _rdPrefs           = _rdLoadPrefs(); // 読書データ表示設定（非同期・端末ローカル）
 let _rlSearchTimer     = null;     // 読みかけリスト検索入力のデバウンスタイマー
 let _mobileProgressTimer = null;  // モバイル進捗ピル 非表示タイマー
 let _sidebarTab        = 'toc';    // 'toc' | 'search' — サイドバーの現在タブ
@@ -3788,6 +3880,11 @@ function updatePageInfo() {
 // ══════════════════════════════════════════
 document.addEventListener('keydown', e => {
   if (e.target.tagName === 'SELECT' || e.target.tagName === 'INPUT') return;
+  // 読書データ画面が開いている間はショートカットを止め、Escape で閉じる
+  if (document.getElementById('reading-data-overlay').classList.contains('show')) {
+    if (e.key === 'Escape') { closeReadingData(); e.preventDefault(); }
+    return;
+  }
   // FXL ズーム専用ショートカット（z / 0 / 1-6 / Escape）
   if (state.renderMode === 'fxl') {
     if (e.key === 'z' || e.key === 'Z') {
@@ -4719,6 +4816,8 @@ function _rlCollect() {
         finished: spineIdx >= spineCount - 1 && ratio > 0.9,  // 最終章かつ ratio > 0.9
         lastOpenedAt: val.lastOpenedAt || null,
         creator: val.creator || '',
+        creators: Array.isArray(val.creators) ? val.creators : null,
+        finishedAt: val.finishedAt || null,
         cover: val.cover || '',
       });
     } catch(e) {}
@@ -5064,7 +5163,7 @@ function closeBook() {
   state.epub = null; state.opfPath = ''; state.opfDir = '';
   state.spine = []; state.manifest = {}; state.toc = [];
   state.currentSpineIdx = 0;
-  state.bookTitle = ''; state.bookCreator = ''; state.bookCoverDataUri = '';
+  state.bookTitle = ''; state.bookCreator = ''; state.bookCreators = []; state.bookCoverDataUri = '';
   state.bookKey = ''; state.publisherAxis = null;
   state.renderMode = 'reflow'; state.fxlPpd = 'ltr';
   state.fxlPairs = null; state.currentPairIdx = 0;
@@ -5098,8 +5197,137 @@ function closeBook() {
 
 function showFinishedBanner() {
   _bookFinished = true;
+  _rdMarkFinishedAt();
   const b = document.getElementById('finished-banner');
   b.classList.add('show');
+}
+
+// 読了日時を1度だけ記録（既存値があれば上書きしない＝最古を保持）。
+// markAsFinished（論理削除）では呼ばない＝実際の読了日のみ記録する
+function _rdMarkFinishedAt() {
+  if (!state.bookKey) return;
+  try {
+    const v = JSON.parse(localStorage.getItem(state.bookKey)) || {};
+    if (v.finishedAt) return;
+    v.finishedAt = new Date().toISOString();
+    localStorage.setItem(state.bookKey, JSON.stringify(v));
+  } catch (e) {}
+}
+
+// ══════════════════════════════════════════
+//  読書データ画面（G1：時間計測なし）
+// ══════════════════════════════════════════
+function _rdLoadPrefs() {
+  try {
+    const p = JSON.parse(localStorage.getItem('epub_reading_data_prefs')) || {};
+    return {
+      authorScope: p.authorScope === 'finished' ? 'finished' : _RD_DEFAULTS.authorScope,
+      authorLimit: (typeof p.authorLimit === 'number' && p.authorLimit >= 3 && p.authorLimit <= 30)
+        ? p.authorLimit : _RD_DEFAULTS.authorLimit,
+    };
+  } catch (e) { return { ..._RD_DEFAULTS }; }
+}
+
+function _rdComputeStats(items) {
+  const total    = items.length;
+  const finished = items.filter(it => it.finished).length;
+  const reading  = total - finished;
+  const rate     = total ? Math.round(finished / total * 100) : 0;
+  return { total, finished, reading, rate };
+}
+
+// 読了本を著者別に集計。creators 配列があれば各著者 +1、無ければ creator 文字列を丸ごと 1 キー。
+// 「・」での再分割はしない（外国人名の誤分割回避）
+function _rdAuthorRanking(items) {
+  const map = new Map();  // normKey -> { name, count }
+  items.filter(it => it.finished).forEach(it => {
+    const list = (it.creators && it.creators.length) ? it.creators
+               : (it.creator ? [it.creator] : []);
+    list.forEach(name => {
+      const k = _rlNorm(name);
+      if (!k) return;
+      const e = map.get(k) || { name, count: 0 };
+      e.count++; map.set(k, e);
+    });
+  });
+  const all = [...map.values()].sort((a, b) => b.count - a.count || _rlCollator.compare(a.name, b.name));
+  const limit = _rdPrefs.authorLimit;
+  return { top: all.slice(0, limit), restAuthors: Math.max(0, all.length - limit) };
+}
+
+function _rdRecentFinished(items) {
+  return items.filter(it => it.finished)
+    .map(it => ({ ...it, _at: it.finishedAt || it.lastOpenedAt || null }))
+    .sort((a, b) => (Date.parse(b._at) || 0) - (Date.parse(a._at) || 0))
+    .slice(0, 10);
+}
+
+function _rdFmtDate(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d)) return '';
+  const p = n => String(n).padStart(2, '0');
+  return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+}
+
+function openReadingData() {
+  buildReadingData();
+  document.getElementById('reading-data-overlay').classList.add('show');
+}
+function closeReadingData() {
+  document.getElementById('reading-data-overlay').classList.remove('show');
+}
+
+function buildReadingData() {
+  const body = document.getElementById('reading-data-body');
+  const items = _rlCollect();
+  if (!items.length) {
+    body.innerHTML = `<div class="rd-empty">${t('readingData.empty')}</div>`;
+    return;
+  }
+  const s = _rdComputeStats(items);
+  const unit = t('readingData.booksUnit');
+  // すべての本
+  let html =
+    `<div class="rd-section"><h4>${t('readingData.allBooks')}</h4>` +
+    `<div class="rd-stat-row">` +
+      `<div class="rd-donut" style="background:conic-gradient(var(--accent) 0 ${s.rate}%, var(--ui-border) 0);"><div>${s.rate}%</div></div>` +
+      `<div class="rd-tiles">` +
+        `<div class="rd-tile"><div class="rd-num">${s.finished}</div><div class="rd-lbl">${t('readingData.finishedCount')}</div></div>` +
+        `<div class="rd-tile"><div class="rd-num">${s.reading}</div><div class="rd-lbl">${t('readingData.readingCount')}</div></div>` +
+      `</div>` +
+    `</div></div>`;
+  // よく読む著者
+  const { top, restAuthors } = _rdAuthorRanking(items);
+  if (top.length) {
+    const maxCnt = top[0].count || 1;
+    html += `<div class="rd-section"><h4>${t('readingData.topAuthors')}</h4>`;
+    top.forEach(a => {
+      const w = Math.round(a.count / maxCnt * 100);
+      html +=
+        `<div class="rd-author-row">` +
+          `<span class="rd-author-name">${esc(a.name)}</span>` +
+          `<span class="rd-author-bar-wrap"><span class="rd-author-bar" style="width:${w}%"></span></span>` +
+          `<span class="rd-author-cnt">${a.count}</span>` +
+        `</div>`;
+    });
+    if (restAuthors > 0) html += `<div class="rd-author-more">${t('readingData.othersN', {n: restAuthors})}</div>`;
+    html += `</div>`;
+  }
+  // 最近読了
+  const recent = _rdRecentFinished(items);
+  if (recent.length) {
+    html += `<div class="rd-section"><h4>${t('readingData.recentFinished')}</h4>`;
+    recent.forEach(it => {
+      html +=
+        `<div class="rd-recent-row" data-key="${esc(it.key)}" onclick="closeReadingData();openFilePickerForBook(this.dataset.key)">` +
+          `<span class="rd-recent-title">${esc(it.title)}</span>` +
+          `<span class="rd-recent-date">${_rdFmtDate(it._at)}</span>` +
+        `</div>`;
+    });
+    html += `</div>`;
+  }
+  body.innerHTML = html;
 }
 
 function dismissFinishedBanner() {
@@ -5178,6 +5406,7 @@ function saveBookMeta() {
       ...existing,
       lastOpenedAt: new Date().toISOString(),
       creator: state.bookCreator,
+      ...(state.bookCreators && state.bookCreators.length ? {creators: state.bookCreators} : {}),
       spineCount: state.spine.length,
       ...(state.bookCoverDataUri ? {cover: state.bookCoverDataUri} : {}),
     };
@@ -5429,6 +5658,7 @@ function _rlAddTombstone(bookKey) {
 // 墓標には触らない
 function _rlPurgeLocalData(bookKey) {
   try { localStorage.removeItem(bookKey); } catch (e) {}
+  try { const m = _rdLoadBookStats(); if (m[bookKey]) { delete m[bookKey]; _rdSaveBookStats(m); } } catch (e) {}
   fshDelete(bookKey).then(() => _handleKeys.delete(bookKey)).catch(() => {});
   if (_cachedKeys.has(bookKey)) {
     _idbDelete(bookKey).catch(() => {});
@@ -5520,14 +5750,18 @@ document.getElementById('bookmark-input').addEventListener('change', e => {
           if (tms !== undefined && tms >= (Date.parse(obj.lastOpenedAt) || 0)) continue;
         }
         try {
-          localStorage.setItem(key, typeof val === 'string' ? val : JSON.stringify(val));
-          if (key.startsWith('epub_pos_')) count++;
+          if (key.startsWith('epub_pos_')) { _rdMergePos(key, val); count++; }
+          else localStorage.setItem(key, typeof val === 'string' ? val : JSON.stringify(val));
         } catch(e) { notifyStorageError(); break; }
       }
       // 旧形式キーが取り込まれた場合に備え再統合（state.bookKey は新形式なので統合後にヒットする）
       try { localStorage.removeItem('epub_consolidate_v1'); } catch(e) {}
       consolidateBookmarks();
       _rlCleanupLastBook();
+      // 読書データ（本ごと集計・日ごと時間）をデバイス別 max でマージ → 孤児掃除
+      _rdMergeBookStats(json.bookStats);
+      _rdMergeDays(json.readingDays);
+      _rdPruneOrphanStats();
       let jumped = false;
       if (state.epub && state.bookKey) {
         let newVal = json.bookmarks[state.bookKey];
@@ -5634,6 +5868,107 @@ async function driveFindFile(token) {
   return state.driveFileId;
 }
 
+// ══════════════════════════════════════════
+//  読書データ 同期スキーマ（G1 でロック・G2/G3 もこの構造のまま）
+//  デバイス別アキュムレータ: 累積値は {deviceId: 値}、同IDは max・合計は和でマージ
+// ══════════════════════════════════════════
+const _BOOK_STATS_KEY   = 'epub_book_stats';   // 本ごと集計（G2 で蓄積開始）
+const _READING_DAYS_KEY = 'epub_reading_days'; // 日ごと読書時間（G3 で蓄積開始）
+
+// この端末の安定 ID（同期しない）。G2 の時間計測で self 欄キーとして使う
+function _rdDeviceId() {
+  let id = localStorage.getItem('epub_device_id');
+  if (!id) {
+    try {
+      const a = new Uint8Array(8); crypto.getRandomValues(a);
+      id = [...a].map(b => b.toString(16).padStart(2, '0')).join('');
+    } catch (e) { id = 'd' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+    try { localStorage.setItem('epub_device_id', id); } catch (e) {}
+  }
+  return id;
+}
+
+function _rdLoadBookStats() { try { return JSON.parse(localStorage.getItem(_BOOK_STATS_KEY)) || {}; } catch (e) { return {}; } }
+function _rdSaveBookStats(m) {
+  try {
+    if (m && Object.keys(m).length) localStorage.setItem(_BOOK_STATS_KEY, JSON.stringify(m));
+    else localStorage.removeItem(_BOOK_STATS_KEY);
+  } catch (e) {}
+}
+function _rdLoadDays() { try { const o = JSON.parse(localStorage.getItem(_READING_DAYS_KEY)); return (o && o.days && typeof o.days === 'object') ? o.days : {}; } catch (e) { return {}; } }
+function _rdSaveDays(d) {
+  try {
+    if (d && Object.keys(d).length) localStorage.setItem(_READING_DAYS_KEY, JSON.stringify({ days: d }));
+    else localStorage.removeItem(_READING_DAYS_KEY);
+  } catch (e) {}
+}
+function _rdHasStats() { return Object.keys(_rdLoadBookStats()).length > 0; }
+function _rdHasDays()  { return Object.keys(_rdLoadDays()).length > 0; }
+
+// 受信 bookStats を本ごと・デバイス別 max でマージ（epub_pos が無い本はスキップ＝孤児防止）
+function _rdMergeBookStats(remote) {
+  if (!remote || typeof remote !== 'object') return;
+  const local = _rdLoadBookStats();
+  let changed = false;
+  for (const k in remote) {
+    if (!Object.prototype.hasOwnProperty.call(remote, k)) continue;
+    if (localStorage.getItem(k) === null) continue;
+    const r = remote[k]; if (!r || typeof r !== 'object') continue;
+    const cur = local[k] || {};
+    const ms = { ...(cur.ms || {}) };
+    if (r.ms && typeof r.ms === 'object')
+      for (const dev in r.ms) { const v = +r.ms[dev] || 0; if (!(dev in ms) || v > ms[dev]) ms[dev] = v; }
+    const merged = { ms, chars: Math.max(+cur.chars || 0, +r.chars || 0), total: Math.max(+cur.total || 0, +r.total || 0) };
+    const fa = [cur.firstAt, r.firstAt].map(x => Date.parse(x)).filter(x => !isNaN(x));
+    if (fa.length) merged.firstAt = new Date(Math.min(...fa)).toISOString();
+    local[k] = merged; changed = true;
+  }
+  if (changed) _rdSaveBookStats(local);
+}
+
+// 受信 readingDays を日ごと・デバイス別 max でマージ（墓標非適用）
+function _rdMergeDays(remote) {
+  if (!remote || typeof remote !== 'object') return;
+  const local = _rdLoadDays();
+  let changed = false;
+  for (const date in remote) {
+    if (!Object.prototype.hasOwnProperty.call(remote, date)) continue;
+    const r = remote[date]; if (!r || typeof r !== 'object') continue;
+    const cur = { ...(local[date] || {}) };
+    for (const dev in r) { const v = +r[dev] || 0; if (!(dev in cur) || v > cur[dev]) cur[dev] = v; }
+    local[date] = cur; changed = true;
+  }
+  if (changed) _rdSaveDays(local);
+}
+
+// epub_pos の取り込み: 位置はリモート優先だが finishedAt（最古）と creators（リモート欠落時）は温存
+function _rdMergePos(key, remoteRaw) {
+  let remote;
+  try { remote = typeof remoteRaw === 'string' ? JSON.parse(remoteRaw) : remoteRaw; } catch (e) { return; }
+  if (!remote || typeof remote !== 'object') { localStorage.setItem(key, typeof remoteRaw === 'string' ? remoteRaw : JSON.stringify(remoteRaw)); return; }
+  let local = null;
+  try { local = JSON.parse(localStorage.getItem(key)); } catch (e) {}
+  const merged = { ...remote };
+  if (local && typeof local === 'object') {
+    const lf = local.finishedAt, rf = remote.finishedAt;
+    if (lf && rf) merged.finishedAt = (Date.parse(lf) <= Date.parse(rf)) ? lf : rf;
+    else if (lf || rf) merged.finishedAt = lf || rf;
+    if (!(Array.isArray(remote.creators) && remote.creators.length) && Array.isArray(local.creators) && local.creators.length)
+      merged.creators = local.creators;
+  }
+  localStorage.setItem(key, JSON.stringify(merged));
+}
+
+// epub_book_stats のうち対応する epub_pos が無いエントリを掃除（purge・墓標・consolidate 改名の後始末）
+function _rdPruneOrphanStats() {
+  const m = _rdLoadBookStats();
+  let changed = false;
+  for (const k in m) {
+    if (Object.prototype.hasOwnProperty.call(m, k) && localStorage.getItem(k) === null) { delete m[k]; changed = true; }
+  }
+  if (changed) _rdSaveBookStats(m);
+}
+
 // ローカルのしおりデータを収集して { version, exportedAt, bookmarks } を返す
 function collectBookmarks() {
   const data = {};
@@ -5645,7 +5980,9 @@ function collectBookmarks() {
   }
   const purged = _rlLoadPurged();
   return { version: 1, exportedAt: new Date().toISOString(), bookmarks: data,
-           ...(purged.length ? { purged } : {}) };
+           ...(purged.length ? { purged } : {}),
+           ...(_rdHasStats() ? { bookStats: _rdLoadBookStats() } : {}),
+           ...(_rdHasDays()  ? { readingDays: _rdLoadDays() }   : {}) };
 }
 
 // しおりを Drive に保存（Driveにしおりを保存ボタン）
@@ -5823,14 +6160,18 @@ async function driveDownload() {
         if (tms !== undefined && tms >= opened) continue;
       }
       try {
-        localStorage.setItem(key, typeof val === 'string' ? val : JSON.stringify(val));
-        if (key.startsWith('epub_pos_')) count++;
+        if (key.startsWith('epub_pos_')) { _rdMergePos(key, val); count++; }
+        else localStorage.setItem(key, typeof val === 'string' ? val : JSON.stringify(val));
       } catch(e) { notifyStorageError(); break; }
     }
     // Drive 上の旧形式キーが取り込まれた場合に備え再統合
     try { localStorage.removeItem('epub_consolidate_v1'); } catch(e) {}
     consolidateBookmarks();
     _rlCleanupLastBook();
+    // 読書データ（本ごと集計・日ごと時間）をデバイス別 max でマージ → 孤児掃除
+    _rdMergeBookStats(json.bookStats);
+    _rdMergeDays(json.readingDays);
+    _rdPruneOrphanStats();
     let jumped = false;
     if (state.epub && state.bookKey) {
       let newVal = json.bookmarks[state.bookKey];
