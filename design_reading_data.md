@@ -26,7 +26,7 @@ yomikake（`yomikake.html` / `yomikake_ios.html`）に kobo / justread 風の **
 | **G1** | 読了率・読了冊数・読みかけ冊数・著者グラフ・最近読了 | 不要 | **実装する（画面込み）** |
 | **G2** | 累計読書時間・本ごと読書時間・「最後の本」パネル | 必要 | **実装済み（v1.13.0・§14）** |
 | **G2.1** | 文字数（既読/総）・読書スピード・読了所要時間 | 必要 | **実装済み（§14.4）** |
-| **G3** | 連続 日/週/月・読書カレンダー・週次/月次ペース | 必要 | 設計のみ（同期項目確定） |
+| **G3** | 連続 日/週/月・読書カレンダー・週次/月次ペース | 必要 | **両ファイル実装済み・コミット前**（§15・v2.0.0） |
 
 - G1 で追加する保存項目は **`epub_pos_*` への `finishedAt` と `creators` の2フィールドだけ**。時間計測インフラ（`epub_book_stats` / `epub_reading_days`）は G1 では作らない。
 - ただし **同期マージ規則は G1 時点で G2/G3 分も含めて実装**しておく（受信したら無視せずマージできる状態にし、将来の相互運用で取りこぼさない）。
@@ -777,6 +777,149 @@ G2 追加（`I18N` へ・両ファイル）:
 - [ ] i18n 4言語（§14.8）
 - [ ] iOS 版へ同等反映（§14.9・LF）
 - [ ] 動作確認：3分超放置で加算停止／タブ切替フラッシュ／本切替で帰属が混ざらない／累計＝reading_days 単一ソース
+
+## 15. G3 詳細実装設計（現行コードベース・2026-06-28）
+
+> **実装状況（2026-06-28）**: **両ファイル（`yomikake.html` CRLF / `yomikake_ios.html` LF）に実装済み・コミット前**。JS 構文チェック＋コアロジック単体テスト22件通過（猶予デイリーストリーク／ISO 週ストリーク／月ストリーク／カレンダー量子化・未来日・oldest拡張／週次ペース／剪定 cutoff）。実装関数：日付ヘルパ（`_rdDateKey`/`_rdParseDayKey`/`_rdAddDays`/`_rdWeekStartKey`/`_rdDayTotals`）、ストリーク（`_rdStreakDays`/`_rdStreakWeeks`/`_rdStreakMonths`）、カレンダー（`_rdCalBucket`/`_rdCalendarColumns`）、ペース（`_rdPaceWeekly`/`_rdPaceMonthly`/`_rdSetPaceUnit`）、剪定（`_rdPruneDays`＋`_rdSaveDays`／`_rdMergeDays` cutoff）、画面（`_rdContinuitySectionHtml`/`_rdPaceSectionHtml`＋`buildReadingData` 配線＋カレンダー rAF 右端スクロール）、prefs（`_RD_DEFAULTS`/`_rdLoadPrefs`/`_rdSavePrefs` に `paceUnit`/`calWeeks`）、CSS（`.rd-cal*`/`.rd-pace*`）、i18n 11キー×4言語。ブラウザ実機の目視確認は未実施（要手動テスト）。
+>
+> **状態**: 設計のみ（旧）。**対象バージョン: v2.0.0**（G1〜G3 完成＋懸念点解消をもって 2.0.0 とする方針）。
+> **同期スキーマは G1 でロック済み・G3 で構造変更なし**（マージ規則 max は不変。剪定 cutoff スキップを `_rdMergeDays` に1行足すのみ＝ペイロード構造・規則は変えない）。
+>
+> **ユーザー確定（2026-06-28）**:
+> 1. 週の起点 = **月曜（ISO 8601）**
+> 2. 読書カレンダー = **直近1年・横スクロール**（過去最大3年まで遡及）
+> 3. 週次/月次ペース = **初期は週次**（週/月トグルあり）
+> 4. デイリーストリーク = **昨日まで連続なら継続表示（猶予あり・kobo 風）**
+
+**前提**：`epub_reading_days`（=累計時間/読書日の単一ソース）は G2 で蓄積・同期・孤児非対象（§12-E）まで実装済み。**G3 が新規実装するのは「①日付集計ヘルパ ②連続 日/週/月 ③カレンダー草グラフ ④週次/月次ペース ⑤剪定の追加と同期収束 ⑥画面（継続＋ペースの2セクション）⑦i18n」だけ**。命名は G1/G2 同様 `_rd` / `rd` プレフィックス。両ファイル共通（本体 CRLF・iOS 版 LF）。行番号は G2 実装後の現行 `yomikake.html` の目安。
+
+### 15.1 データソースと日付ヘルパ
+
+- 単一ソース = `_rdLoadDays()`（~6133）の `days` マップ `{ 'YYYY-MM-DD': { dev: ms } }`。
+- **`_rdDayTotals()`** → `{ 'YYYY-MM-DD': totalMs }`（デバイス和）。全 G3 指標の唯一の入力。`totalMs > 0` の日を「読書日」と定義（flush は ms>0 時のみ書くのでキー存在≒読書日だが、安全に `>0` で判定）。
+- 端末ローカル基準の日付ユーティリティ（既存 `_rdTodayKey()`（~5399）と整合）:
+  ```js
+  function _rdDateKey(d){ const p=n=>String(n).padStart(2,'0'); return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate()); }
+  function _rdParseDayKey(k){ const [y,m,da]=k.split('-').map(Number); return new Date(y, m-1, da, 12, 0, 0); } // 正午固定でDST安全
+  function _rdAddDays(k,n){ const d=_rdParseDayKey(k); d.setDate(d.getDate()+n); return _rdDateKey(d); }
+  function _rdWeekStartKey(k){ const d=_rdParseDayKey(k); const dow=(d.getDay()+6)%7; /*月=0..日=6*/ d.setDate(d.getDate()-dow); return _rdDateKey(d); }
+  function _rdMonthKey(k){ return k.slice(0,7); } // 'YYYY-MM'
+  ```
+- `_rdTodayKey()` は `_rdDateKey(new Date())` で表現できる（重複なら `_rdTodayKey` を `_rdDateKey` 利用に統一可。既存呼び出しは温存）。
+
+### 15.2 連続記録（ストリーク）
+
+読書日判定 `has = k => (totals[k]||0) > 0`。3指標とも「猶予→遡り」の同パターン。
+
+```js
+function _rdStreakDays(totals){
+  const has=k=>(totals[k]||0)>0;
+  let cur=_rdTodayKey();
+  if(!has(cur)){ cur=_rdAddDays(cur,-1); if(!has(cur)) return 0; } // 今日未読でも昨日読了なら継続（猶予）
+  let n=0; while(has(cur)){ n++; cur=_rdAddDays(cur,-1); } return n;
+}
+```
+- **週ストリーク** `_rdStreakWeeks(totals)`：読書週 = その週（月曜起点）に読書日が1日でもある週。起点=今週の月曜、今週未読書なら先週へ猶予、連続する読書週を数える（`_rdAddDays(weekStart,-7)` で前週へ）。週内に読書日があるかは `totals` のキーを走査して `_rdWeekStartKey` でグルーピングした集合 `Set<weekStart>` を一度作ると O(日数)。
+- **月ストリーク** `_rdStreakMonths(totals)`：読書月 = その月に読書日が1日でもある月。集合 `Set<'YYYY-MM'>` を作り、今月→（未読書なら先月へ猶予）→前月へ遡って連続月数。前月は `_rdParseDayKey(monthFirst)` の `setMonth(-1)`。
+- 共通化案：`Set` 構築を `_rdDaySet/_rdWeekSet/_rdMonthSet(totals)` に分け、ストリーク本体は「起点・前へ進む関数・集合」を引数に取る `_rdStreakOver(set, startKey, prevFn)` で1本化してもよい（任意）。
+
+### 15.3 読書カレンダー（草グラフ）
+
+- **範囲**：今日を含む週（月曜起点）を最右列に、左へ既定 `_rdPrefs.calWeeks=53` 週を描画。`.rd-cal-wrap` を `overflow-x:auto` にして過去へ横スクロール（描画自体を最大3年=156週まで広げる／または初期53週＋スクロール時に追加。初版は **保持窓内の全週を一括描画して CSS 横スクロール** が簡潔）。
+- **グリッド**：列=週・行=曜日（月→日の7行）。`display:grid; grid-auto-flow:column; grid-template-rows:repeat(7,Npx)`。最古の週から今週まで列を生成し、各列は月曜〜日曜の7セル。
+- **量子化（5段階）**：`_RD_CAL_BUCKETS = [15,30,60]`（分）。bucket = 0(未読) / 1(>0〜15分) / 2(15〜30) / 3(30〜60) / 4(≥60)。
+- **配色**：bucket0 = `--ui-border`、1〜4 = `--accent` を `opacity .28/.5/.72/1`。クラス `.rd-cal-cell.l1..l4`。
+- **未来日**（今週の今日より後）：空セル（bucket0 かつ `visibility:hidden` で隙間を保持）。
+- セルは `data-d="YYYY-MM-DD" data-m="<分>"`。タップ/ホバーで日付＋時間をツールチップ（PC）／トースト（タッチ・任意）。
+- **月ラベル/凡例**：列上端に月境界の月名（簡易：その列に月初を含む週なら月名を出す）、右下に「少 ■▢▣■ 多」凡例（`readingData.calLess/calMore`）。
+
+### 15.4 週次/月次ペース（棒グラフ）
+
+- `_rdPaceWeekly(totals, n=12)` → 直近 n 週の `[{label, ms}]`（label 例 `M/D`＝週頭）。`_rdPaceMonthly(totals, n=12)` → 直近 n ヶ月（label `YYYY/M` または `M月`）。各週/月は該当日の `totals` を合算。
+- **棒グラフ**：`.rd-pace`（`display:flex; align-items:flex-end; height:80px`）に縦棒 `.rd-pace-bar`（高さ=`ms/maxMs*100%`、`min-height:2px`）。下にラベル、タップ/ホバーで値。
+- **単位トグル**：`_rdPrefs.paceUnit ∈ {'week','month'}`。トグルは固定リテラルのインライン handler（データ埋め込みではないので規約 OK）：
+  ```html
+  <button class="rd-pace-tab" data-unit="week"  onclick="_rdSetPaceUnit(this.dataset.unit)">…</button>
+  <button class="rd-pace-tab" data-unit="month" onclick="_rdSetPaceUnit(this.dataset.unit)">…</button>
+  ```
+  `_rdSetPaceUnit(u)` が prefs 保存 → `buildReadingData()` 再描画。
+
+### 15.5 剪定（保持窓）と同期収束
+
+- **保持窓** `_RD_DAYS_KEEP = 1100`（≒3年・§11）。
+- **`_rdPruneDays(d)`**：今日から `_RD_DAYS_KEEP` 日より古い日付キーを削除。**`_rdSaveDays()`（~6134）冒頭で保存前に適用**。
+- **同期収束**（重要）：`_rdMergeDays(remote)`（G2 実装済み・~6157 付近）に **cutoff より古い受信日付をスキップ**する1行を追加。これが無いと「剪定で消した日が Drive 経由で再流入」して剪定が無効化される。`collectBookmarks()` は剪定済み `_rdLoadDays()` を載せるので古い日は再送されない。→ 全端末で古い日が収束的に消える。
+  - マージ規則（デバイス別 max）自体は不変。**同期スキーマ・ペイロード構造は変えない**（§0-3）。3年超オフライン端末が後で同期する稀ケースのみ一時再流入し得るが次回剪定で除去・データ極小で実害なし。
+
+### 15.6 画面（継続セクション＋ペースセクション）
+
+`buildReadingData()`（~5488）に、**`_rdHasDays()` が true のときのみ**、`lastBook` セクションの後・`allBooks` の前へ2セクション挿入。配置順：**lastBook → 継続 → ペース → すべての本 → 著者 → 最近読了**（§5.2 準拠）。
+
+1. **継続セクション**（`readingData.continuity`）
+   - 3タイル（連続 日/週/月）＝既存 `.rd-tiles`/`.rd-tile` を流用。`rd-num`=数値、`rd-lbl`=「日連続/週連続/月連続」。0 でも表示。
+   - その下に `.rd-cal-wrap` 草グラフ＋凡例。
+2. **ペースセクション**（`readingData.pace`）
+   - 週/月トグル＋ `.rd-pace` 棒グラフ。
+- `_rdHasDays()` false（時間未蓄積）なら **DOM ごと出さない**（G1/G2 同方針＝プレースホルダ無し）。
+
+**CSS 追加**（既存 `rd-*` に倣う・テーマ変数のみ。本体 ~456 付近に追記）:
+```css
+.rd-cal-wrap{ overflow-x:auto; padding-bottom:4px; }
+.rd-cal{ display:grid; grid-auto-flow:column; grid-template-rows:repeat(7,11px); gap:3px; width:max-content; }
+.rd-cal-cell{ width:11px; height:11px; border-radius:2px; background:var(--ui-border); }
+.rd-cal-cell.l1{ background:var(--accent); opacity:.28; }
+.rd-cal-cell.l2{ background:var(--accent); opacity:.5; }
+.rd-cal-cell.l3{ background:var(--accent); opacity:.72; }
+.rd-cal-cell.l4{ background:var(--accent); opacity:1; }
+.rd-cal-legend{ display:flex; align-items:center; gap:4px; justify-content:flex-end; font-size:11px; opacity:.6; margin-top:6px; }
+.rd-pace{ display:flex; align-items:flex-end; gap:4px; height:84px; margin-top:8px; }
+.rd-pace-col{ flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; }
+.rd-pace-bar{ width:100%; background:var(--accent); border-radius:3px 3px 0 0; min-height:2px; }
+.rd-pace-lbl{ font-size:10px; opacity:.55; white-space:nowrap; }
+.rd-pace-tabs{ display:flex; gap:6px; margin-bottom:4px; }
+.rd-pace-tab{ font-size:12px; padding:3px 10px; border:1px solid var(--ui-border); border-radius:6px; background:transparent; color:var(--ui-text); cursor:pointer; }
+.rd-pace-tab.active{ background:var(--accent); color:#fff; border-color:var(--accent); }
+```
+
+### 15.7 表示設定 `epub_reading_data_prefs`（非同期・拡張）
+
+`_RD_DEFAULTS`（~2953）に追加：`paceUnit:'week'`, `calWeeks:53`。`_rdLoadPrefs()`（~5305）にホワイトリスト検証追加（`paceUnit ∈ {'week','month'}`、`calWeeks` を数値・範囲クランプ）。同期しない。
+
+### 15.8 i18n キー（4言語：ja / en / zh-TW / zh-CN）
+
+G3 追加（`I18N` へ・両ファイル）:
+`readingData.continuity`（継続）, `readingData.streakDayLabel`（日連続）, `readingData.streakWeekLabel`（週連続）, `readingData.streakMonthLabel`（月連続）, `readingData.calendar`（読書カレンダー）, `readingData.calLess`（少）, `readingData.calMore`（多）, `readingData.calTooltip`（{date}・{dur}）, `readingData.pace`（読書ペース）, `readingData.paceWeekly`（週次）, `readingData.paceMonthly`（月次）。
+- ストリークは「数値タイル＋単位ラベル」方式なので `{n}` 埋め込み不要。命名は実装時に微調整可。
+
+### 15.9 iOS 版（`yomikake_ios.html`）差分
+
+- ロジック共通・LF。`buildReadingData` の対応箇所（G2 後にずれた行）へ同挿入。
+- カレンダー横スクロールは `.rd-cal-wrap` に `-webkit-overflow-scrolling:touch` を併記。セルタップはツールチップの代わりにトースト（任意）。
+- 計測・同期・剪定ロジックは共通。G3 は描画＋剪定のみで iOS 固有分岐なし。
+
+### 15.10 実装前のユーザー確認事項
+
+1. 週起点 = 月曜（ISO） ✓ 確定
+2. カレンダー = 直近1年・横スクロール（3年まで遡及） ✓ 確定
+3. ペース初期 = 週次（週/月トグル） ✓ 確定
+4. デイリーストリーク = 昨日まで連続なら継続（猶予あり） ✓ 確定
+5. カレンダー量子化の閾値 = 0/15/30/60 分の5段階（**提案値**・実装後に体感調整可）
+6. 保持窓 = 1100 日（3年）
+
+### 15.11 実装チェックリスト（両ファイル）
+
+- [ ] 日付ヘルパ（`_rdDateKey` / `_rdParseDayKey` / `_rdAddDays` / `_rdWeekStartKey` / `_rdMonthKey` / `_rdDayTotals`）
+- [ ] ストリーク（`_rdStreakDays` / `_rdStreakWeeks` / `_rdStreakMonths`、必要なら `_rdDaySet`/`_rdWeekSet`/`_rdMonthSet`）
+- [ ] カレンダー（セル生成＋5段階量子化、月ラベル・凡例）
+- [ ] ペース（`_rdPaceWeekly` / `_rdPaceMonthly` / `_rdSetPaceUnit`）
+- [ ] 剪定（`_rdPruneDays` を `_rdSaveDays` に、cutoff スキップを `_rdMergeDays` に）
+- [ ] `buildReadingData` に継続/ペースの2セクション＋CSS
+- [ ] `_RD_DEFAULTS` / `_rdLoadPrefs` 拡張（`paceUnit` / `calWeeks`）
+- [ ] i18n 4言語（§15.8）
+- [ ] iOS 版へ同等反映（LF）
+- [ ] 動作確認：猶予ストリーク／ISO 週境界（月曜）／カレンダー量子化と未来日／ペース週月トグル／剪定が同期で再流入しない／`_rdHasDays` false で非表示
+
+---
 
 ## 11. 未決事項 / 将来
 

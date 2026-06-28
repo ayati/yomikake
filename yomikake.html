@@ -455,11 +455,33 @@
   .rd-recent-title { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .rd-recent-date { flex-shrink:0; opacity:.6; font-variant-numeric:tabular-nums; }
   .rd-empty { text-align:center; opacity:.6; padding:32px 0; font-size:14px; }
+  /* G3: 継続（カレンダー）・ペース */
+  .rd-cal-caption { font-size:12px; opacity:.55; margin-top:14px; }
+  .rd-cal-wrap { overflow-x:auto; padding-bottom:4px; -webkit-overflow-scrolling:touch; margin-top:6px; }
+  .rd-cal-months { display:grid; grid-auto-flow:column; grid-auto-columns:11px; gap:3px; width:max-content; margin-bottom:3px; }
+  .rd-cal-mlbl { font-size:10px; opacity:.55; white-space:nowrap; height:12px; overflow:visible; }
+  .rd-cal { display:grid; grid-auto-flow:column; grid-auto-columns:11px; grid-template-rows:repeat(7,11px); gap:3px; width:max-content; }
+  .rd-cal-cell { width:11px; height:11px; border-radius:2px; background:var(--ui-border); }
+  .rd-cal-cell.l1 { background:var(--accent); opacity:.28; }
+  .rd-cal-cell.l2 { background:var(--accent); opacity:.5; }
+  .rd-cal-cell.l3 { background:var(--accent); opacity:.72; }
+  .rd-cal-cell.l4 { background:var(--accent); opacity:1; }
+  .rd-cal-future { background:transparent !important; }
+  .rd-cal-legend { display:flex; align-items:center; gap:4px; justify-content:flex-end; font-size:11px; opacity:.6; margin-top:6px; }
+  .rd-cal-legend .rd-cal-cell { display:inline-block; }
+  .rd-pace-tabs { display:flex; gap:6px; margin-bottom:8px; }
+  .rd-pace-tab { font-size:12px; padding:3px 10px; border:1px solid var(--ui-border); border-radius:6px; background:transparent; color:var(--ui-text); cursor:pointer; }
+  .rd-pace-tab.active { background:var(--accent); color:#fff; border-color:var(--accent); }
+  .rd-pace { display:flex; align-items:flex-end; gap:4px; min-height:84px; }
+  .rd-pace-col { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; gap:4px; }
+  .rd-pace-bar { width:100%; max-width:22px; background:var(--accent); border-radius:3px 3px 0 0; }
+  .rd-pace-lbl { font-size:10px; opacity:.55; white-space:nowrap; }
   #welcome-rd-btn { background:var(--ui-bg); border:1px solid var(--ui-border); color:var(--ui-text); padding:8px 16px; border-radius:8px; cursor:pointer; font-size:13px; font-weight:500; transition:filter .15s; }
   #welcome-rd-btn:hover { filter:brightness(1.05); }
   #file-input { display:none; }
   #toast { position:fixed; top:72px; left:50%; transform:translateX(-50%) translateY(-10px); background:var(--text); color:var(--bg); padding:10px 24px; border-radius:24px; font-size:13px; font-weight:500; z-index:300; opacity:0; visibility:hidden; transition:all .3s cubic-bezier(0.16,1,0.3,1); pointer-events:none; white-space:nowrap; box-shadow:0 8px 24px rgba(0,0,0,0.15); }
   #toast.show { opacity:1; visibility:visible; transform:translateX(-50%) translateY(0); }
+  #toast.toast-action { pointer-events:auto; cursor:pointer; box-shadow:0 0 0 2px var(--accent), 0 8px 24px rgba(0,0,0,0.25); }
 
   #loading-overlay { position:fixed; inset:0; background:rgba(0,0,0,.45); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); z-index:250; display:none; align-items:center; justify-content:center; opacity:0; transition:opacity .2s; }
   #loading-overlay.show { display:flex; opacity:1; }
@@ -970,7 +992,11 @@ let _refreshTimer     = null;  // トークン事前リフレッシュの setTim
 let _autoSaveTimer    = null;  // Drive自動保存の pending setTimeout ID
 let _lastAutoSaveAt   = 0;     // 最後の自動保存成功タイムスタンプ (ms)
 let _autoSaveBusy     = false; // 同時アップロード防止フラグ
+let _autoSaveDirty    = false; // デバウンス待ちの未アップロード変更があるか
+let _driveSyncBusy    = false; // サイレント同期pull の同時実行防止フラグ
+let _lastSyncPullAt   = 0;     // 最後にサイレント同期pull した時刻 (ms) — 連続復帰のスロットリング用
 const AUTO_SAVE_INTERVAL = 60000; // 自動保存の最小間隔: 1分 (ms)
+const SYNC_PULL_THROTTLE = 15000; // 復帰時 pull の最小間隔 (ms)
 
 // ══════════════════════════════════════════
 //  i18n — 国際化
@@ -1055,7 +1081,7 @@ const I18N = {
     'help.author':          '著者：{creator}',
     'help.chapters':        'チャプター数：{n}',
     'help.tocItems':        '目次項目数：{n}',
-    'help.body':            '<p><strong>📜 ページスクロール（主操作）</strong></p><p>　スペースキー：1画面分 前進スクロール</p><p>　Shift+スペース：1画面分 後退スクロール</p><p>　↓ / PageDown：前進スクロール</p><p>　↑ / PageUp：後退スクロール</p><p>　画面下「次へ↓」・上「↑前へ」ボタン</p><p>　※章末尾/先頭で自動的に章移動</p><br><p><strong>📖 章切り替え（リフロー型のみ）</strong></p><p>　← キー：次の章　　→ キー：前の章</p><p>　Home：最初の章　　End：最後の章</p><br><p><strong>🎯 ページジャンプ（サイドバー）</strong></p><p>　サイドバー（☰ 目次ボタン）最上部の「ジャンプ」パネル</p><p>　スライダー：ドラッグで任意位置にプレビュー＆ジャンプ</p><p>　📖 表紙 / -10 / +10 / 🏁 末尾 の4ボタン</p><p>　ページ番号（リフロー型は章番号）を入力して Go または Enter</p><p>　ジャンプ前の位置は自動的にジャンプ履歴（↩）に記録され、タップで戻れます</p><br><p><strong>🖼️ マンガ・雑誌モード（FXL / Fixed Layout）</strong></p><p>　pre-paginated 指定の ePub を自動検出し、画像1枚/ページ を画面内フィット表示</p><p>　PC/タブレット横長画面では2ページ見開き自動表示</p><p>　組方向・フォント等は無効化、代わりに⚙設定の「見開き表示」で自動/単ページ/見開きを切替</p><p>　マンガ（RTL）は右ページから順に表示、見開き時は中央で隣接</p><p>　スマホでは☰ボタン→ジャンプパネルで表紙・末尾・任意ページへ遷移</p><br><p><strong>🔍 コマ読みズーム（FXLのみ）</strong></p><p>　ツールバー🔍ボタン・ダブルタップ・キーボード <code>z</code> で ON/OFF</p><p>　⚙設定「ズームモード」で4種から選択：</p><p>　<b>ストーリーまんが</b>＝1ページを2列×3行=6領域に分け、右上→左上→右中→左中→右下→左下 の順で順次遷移（5タップで1ページ読了→次ページ1領域目）</p><p>　<b>4コマまんが</b>＝右列3個→左列3個 の順（縦4コマ用）</p><p>　<b>縦合わせ・横スクロール</b>（v1.8.4）＝縦持ちスマホ×縦書き紙本スキャンに最適。画像を画面の縦いっぱいに拡大、Nextで書字方向に横ステップ→末尾で次ページ冒頭へ</p><p>　<b>横合わせ・縦スクロール</b>（v1.8.5）＝横倒しスマホ×横書き紙本スキャンに最適。画像を画面の横いっぱいに拡大、Nextで上→下にステップ→末尾で次ページ冒頭へ</p><p>　LTR書籍（洋書）は自動で左右反転（⚙「LTR書籍で反転」でOFF可能、6領域モード時のみ）</p><p>　ズーム中の任意ドラッグで自由パン（🌀）へ移行。右下のピル（🎯/↔/↕/🌀）をタップで復帰/次領域へ</p><p>　画面端からさらに読み進み方向へ引っ張る（ラバーバンド）で次/前ページへジャンプ</p><p>　キーボード <code>1</code>～<code>6</code> で領域直接指定（6領域モード専用）、<code>0</code>/<code>Esc</code> で解除、<code>Space</code>/<code>↑↓</code> で順次遷移</p><p>　⚙「拡大倍率」：1.5x / 2.0x / 2.5x（6領域モード専用。軸モードは画像比から自動算出）</p><p>　軸モード（縦合わせ／横合わせ）は全画面モード（<code>f</code>キー）と併用で上下/左右の余白が完全消滅</p><br><p><strong>🔍 全文検索（リフロー型のみ）</strong></p><p>　サイドバー（目次ボタン）→「検索」タブにキーワードを入力して Enter</p><p>　章タイトルと一致箇所のスニペットを表示。クリックでその章に移動（ジャンプ履歴にも記録）</p><p>　画像形式の本（FXL）では全文検索は利用できません</p><br><p><strong>🎨 表示設定（⚙アイコン）</strong></p><p>　フォント：22種（游明朝・ゴシック・Google Fonts など）※リフロー型のみ</p><p>　テーマ：8色（標準・セピア・白紙・ダーク・さくら・星空・抹茶・月夜）</p><p>　文字サイズ・行間・余白・書字方向 ※リフロー型のみ</p><p>　見開き表示（FXL時のみ）：自動 / 単ページ / 見開き</p><br><p><strong>🔖 しおり・ジャンプ履歴</strong></p><p>　読み位置は自動記録。サイドバーの目次タブでジャンプ履歴と元の位置に戻れます</p><p>　📥 ローカル読込：PCに保存した .json ファイルからしおりを読み込む</p><p>　📤 ローカル書出：しおりを .json ファイルとしてPCに書き出す</p><p>　☁↓ Drive読込：Google Driveからしおりを読み込む（ローカルを上書き）</p><p>　☁↑ Drive保存：しおりをGoogle Driveに保存する（複数デバイス間で共有可能）</p><p style="font-size:12px;opacity:.6;">　※ Drive機能はHTTPサーバー経由の起動とGoogle Client IDの設定が必要です</p><br><p><strong>📚 読みかけリスト</strong></p><p>　本を開いていないとき、ウェルカム画面に読みかけの本を一覧表示します</p><p>　各カードに表紙・タイトル・著者名・進捗バー・最終閲覧日を表示</p><p>　カード右下「このファイルを開く」でファイルを選ぶと前回の続きから自動再開</p><p>　最終章の末尾まで読み進めると画面下部に読了バナーが表示されます</p><p>　「読みかけリストへ」：本を閉じてリストへ戻る。読了済みとしてリストから自動除外</p><p>　「閉じない」：バナーを閉じてそのまま読み続けられます</p><p>　⚙ 設定パネル末尾「本を閉じる」でいつでもリストへ戻れます（読み位置を自動保存）</p><p>　リスト右上「編集」ボタンで編集モードに切り替え、各カードの × で削除できます</p><br><p><strong>⬛ フルスクリーン</strong></p><p>　f キー（またはツールバーボタン）でUI非表示・全画面読書モード。Esc または上端タップで解除</p><br><p><strong>ファイル形式</strong></p><p>　.epub / .kepub（Kobo）対応。リフロー型・固定レイアウト型（マンガ・雑誌）どちらも自動判別</p>',
+    'help.body':            '<p><strong>📜 ページスクロール（主操作）</strong></p><p>　スペースキー：1画面分 前進スクロール</p><p>　Shift+スペース：1画面分 後退スクロール</p><p>　↓ / PageDown：前進スクロール</p><p>　↑ / PageUp：後退スクロール</p><p>　画面下「次へ↓」・上「↑前へ」ボタン</p><p>　※章末尾/先頭で自動的に章移動</p><br><p><strong>📖 章切り替え（リフロー型のみ）</strong></p><p>　← キー：次の章　　→ キー：前の章</p><p>　Home：最初の章　　End：最後の章</p><br><p><strong>🎯 ページジャンプ（サイドバー）</strong></p><p>　サイドバー（☰ 目次ボタン）最上部の「ジャンプ」パネル</p><p>　スライダー：ドラッグで任意位置にプレビュー＆ジャンプ</p><p>　📖 表紙 / -10 / +10 / 🏁 末尾 の4ボタン</p><p>　ページ番号（リフロー型は章番号）を入力して Go または Enter</p><p>　ジャンプ前の位置は自動的にジャンプ履歴（↩）に記録され、タップで戻れます</p><br><p><strong>🖼️ マンガ・雑誌モード（FXL / Fixed Layout）</strong></p><p>　pre-paginated 指定の ePub を自動検出し、画像1枚/ページ を画面内フィット表示</p><p>　PC/タブレット横長画面では2ページ見開き自動表示</p><p>　組方向・フォント等は無効化、代わりに⚙設定の「見開き表示」で自動/単ページ/見開きを切替</p><p>　マンガ（RTL）は右ページから順に表示、見開き時は中央で隣接</p><p>　スマホでは☰ボタン→ジャンプパネルで表紙・末尾・任意ページへ遷移</p><br><p><strong>🔍 コマ読みズーム（FXLのみ）</strong></p><p>　ツールバー🔍ボタン・ダブルタップ・キーボード <code>z</code> で ON/OFF</p><p>　⚙設定「ズームモード」で4種から選択：</p><p>　<b>ストーリーまんが</b>＝1ページを2列×3行=6領域に分け、右上→左上→右中→左中→右下→左下 の順で順次遷移（5タップで1ページ読了→次ページ1領域目）</p><p>　<b>4コマまんが</b>＝右列3個→左列3個 の順（縦4コマ用）</p><p>　<b>縦合わせ・横スクロール</b>（v1.8.4）＝縦持ちスマホ×縦書き紙本スキャンに最適。画像を画面の縦いっぱいに拡大、Nextで書字方向に横ステップ→末尾で次ページ冒頭へ</p><p>　<b>横合わせ・縦スクロール</b>（v1.8.5）＝横倒しスマホ×横書き紙本スキャンに最適。画像を画面の横いっぱいに拡大、Nextで上→下にステップ→末尾で次ページ冒頭へ</p><p>　LTR書籍（洋書）は自動で左右反転（⚙「LTR書籍で反転」でOFF可能、6領域モード時のみ）</p><p>　ズーム中の任意ドラッグで自由パン（🌀）へ移行。右下のピル（🎯/↔/↕/🌀）をタップで復帰/次領域へ</p><p>　画面端からさらに読み進み方向へ引っ張る（ラバーバンド）で次/前ページへジャンプ</p><p>　キーボード <code>1</code>～<code>6</code> で領域直接指定（6領域モード専用）、<code>0</code>/<code>Esc</code> で解除、<code>Space</code>/<code>↑↓</code> で順次遷移</p><p>　⚙「拡大倍率」：1.5x / 2.0x / 2.5x（6領域モード専用。軸モードは画像比から自動算出）</p><p>　軸モード（縦合わせ／横合わせ）は全画面モード（<code>f</code>キー）と併用で上下/左右の余白が完全消滅</p><br><p><strong>🔍 全文検索（リフロー型のみ）</strong></p><p>　サイドバー（目次ボタン）→「検索」タブにキーワードを入力して Enter</p><p>　章タイトルと一致箇所のスニペットを表示。クリックでその章に移動（ジャンプ履歴にも記録）</p><p>　画像形式の本（FXL）では全文検索は利用できません</p><br><p><strong>🎨 表示設定（⚙アイコン）</strong></p><p>　フォント：22種（游明朝・ゴシック・Google Fonts など）※リフロー型のみ</p><p>　テーマ：8色（標準・セピア・白紙・ダーク・さくら・星空・抹茶・月夜）</p><p>　文字サイズ・行間・余白・書字方向 ※リフロー型のみ</p><p>　見開き表示（FXL時のみ）：自動 / 単ページ / 見開き</p><br><p><strong>🔖 しおり・ジャンプ履歴</strong></p><p>　読み位置は自動記録。サイドバーの目次タブでジャンプ履歴と元の位置に戻れます</p><p>　📥 ローカル読込：PCに保存した .json ファイルからしおりを読み込む</p><p>　📤 ローカル書出：しおりを .json ファイルとしてPCに書き出す</p><p>　☁↓ Drive読込：Google Driveからしおりを読み込む（ローカルを上書き）</p><p>　☁↑ Drive保存：しおりをGoogle Driveに保存する（複数デバイス間で共有可能）</p><p>　⚙設定「しおり自動保存」ON：読書位置を自動でDriveに保存し、起動時・タブ復帰時に他端末の続きを自動取得します（より進んだ位置を採用。読書中はトーストで通知→タップで移動）</p><p style="font-size:12px;opacity:.6;">　※ Drive機能はHTTPサーバー経由の起動とGoogle Client IDの設定が必要です</p><br><p><strong>📚 読みかけリスト</strong></p><p>　本を開いていないとき、ウェルカム画面に読みかけの本を一覧表示します</p><p>　各カードに表紙・タイトル・著者名・進捗バー・最終閲覧日を表示</p><p>　カード右下「このファイルを開く」でファイルを選ぶと前回の続きから自動再開</p><p>　最終章の末尾まで読み進めると画面下部に読了バナーが表示されます</p><p>　「読みかけリストへ」：本を閉じてリストへ戻る。読了済みとしてリストから自動除外</p><p>　「閉じない」：バナーを閉じてそのまま読み続けられます</p><p>　⚙ 設定パネル末尾「本を閉じる」でいつでもリストへ戻れます（読み位置を自動保存）</p><p>　リスト右上「編集」ボタンで編集モードに切り替え、各カードの × で削除できます</p><br><p><strong>📊 読書データ</strong></p><p>　ツールバー📊ボタン（またはウェルカム画面のボタン）で読書統計を表示</p><p>　読了率・読了冊数・読みかけ冊数／よく読む著者／最近読了（タップで再オープン）</p><p>　累計読書時間・本ごとの読書時間・読書スピード・読了までの目安（リフロー型）</p><p>　連続読書（日／週／月）・読書カレンダー（草グラフ）・週次／月次の読書ペース</p><p style="font-size:12px;opacity:.6;">　※ 読書時間はこの端末での実読のみ計測。Drive自動保存ONで端末間の合算・同期に対応</p><br><p><strong>⬛ フルスクリーン</strong></p><p>　f キー（またはツールバーボタン）でUI非表示・全画面読書モード。Esc または上端タップで解除</p><br><p><strong>ファイル形式</strong></p><p>　.epub / .kepub（Kobo）対応。リフロー型・固定レイアウト型（マンガ・雑誌）どちらも自動判別</p>',
     'loading.fetching':     '📂 ファイルを取得しています…',
     'loading.opening':      '「{filename}」を開いています…',
     'loading.unzipping':    '📦 ePubを展開中…',
@@ -1071,6 +1097,8 @@ const I18N = {
     'toast.storageError':   '⚠️ しおり・設定の保存に失敗しました（ストレージ容量不足の可能性）',
     'toast.resumeHint':     '同じファイル「{title}」を開いてください',
     'toast.driveUploaded':       '☁️ Driveにしおりを保存しました（{count}冊分）',
+    'toast.driveSaveFailed':     'Driveへのしおり保存に失敗しました（電波状況をご確認ください）',
+    'toast.driveSyncAvailable':  '☁️ 別の端末で読み進めた位置があります（タップで移動）',
     'toast.driveDownloaded':     '☁️ Driveからしおりを読み込みました（{count}冊分）',
     'toast.driveJumped':         '☁️ Driveからしおりを読み込み、第{n}章に移動しました',
     'toast.driveNoFile':         'Drive上にしおりファイルが見つかりません',
@@ -1185,6 +1213,16 @@ const I18N = {
     'readingData.durM':           '{m}分',
     'readingData.speed':          '{n}字/分',
     'readingData.timeToFinish':   '残り 約{t}',
+    'readingData.continuity':     '継続',
+    'readingData.streakDayLabel': '日連続',
+    'readingData.streakWeekLabel':'週連続',
+    'readingData.streakMonthLabel':'月連続',
+    'readingData.calendar':       '読書カレンダー',
+    'readingData.calLess':        '少',
+    'readingData.calMore':        '多',
+    'readingData.pace':           '読書ペース',
+    'readingData.paceWeekly':     '週次',
+    'readingData.paceMonthly':    '月次',
   },
   en: {
     'btn.open':             'Open',
@@ -1263,7 +1301,7 @@ const I18N = {
     'help.author':          'Author: {creator}',
     'help.chapters':        'Chapters: {n}',
     'help.tocItems':        'TOC items: {n}',
-    'help.body':            '<p><strong>📜 Page scroll (main operation)</strong></p><p>&nbsp;Space: scroll forward one page</p><p>&nbsp;Shift+Space: scroll back one page</p><p>&nbsp;↓ / PageDown: scroll forward</p><p>&nbsp;↑ / PageUp: scroll back</p><p>&nbsp;"Next ↓" button (bottom) / "↑ Prev" button (top)</p><p>&nbsp;※ Automatically advances chapter at boundaries</p><br><p><strong>📖 Chapter navigation (reflow only)</strong></p><p>&nbsp;← key: next chapter　　→ key: previous chapter</p><p>&nbsp;Home: first chapter　　End: last chapter</p><br><p><strong>🎯 Page Jump (sidebar)</strong></p><p>&nbsp;Jump panel at the top of the sidebar (☰ Contents button)</p><p>&nbsp;Slider: drag to preview, release to jump to any page</p><p>&nbsp;📖 Cover / -10 / +10 / 🏁 End buttons</p><p>&nbsp;Type a page number (or chapter # in reflow mode) and tap Go or press Enter</p><p>&nbsp;Previous position is saved to jump history (↩) automatically; tap to return</p><br><p><strong>🖼️ Manga / Magazine mode (FXL / Fixed Layout)</strong></p><p>&nbsp;Auto-detects pre-paginated ePubs; displays one image per page, fit to screen</p><p>&nbsp;Landscape screens show two-page spreads automatically</p><p>&nbsp;Writing mode & font settings are disabled; use "Spread layout" in ⚙ settings (Auto / Single / Two-page)</p><p>&nbsp;Manga (RTL) displays the right page first; spread pairs are adjacent at the center</p><p>&nbsp;On smartphones, use the sidebar jump panel to navigate to cover / end / any page</p><br><p><strong>🔍 Panel zoom (FXL only)</strong></p><p>&nbsp;Toggle with the 🔍 toolbar button, double-tap the page, or press <code>z</code>.</p><p>&nbsp;Choose one of 4 modes in ⚙ Settings "Zoom mode":</p><p>&nbsp;<b>Story manga</b> — Each page is split into 2×3 = 6 regions. Tap Next to walk TR→TL→MR→ML→BR→BL (5 taps per page, then region 1 of the next page).</p><p>&nbsp;<b>4-panel manga</b> — Right column ×3 → left column ×3 (for 4-panel vertical strips).</p><p>&nbsp;<b>Fit height, scroll H</b> (v1.8.4) — Best for vertical-text scanned books on portrait phones. Image fills viewport height; Next steps horizontally in reading direction → top of next page at end.</p><p>&nbsp;<b>Fit width, scroll V</b> (v1.8.5) — Best for horizontal-text scanned books on landscape phones. Image fills viewport width; Next steps top → bottom → top of next page at end.</p><p>&nbsp;LTR books are auto-mirrored (toggle off via "Flip for LTR books"; 6-region modes only).</p><p>&nbsp;Drag anywhere to switch to free pan (🌀). Tap the bottom-right pill (🎯/↔/↕/🌀) to snap back to a preset or step to next region.</p><p>&nbsp;Keep dragging past the edge ("rubber band") to jump to the next/prev page.</p><p>&nbsp;Keyboard: <code>1</code>-<code>6</code> jumps to region (6-region modes only), <code>0</code>/<code>Esc</code> exits, <code>Space</code>/<code>↑↓</code> steps.</p><p>&nbsp;⚙ "Zoom level": 1.5x / 2.0x / 2.5x (6-region modes only; axis modes auto-compute from image aspect ratio).</p><p>&nbsp;Axis modes pair with fullscreen (<code>f</code> key) to eliminate page margins entirely.</p><br><p><strong>🔍 Full-text search (reflow only)</strong></p><p>&nbsp;Open sidebar (Contents button) → "Search" tab, type a keyword and press Enter</p><p>&nbsp;Click a result to jump to that chapter (also recorded in jump history)</p><p>&nbsp;Image-based books (FXL) do not support full-text search</p><br><p><strong>🎨 Display settings (⚙ icon)</strong></p><p>&nbsp;Font: 22 options (Mincho, Gothic, Google Fonts, etc.) — reflow only</p><p>&nbsp;Theme: 8 colors (Standard, Sepia, White, Dark, Sakura, Starry Night, Matcha, Moonlit)</p><p>&nbsp;Font size, line height, margin, and writing mode — reflow only</p><p>&nbsp;Spread layout (FXL only): Auto / Single page / Two-page</p><br><p><strong>🔖 Bookmarks &amp; jump history</strong></p><p>&nbsp;Reading position is saved automatically. Sidebar TOC tab shows jump history.</p><p>&nbsp;📥 Local import: Load bookmarks from a saved .json file on your device</p><p>&nbsp;📤 Local export: Download bookmarks as a .json file to your device</p><p>&nbsp;☁↓ Drive load: Load bookmarks from Google Drive (overwrites local data)</p><p>&nbsp;☁↑ Drive save: Save bookmarks to Google Drive (share across devices)</p><p style="font-size:12px;opacity:.6;">&nbsp;※ Drive features require an HTTP server and Google Client ID configuration</p><br><p><strong>📚 Reading list</strong></p><p>&nbsp;When no book is open, the welcome screen shows a list of books in progress</p><p>&nbsp;Each card shows the cover, title, author, progress bar, and last read date</p><p>&nbsp;Tap "Open this file" on a card to pick the file and resume where you left off</p><p>&nbsp;When you reach the end of the last chapter, a "Finished" banner appears</p><p>&nbsp;"Back to reading list": close the book and return to the list (marked as completed)</p><p>&nbsp;"Stay": dismiss the banner and keep reading</p><p>&nbsp;"Close book" at the bottom of ⚙ Settings closes the book anytime (position is saved)</p><p>&nbsp;Tap "Edit" (top right of list) to enter edit mode; tap × on a card to remove it from the list</p><br><p><strong>⬛ Fullscreen</strong></p><p>&nbsp;Press f (or toolbar button) to hide UI and read fullscreen. Press Esc or tap top edge to exit.</p><br><p><strong>File formats</strong></p><p>&nbsp;.epub / .kepub (Kobo) supported. Both reflowable and fixed-layout (manga / magazine) books are auto-detected</p>',
+    'help.body':            '<p><strong>📜 Page scroll (main operation)</strong></p><p>&nbsp;Space: scroll forward one page</p><p>&nbsp;Shift+Space: scroll back one page</p><p>&nbsp;↓ / PageDown: scroll forward</p><p>&nbsp;↑ / PageUp: scroll back</p><p>&nbsp;"Next ↓" button (bottom) / "↑ Prev" button (top)</p><p>&nbsp;※ Automatically advances chapter at boundaries</p><br><p><strong>📖 Chapter navigation (reflow only)</strong></p><p>&nbsp;← key: next chapter　　→ key: previous chapter</p><p>&nbsp;Home: first chapter　　End: last chapter</p><br><p><strong>🎯 Page Jump (sidebar)</strong></p><p>&nbsp;Jump panel at the top of the sidebar (☰ Contents button)</p><p>&nbsp;Slider: drag to preview, release to jump to any page</p><p>&nbsp;📖 Cover / -10 / +10 / 🏁 End buttons</p><p>&nbsp;Type a page number (or chapter # in reflow mode) and tap Go or press Enter</p><p>&nbsp;Previous position is saved to jump history (↩) automatically; tap to return</p><br><p><strong>🖼️ Manga / Magazine mode (FXL / Fixed Layout)</strong></p><p>&nbsp;Auto-detects pre-paginated ePubs; displays one image per page, fit to screen</p><p>&nbsp;Landscape screens show two-page spreads automatically</p><p>&nbsp;Writing mode & font settings are disabled; use "Spread layout" in ⚙ settings (Auto / Single / Two-page)</p><p>&nbsp;Manga (RTL) displays the right page first; spread pairs are adjacent at the center</p><p>&nbsp;On smartphones, use the sidebar jump panel to navigate to cover / end / any page</p><br><p><strong>🔍 Panel zoom (FXL only)</strong></p><p>&nbsp;Toggle with the 🔍 toolbar button, double-tap the page, or press <code>z</code>.</p><p>&nbsp;Choose one of 4 modes in ⚙ Settings "Zoom mode":</p><p>&nbsp;<b>Story manga</b> — Each page is split into 2×3 = 6 regions. Tap Next to walk TR→TL→MR→ML→BR→BL (5 taps per page, then region 1 of the next page).</p><p>&nbsp;<b>4-panel manga</b> — Right column ×3 → left column ×3 (for 4-panel vertical strips).</p><p>&nbsp;<b>Fit height, scroll H</b> (v1.8.4) — Best for vertical-text scanned books on portrait phones. Image fills viewport height; Next steps horizontally in reading direction → top of next page at end.</p><p>&nbsp;<b>Fit width, scroll V</b> (v1.8.5) — Best for horizontal-text scanned books on landscape phones. Image fills viewport width; Next steps top → bottom → top of next page at end.</p><p>&nbsp;LTR books are auto-mirrored (toggle off via "Flip for LTR books"; 6-region modes only).</p><p>&nbsp;Drag anywhere to switch to free pan (🌀). Tap the bottom-right pill (🎯/↔/↕/🌀) to snap back to a preset or step to next region.</p><p>&nbsp;Keep dragging past the edge ("rubber band") to jump to the next/prev page.</p><p>&nbsp;Keyboard: <code>1</code>-<code>6</code> jumps to region (6-region modes only), <code>0</code>/<code>Esc</code> exits, <code>Space</code>/<code>↑↓</code> steps.</p><p>&nbsp;⚙ "Zoom level": 1.5x / 2.0x / 2.5x (6-region modes only; axis modes auto-compute from image aspect ratio).</p><p>&nbsp;Axis modes pair with fullscreen (<code>f</code> key) to eliminate page margins entirely.</p><br><p><strong>🔍 Full-text search (reflow only)</strong></p><p>&nbsp;Open sidebar (Contents button) → "Search" tab, type a keyword and press Enter</p><p>&nbsp;Click a result to jump to that chapter (also recorded in jump history)</p><p>&nbsp;Image-based books (FXL) do not support full-text search</p><br><p><strong>🎨 Display settings (⚙ icon)</strong></p><p>&nbsp;Font: 22 options (Mincho, Gothic, Google Fonts, etc.) — reflow only</p><p>&nbsp;Theme: 8 colors (Standard, Sepia, White, Dark, Sakura, Starry Night, Matcha, Moonlit)</p><p>&nbsp;Font size, line height, margin, and writing mode — reflow only</p><p>&nbsp;Spread layout (FXL only): Auto / Single page / Two-page</p><br><p><strong>🔖 Bookmarks &amp; jump history</strong></p><p>&nbsp;Reading position is saved automatically. Sidebar TOC tab shows jump history.</p><p>&nbsp;📥 Local import: Load bookmarks from a saved .json file on your device</p><p>&nbsp;📤 Local export: Download bookmarks as a .json file to your device</p><p>&nbsp;☁↓ Drive load: Load bookmarks from Google Drive (overwrites local data)</p><p>&nbsp;☁↑ Drive save: Save bookmarks to Google Drive (share across devices)</p><p>&nbsp;⚙ "Auto-save bookmarks" ON: position is saved to Drive automatically and the latest position from other devices is pulled on startup / tab focus (more-advanced position wins; while reading you get a toast — tap to move)</p><p style="font-size:12px;opacity:.6;">&nbsp;※ Drive features require an HTTP server and Google Client ID configuration</p><br><p><strong>📚 Reading list</strong></p><p>&nbsp;When no book is open, the welcome screen shows a list of books in progress</p><p>&nbsp;Each card shows the cover, title, author, progress bar, and last read date</p><p>&nbsp;Tap "Open this file" on a card to pick the file and resume where you left off</p><p>&nbsp;When you reach the end of the last chapter, a "Finished" banner appears</p><p>&nbsp;"Back to reading list": close the book and return to the list (marked as completed)</p><p>&nbsp;"Stay": dismiss the banner and keep reading</p><p>&nbsp;"Close book" at the bottom of ⚙ Settings closes the book anytime (position is saved)</p><p>&nbsp;Tap "Edit" (top right of list) to enter edit mode; tap × on a card to remove it from the list</p><br><p><strong>📊 Reading Data</strong></p><p>&nbsp;Open reading stats from the 📊 toolbar button (or the welcome screen button)</p><p>&nbsp;Completion rate, finished / in-progress counts, top authors, recently finished (tap to reopen)</p><p>&nbsp;Total reading time, per-book time, reading speed, estimated time to finish (reflow only)</p><p>&nbsp;Reading streaks (day / week / month), reading calendar (heatmap), weekly / monthly pace</p><p style="font-size:12px;opacity:.6;">&nbsp;※ Time is measured for actual reading on this device only; with Drive auto-save it is combined across devices</p><br><p><strong>⬛ Fullscreen</strong></p><p>&nbsp;Press f (or toolbar button) to hide UI and read fullscreen. Press Esc or tap top edge to exit.</p><br><p><strong>File formats</strong></p><p>&nbsp;.epub / .kepub (Kobo) supported. Both reflowable and fixed-layout (manga / magazine) books are auto-detected</p>',
     'loading.fetching':     '📂 Fetching file…',
     'loading.opening':      'Opening "{filename}"…',
     'loading.unzipping':    '📦 Unzipping ePub…',
@@ -1279,6 +1317,8 @@ const I18N = {
     'toast.storageError':   '⚠️ Failed to save (storage may be full)',
     'toast.resumeHint':     'Please open "{title}"',
     'toast.driveUploaded':       '☁️ Bookmarks saved to Drive ({count} book(s))',
+    'toast.driveSaveFailed':     'Failed to save bookmarks to Drive (check your connection)',
+    'toast.driveSyncAvailable':  '☁️ A newer position from another device is available (tap to move)',
     'toast.driveDownloaded':     '☁️ Bookmarks loaded from Drive ({count} book(s))',
     'toast.driveJumped':         '☁️ Bookmarks loaded — jumped to chapter {n}',
     'toast.driveNoFile':         'No bookmark file found on Drive',
@@ -1393,6 +1433,16 @@ const I18N = {
     'readingData.durM':           '{m}m',
     'readingData.speed':          '{n} cpm',
     'readingData.timeToFinish':   '~{t} left',
+    'readingData.continuity':     'Streaks',
+    'readingData.streakDayLabel': 'day streak',
+    'readingData.streakWeekLabel':'week streak',
+    'readingData.streakMonthLabel':'month streak',
+    'readingData.calendar':       'Reading calendar',
+    'readingData.calLess':        'Less',
+    'readingData.calMore':        'More',
+    'readingData.pace':           'Reading pace',
+    'readingData.paceWeekly':     'Weekly',
+    'readingData.paceMonthly':    'Monthly',
   },
   'zh-TW': {
     'btn.open':             '開啟',
@@ -1471,7 +1521,7 @@ const I18N = {
     'help.author':          '作者：{creator}',
     'help.chapters':        '章節數：{n}',
     'help.tocItems':        '目錄項目數：{n}',
-    'help.body':            '<p><strong>📜 頁面捲動（主要操作）</strong></p><p>　空白鍵：前進一頁</p><p>　Shift+空白：後退一頁</p><p>　↓ / PageDown：前進捲動</p><p>　↑ / PageUp：後退捲動</p><p>　畫面下方「下一頁↓」・上方「↑上一頁」按鈕</p><p>　※章節末尾/開頭時自動切換章節</p><br><p><strong>📖 章節切換（僅限流式排版）</strong></p><p>　← 鍵：下一章　　→ 鍵：上一章</p><p>　Home：第一章　　End：最後一章</p><br><p><strong>🎯 頁面跳轉（側邊欄）</strong></p><p>　側邊欄（☰ 目錄按鈕）最上方的「跳轉」面板</p><p>　滑桿：拖曳預覽並跳至任意位置</p><p>　📖 封面 / -10 / +10 / 🏁 末頁 四個按鈕</p><p>　輸入頁碼（流式排版為章節號）後按 Go 或 Enter</p><p>　跳轉前位置自動記錄於跳轉歷史（↩），點選即可返回</p><br><p><strong>🖼️ 漫畫・雜誌模式（FXL / Fixed Layout）</strong></p><p>　自動偵測 pre-paginated ePub，每頁單張圖片等比縮放顯示</p><p>　橫向畫面自動顯示跨頁（兩頁並排）</p><p>　書寫方向・字型等設定停用，改以⚙設定「跨頁顯示」切換自動/單頁/跨頁</p><p>　漫畫（RTL）依右頁起始顯示，跨頁時於畫面中央相鄰</p><p>　手機可透過☰按鈕→跳轉面板瀏覽封面・末頁・任意頁</p><br><p><strong>🔍 分格閱讀縮放（僅 FXL）</strong></p><p>　工具列🔍按鈕・雙擊頁面・鍵盤 <code>z</code> 開啟／關閉</p><p>　⚙設定「縮放模式」可選 4 種：</p><p>　<b>故事型漫畫</b>＝單頁劃分為 2欄×3列=6個區域，Next 按右上→左上→右中→左中→右下→左下 順序切換（5次到達下一頁第1區域）</p><p>　<b>四格漫畫</b>＝右欄3個→左欄3個 順序（縱向四格用）</p><p>　<b>配合高度・橫向捲動</b>（v1.8.4）＝直立手機 × 直書紙本掃描最佳。圖像縱向填滿畫面，Next 依書寫方向橫向捲動，到末端跳至下一頁開頭</p><p>　<b>配合寬度・縱向捲動</b>（v1.8.5）＝橫向手機 × 橫書紙本掃描最佳。圖像橫向填滿畫面，Next 上→下捲動，到末端跳至下一頁開頭</p><p>　LTR 書籍自動左右反轉（可於⚙「LTR 書籍左右反轉」關閉，僅 6 區域模式）</p><p>　拖曳進入🌀自由模式，右下膠囊（🎯/↔/↕/🌀）點擊回到預設/下個區域</p><p>　邊緣再拉（橡皮筋）跳至下一／前一頁</p><p>　鍵盤 <code>1</code>～<code>6</code> 直接跳區域（僅 6 區域模式），<code>0</code>/<code>Esc</code> 解除，<code>Space</code>/<code>↑↓</code> 逐個切換</p><p>　⚙「縮放倍率」：1.5x / 2.0x / 2.5x（僅 6 區域模式。軸模式由圖像比例自動計算）</p><p>　軸模式搭配全螢幕（<code>f</code> 鍵）可消除上下／左右邊距</p><br><p><strong>🔍 全文搜尋（僅限流式排版）</strong></p><p>　側邊欄（目錄按鈕）→「搜尋」索引標籤，輸入關鍵字後按 Enter</p><p>　點擊結果即可跳轉至該章（同時記錄於跳轉歷史）</p><p>　圖片格式書籍（FXL）無法使用全文搜尋</p><br><p><strong>🎨 顯示設定（⚙圖示）</strong></p><p>　字型：22 種（明朝體・黑體・Google Fonts 等）※僅限流式排版</p><p>　主題：8 色（標準・棕褐・白紙・暗色・櫻花・星空・抹茶・月夜）</p><p>　字型大小・行距・邊距・書寫方向 ※僅限流式排版</p><p>　跨頁顯示（僅 FXL）：自動 / 單頁 / 跨頁</p><br><p><strong>🔖 書籤・跳轉歷史</strong></p><p>　閱讀位置自動記錄。側邊欄目錄索引標籤可查看跳轉歷史</p><p>　📥 本機匯入：從已儲存的 .json 檔案載入書籤</p><p>　📤 本機匯出：將書籤下載為 .json 檔案</p><p>　☁↓ 從 Drive 載入：從 Google Drive 載入書籤（覆蓋本機資料）</p><p>　☁↑ 儲存至 Drive：將書籤儲存至 Google Drive（可跨裝置共用）</p><p style="font-size:12px;opacity:.6;">　※ Drive 功能需透過 HTTP 伺服器啟動並設定 Google Client ID</p><br><p><strong>📚 閱讀中清單</strong></p><p>　未開啟書籍時，歡迎畫面顯示正在閱讀的書籍清單</p><p>　書卡顯示封面、書名、作者、進度列及最後閱讀日期</p><p>　點選書卡右下角「開啟此檔案」，選擇檔案後從上次位置繼續閱讀</p><p>　讀到最後一章末尾時，畫面下方會出現讀完提示橫幅</p><p>　「回到閱讀清單」：關閉書籍並返回清單（標記為已讀完並自動移除）</p><p>　「繼續閱讀」：關閉橫幅，繼續閱讀</p><p>　⚙ 設定面板底部的「關閉書籍」可隨時返回清單（自動儲存閱讀位置）</p><p>　點選清單右上角「編輯」進入編輯模式，點選書卡 × 可從清單移除</p><br><p><strong>⬛ 全螢幕</strong></p><p>　按 f 鍵（或工具列按鈕）隱藏 UI 全螢幕閱讀。按 Esc 或點選上緣退出</p><br><p><strong>支援格式</strong></p><p>　.epub / .kepub（Kobo）。流式排版與固定版式（漫畫・雜誌）均自動偵測</p>',
+    'help.body':            '<p><strong>📜 頁面捲動（主要操作）</strong></p><p>　空白鍵：前進一頁</p><p>　Shift+空白：後退一頁</p><p>　↓ / PageDown：前進捲動</p><p>　↑ / PageUp：後退捲動</p><p>　畫面下方「下一頁↓」・上方「↑上一頁」按鈕</p><p>　※章節末尾/開頭時自動切換章節</p><br><p><strong>📖 章節切換（僅限流式排版）</strong></p><p>　← 鍵：下一章　　→ 鍵：上一章</p><p>　Home：第一章　　End：最後一章</p><br><p><strong>🎯 頁面跳轉（側邊欄）</strong></p><p>　側邊欄（☰ 目錄按鈕）最上方的「跳轉」面板</p><p>　滑桿：拖曳預覽並跳至任意位置</p><p>　📖 封面 / -10 / +10 / 🏁 末頁 四個按鈕</p><p>　輸入頁碼（流式排版為章節號）後按 Go 或 Enter</p><p>　跳轉前位置自動記錄於跳轉歷史（↩），點選即可返回</p><br><p><strong>🖼️ 漫畫・雜誌模式（FXL / Fixed Layout）</strong></p><p>　自動偵測 pre-paginated ePub，每頁單張圖片等比縮放顯示</p><p>　橫向畫面自動顯示跨頁（兩頁並排）</p><p>　書寫方向・字型等設定停用，改以⚙設定「跨頁顯示」切換自動/單頁/跨頁</p><p>　漫畫（RTL）依右頁起始顯示，跨頁時於畫面中央相鄰</p><p>　手機可透過☰按鈕→跳轉面板瀏覽封面・末頁・任意頁</p><br><p><strong>🔍 分格閱讀縮放（僅 FXL）</strong></p><p>　工具列🔍按鈕・雙擊頁面・鍵盤 <code>z</code> 開啟／關閉</p><p>　⚙設定「縮放模式」可選 4 種：</p><p>　<b>故事型漫畫</b>＝單頁劃分為 2欄×3列=6個區域，Next 按右上→左上→右中→左中→右下→左下 順序切換（5次到達下一頁第1區域）</p><p>　<b>四格漫畫</b>＝右欄3個→左欄3個 順序（縱向四格用）</p><p>　<b>配合高度・橫向捲動</b>（v1.8.4）＝直立手機 × 直書紙本掃描最佳。圖像縱向填滿畫面，Next 依書寫方向橫向捲動，到末端跳至下一頁開頭</p><p>　<b>配合寬度・縱向捲動</b>（v1.8.5）＝橫向手機 × 橫書紙本掃描最佳。圖像橫向填滿畫面，Next 上→下捲動，到末端跳至下一頁開頭</p><p>　LTR 書籍自動左右反轉（可於⚙「LTR 書籍左右反轉」關閉，僅 6 區域模式）</p><p>　拖曳進入🌀自由模式，右下膠囊（🎯/↔/↕/🌀）點擊回到預設/下個區域</p><p>　邊緣再拉（橡皮筋）跳至下一／前一頁</p><p>　鍵盤 <code>1</code>～<code>6</code> 直接跳區域（僅 6 區域模式），<code>0</code>/<code>Esc</code> 解除，<code>Space</code>/<code>↑↓</code> 逐個切換</p><p>　⚙「縮放倍率」：1.5x / 2.0x / 2.5x（僅 6 區域模式。軸模式由圖像比例自動計算）</p><p>　軸模式搭配全螢幕（<code>f</code> 鍵）可消除上下／左右邊距</p><br><p><strong>🔍 全文搜尋（僅限流式排版）</strong></p><p>　側邊欄（目錄按鈕）→「搜尋」索引標籤，輸入關鍵字後按 Enter</p><p>　點擊結果即可跳轉至該章（同時記錄於跳轉歷史）</p><p>　圖片格式書籍（FXL）無法使用全文搜尋</p><br><p><strong>🎨 顯示設定（⚙圖示）</strong></p><p>　字型：22 種（明朝體・黑體・Google Fonts 等）※僅限流式排版</p><p>　主題：8 色（標準・棕褐・白紙・暗色・櫻花・星空・抹茶・月夜）</p><p>　字型大小・行距・邊距・書寫方向 ※僅限流式排版</p><p>　跨頁顯示（僅 FXL）：自動 / 單頁 / 跨頁</p><br><p><strong>🔖 書籤・跳轉歷史</strong></p><p>　閱讀位置自動記錄。側邊欄目錄索引標籤可查看跳轉歷史</p><p>　📥 本機匯入：從已儲存的 .json 檔案載入書籤</p><p>　📤 本機匯出：將書籤下載為 .json 檔案</p><p>　☁↓ 從 Drive 載入：從 Google Drive 載入書籤（覆蓋本機資料）</p><p>　☁↑ 儲存至 Drive：將書籤儲存至 Google Drive（可跨裝置共用）</p><p>　⚙設定「自動儲存書籤」開啟：自動將閱讀位置儲存至 Drive，並於啟動・切回分頁時自動取得其他裝置的最新位置（採用較前進的位置；閱讀中以提示通知→點擊跳轉）</p><p style="font-size:12px;opacity:.6;">　※ Drive 功能需透過 HTTP 伺服器啟動並設定 Google Client ID</p><br><p><strong>📚 閱讀中清單</strong></p><p>　未開啟書籍時，歡迎畫面顯示正在閱讀的書籍清單</p><p>　書卡顯示封面、書名、作者、進度列及最後閱讀日期</p><p>　點選書卡右下角「開啟此檔案」，選擇檔案後從上次位置繼續閱讀</p><p>　讀到最後一章末尾時，畫面下方會出現讀完提示橫幅</p><p>　「回到閱讀清單」：關閉書籍並返回清單（標記為已讀完並自動移除）</p><p>　「繼續閱讀」：關閉橫幅，繼續閱讀</p><p>　⚙ 設定面板底部的「關閉書籍」可隨時返回清單（自動儲存閱讀位置）</p><p>　點選清單右上角「編輯」進入編輯模式，點選書卡 × 可從清單移除</p><br><p><strong>📊 閱讀數據</strong></p><p>　工具列📊按鈕（或歡迎畫面按鈕）顯示閱讀統計</p><p>　讀完率・讀完本數・閱讀中本數／常讀作者／最近讀完（點擊重新開啟）</p><p>　累計閱讀時間・每本閱讀時間・閱讀速度・預計讀完時間（流式排版）</p><p>　連續閱讀（日／週／月）・閱讀日曆（草圖）・每週／每月閱讀步調</p><p style="font-size:12px;opacity:.6;">　※ 閱讀時間僅計算本裝置的實際閱讀；開啟 Drive 自動儲存後可跨裝置合計同步</p><br><p><strong>⬛ 全螢幕</strong></p><p>　按 f 鍵（或工具列按鈕）隱藏 UI 全螢幕閱讀。按 Esc 或點選上緣退出</p><br><p><strong>支援格式</strong></p><p>　.epub / .kepub（Kobo）。流式排版與固定版式（漫畫・雜誌）均自動偵測</p>',
     'loading.fetching':     '📂 正在取得檔案…',
     'loading.opening':      '正在開啟「{filename}」…',
     'loading.unzipping':    '📦 正在解壓 ePub…',
@@ -1487,6 +1537,8 @@ const I18N = {
     'toast.storageError':   '⚠️ 儲存失敗（可能儲存空間不足）',
     'toast.resumeHint':     '請開啟「{title}」',
     'toast.driveUploaded':       '☁️ 書籤已儲存至 Drive（{count} 本書）',
+    'toast.driveSaveFailed':     '書籤儲存至 Drive 失敗（請檢查網路連線）',
+    'toast.driveSyncAvailable':  '☁️ 有來自其他裝置的較新閱讀位置（點擊跳轉）',
     'toast.driveDownloaded':     '☁️ 已從 Drive 載入書籤（{count} 本書）',
     'toast.driveJumped':         '☁️ 已從 Drive 載入書籤，跳轉至第 {n} 章',
     'toast.driveNoFile':         'Drive 上找不到書籤檔案',
@@ -1601,6 +1653,16 @@ const I18N = {
     'readingData.durM':           '{m}分',
     'readingData.speed':          '{n}字/分',
     'readingData.timeToFinish':   '剩餘約{t}',
+    'readingData.continuity':     '連續記錄',
+    'readingData.streakDayLabel': '日連續',
+    'readingData.streakWeekLabel':'週連續',
+    'readingData.streakMonthLabel':'月連續',
+    'readingData.calendar':       '閱讀日曆',
+    'readingData.calLess':        '少',
+    'readingData.calMore':        '多',
+    'readingData.pace':           '閱讀步調',
+    'readingData.paceWeekly':     '每週',
+    'readingData.paceMonthly':    '每月',
   },
   'zh-CN': {
     'btn.open':             '打开',
@@ -1679,7 +1741,7 @@ const I18N = {
     'help.author':          '作者：{creator}',
     'help.chapters':        '章节数：{n}',
     'help.tocItems':        '目录项目数：{n}',
-    'help.body':            '<p><strong>📜 页面滚动（主要操作）</strong></p><p>　空格键：前进一页</p><p>　Shift+空格：后退一页</p><p>　↓ / PageDown：向前滚动</p><p>　↑ / PageUp：向后滚动</p><p>　画面下方「前进↓」・上方「↑后退」按钮</p><p>　※章节末尾/开头时自动切换章节</p><br><p><strong>📖 章节切换（仅限流式排版）</strong></p><p>　← 键：下一章　　→ 键：上一章</p><p>　Home：第一章　　End：最后一章</p><br><p><strong>🎯 页面跳转（侧边栏）</strong></p><p>　侧边栏（☰ 目录按钮）最上方的「跳转」面板</p><p>　滑块：拖动预览并跳至任意位置</p><p>　📖 封面 / -10 / +10 / 🏁 末页 四个按钮</p><p>　输入页码（流式排版为章节号）后按 Go 或 Enter</p><p>　跳转前位置自动记录于跳转历史（↩），点击即可返回</p><br><p><strong>🖼️ 漫画・杂志模式（FXL / Fixed Layout）</strong></p><p>　自动检测 pre-paginated ePub，每页单张图片等比缩放显示</p><p>　横向画面自动显示跨页（两页并排）</p><p>　书写方向・字体等设置停用，改以⚙设置「跨页显示」切换自动/单页/跨页</p><p>　漫画（RTL）依右页起始显示，跨页时于画面中央相邻</p><p>　手机可通过☰按钮→跳转面板浏览封面・末页・任意页</p><br><p><strong>🔍 分格阅读缩放（仅 FXL）</strong></p><p>　工具栏🔍按钮・双击页面・键盘 <code>z</code> 开启/关闭</p><p>　⚙设置「缩放模式」可选 4 种：</p><p>　<b>故事型漫画</b>＝单页划分为 2列×3行=6个区域，Next 按右上→左上→右中→左中→右下→左下 顺序切换（5次到达下一页第1区域）</p><p>　<b>四格漫画</b>＝右列3个→左列3个 顺序（纵向四格用）</p><p>　<b>适合高度·横向滚动</b>（v1.8.4）＝竖持手机 × 竖排纸本扫描最佳。图像纵向填满画面，Next 依书写方向横向滚动，到末端跳至下一页开头</p><p>　<b>适合宽度·纵向滚动</b>（v1.8.5）＝横放手机 × 横排纸本扫描最佳。图像横向填满画面，Next 上→下滚动，到末端跳至下一页开头</p><p>　LTR 书籍自动左右反转（可于⚙「LTR 书籍左右反转」关闭，仅 6 区域模式）</p><p>　拖动进入🌀自由模式，右下胶囊（🎯/↔/↕/🌀）点击回到预设/下个区域</p><p>　边缘再拉（橡皮筋）跳至下一／前一页</p><p>　键盘 <code>1</code>～<code>6</code> 直接跳区域（仅 6 区域模式），<code>0</code>/<code>Esc</code> 解除，<code>Space</code>/<code>↑↓</code> 逐个切换</p><p>　⚙「缩放倍率」：1.5x / 2.0x / 2.5x（仅 6 区域模式。轴模式由图像比例自动计算）</p><p>　轴模式搭配全屏（<code>f</code> 键）可消除上下／左右边距</p><br><p><strong>🔍 全文搜索（仅限流式排版）</strong></p><p>　侧边栏（目录按钮）→「搜索」选项卡，输入关键词后按 Enter</p><p>　点击结果即可跳转至该章（同时记录于跳转历史）</p><p>　图片格式书籍（FXL）无法使用全文搜索</p><br><p><strong>🎨 显示设置（⚙图标）</strong></p><p>　字体：22 种（明朝体・黑体・Google Fonts 等）※仅限流式排版</p><p>　主题：8 色（标准・棕褐・白纸・深色・樱花・星空・抹茶・月夜）</p><p>　字体大小・行距・边距・书写方向 ※仅限流式排版</p><p>　跨页显示（仅 FXL）：自动 / 单页 / 跨页</p><br><p><strong>🔖 书签・跳转历史</strong></p><p>　阅读位置自动记录。侧边栏目录选项卡可查看跳转历史</p><p>　📥 本地导入：从已保存的 .json 文件加载书签</p><p>　📤 本地导出：将书签下载为 .json 文件</p><p>　☁↓ 从 Drive 加载：从 Google Drive 加载书签（覆盖本地数据）</p><p>　☁↑ 保存至 Drive：将书签保存至 Google Drive（可跨设备共用）</p><p style="font-size:12px;opacity:.6;">　※ Drive 功能需通过 HTTP 服务器启动并配置 Google Client ID</p><br><p><strong>📚 阅读中列表</strong></p><p>　未打开书籍时，欢迎页面显示正在阅读的书籍列表</p><p>　书卡显示封面、书名、作者、进度条及最后阅读日期</p><p>　点击书卡右下角「打开此文件」，选择文件后从上次位置继续阅读</p><p>　读到最后一章末尾时，画面下方会出现读完提示横幅</p><p>　「回到阅读列表」：关闭书籍并返回列表（标记为已读完并自动移除）</p><p>　「继续阅读」：关闭横幅，继续阅读</p><p>　⚙ 设置面板底部的「关闭书籍」可随时返回列表（自动保存阅读位置）</p><p>　点击列表右上角「编辑」进入编辑模式，点击书卡 × 可从列表中删除</p><br><p><strong>⬛ 全屏</strong></p><p>　按 f 键（或工具栏按钮）隐藏 UI 全屏阅读。按 Esc 或点击顶部退出</p><br><p><strong>支持格式</strong></p><p>　.epub / .kepub（Kobo）。流式排版与固定版式（漫画・杂志）均自动检测</p>',
+    'help.body':            '<p><strong>📜 页面滚动（主要操作）</strong></p><p>　空格键：前进一页</p><p>　Shift+空格：后退一页</p><p>　↓ / PageDown：向前滚动</p><p>　↑ / PageUp：向后滚动</p><p>　画面下方「前进↓」・上方「↑后退」按钮</p><p>　※章节末尾/开头时自动切换章节</p><br><p><strong>📖 章节切换（仅限流式排版）</strong></p><p>　← 键：下一章　　→ 键：上一章</p><p>　Home：第一章　　End：最后一章</p><br><p><strong>🎯 页面跳转（侧边栏）</strong></p><p>　侧边栏（☰ 目录按钮）最上方的「跳转」面板</p><p>　滑块：拖动预览并跳至任意位置</p><p>　📖 封面 / -10 / +10 / 🏁 末页 四个按钮</p><p>　输入页码（流式排版为章节号）后按 Go 或 Enter</p><p>　跳转前位置自动记录于跳转历史（↩），点击即可返回</p><br><p><strong>🖼️ 漫画・杂志模式（FXL / Fixed Layout）</strong></p><p>　自动检测 pre-paginated ePub，每页单张图片等比缩放显示</p><p>　横向画面自动显示跨页（两页并排）</p><p>　书写方向・字体等设置停用，改以⚙设置「跨页显示」切换自动/单页/跨页</p><p>　漫画（RTL）依右页起始显示，跨页时于画面中央相邻</p><p>　手机可通过☰按钮→跳转面板浏览封面・末页・任意页</p><br><p><strong>🔍 分格阅读缩放（仅 FXL）</strong></p><p>　工具栏🔍按钮・双击页面・键盘 <code>z</code> 开启/关闭</p><p>　⚙设置「缩放模式」可选 4 种：</p><p>　<b>故事型漫画</b>＝单页划分为 2列×3行=6个区域，Next 按右上→左上→右中→左中→右下→左下 顺序切换（5次到达下一页第1区域）</p><p>　<b>四格漫画</b>＝右列3个→左列3个 顺序（纵向四格用）</p><p>　<b>适合高度·横向滚动</b>（v1.8.4）＝竖持手机 × 竖排纸本扫描最佳。图像纵向填满画面，Next 依书写方向横向滚动，到末端跳至下一页开头</p><p>　<b>适合宽度·纵向滚动</b>（v1.8.5）＝横放手机 × 横排纸本扫描最佳。图像横向填满画面，Next 上→下滚动，到末端跳至下一页开头</p><p>　LTR 书籍自动左右反转（可于⚙「LTR 书籍左右反转」关闭，仅 6 区域模式）</p><p>　拖动进入🌀自由模式，右下胶囊（🎯/↔/↕/🌀）点击回到预设/下个区域</p><p>　边缘再拉（橡皮筋）跳至下一／前一页</p><p>　键盘 <code>1</code>～<code>6</code> 直接跳区域（仅 6 区域模式），<code>0</code>/<code>Esc</code> 解除，<code>Space</code>/<code>↑↓</code> 逐个切换</p><p>　⚙「缩放倍率」：1.5x / 2.0x / 2.5x（仅 6 区域模式。轴模式由图像比例自动计算）</p><p>　轴模式搭配全屏（<code>f</code> 键）可消除上下／左右边距</p><br><p><strong>🔍 全文搜索（仅限流式排版）</strong></p><p>　侧边栏（目录按钮）→「搜索」选项卡，输入关键词后按 Enter</p><p>　点击结果即可跳转至该章（同时记录于跳转历史）</p><p>　图片格式书籍（FXL）无法使用全文搜索</p><br><p><strong>🎨 显示设置（⚙图标）</strong></p><p>　字体：22 种（明朝体・黑体・Google Fonts 等）※仅限流式排版</p><p>　主题：8 色（标准・棕褐・白纸・深色・樱花・星空・抹茶・月夜）</p><p>　字体大小・行距・边距・书写方向 ※仅限流式排版</p><p>　跨页显示（仅 FXL）：自动 / 单页 / 跨页</p><br><p><strong>🔖 书签・跳转历史</strong></p><p>　阅读位置自动记录。侧边栏目录选项卡可查看跳转历史</p><p>　📥 本地导入：从已保存的 .json 文件加载书签</p><p>　📤 本地导出：将书签下载为 .json 文件</p><p>　☁↓ 从 Drive 加载：从 Google Drive 加载书签（覆盖本地数据）</p><p>　☁↑ 保存至 Drive：将书签保存至 Google Drive（可跨设备共用）</p><p>　⚙设置「自动保存书签」开启：自动将阅读位置保存至 Drive，并在启动・切回标签页时自动获取其他设备的最新位置（采用更前进的位置；阅读中以提示通知→点击跳转）</p><p style="font-size:12px;opacity:.6;">　※ Drive 功能需通过 HTTP 服务器启动并配置 Google Client ID</p><br><p><strong>📚 阅读中列表</strong></p><p>　未打开书籍时，欢迎页面显示正在阅读的书籍列表</p><p>　书卡显示封面、书名、作者、进度条及最后阅读日期</p><p>　点击书卡右下角「打开此文件」，选择文件后从上次位置继续阅读</p><p>　读到最后一章末尾时，画面下方会出现读完提示横幅</p><p>　「回到阅读列表」：关闭书籍并返回列表（标记为已读完并自动移除）</p><p>　「继续阅读」：关闭横幅，继续阅读</p><p>　⚙ 设置面板底部的「关闭书籍」可随时返回列表（自动保存阅读位置）</p><p>　点击列表右上角「编辑」进入编辑模式，点击书卡 × 可从列表中删除</p><br><p><strong>📊 阅读数据</strong></p><p>　工具栏📊按钮（或欢迎页面按钮）显示阅读统计</p><p>　读完率・读完本数・阅读中本数／常读作者／最近读完（点击重新打开）</p><p>　累计阅读时间・每本阅读时间・阅读速度・预计读完时间（流式排版）</p><p>　连续阅读（日／周／月）・阅读日历（草图）・每周／每月阅读节奏</p><p style="font-size:12px;opacity:.6;">　※ 阅读时间仅计算本设备的实际阅读；开启 Drive 自动保存后可跨设备合计同步</p><br><p><strong>⬛ 全屏</strong></p><p>　按 f 键（或工具栏按钮）隐藏 UI 全屏阅读。按 Esc 或点击顶部退出</p><br><p><strong>支持格式</strong></p><p>　.epub / .kepub（Kobo）。流式排版与固定版式（漫画・杂志）均自动检测</p>',
     'loading.fetching':     '📂 正在获取文件…',
     'loading.opening':      '正在打开「{filename}」…',
     'loading.unzipping':    '📦 正在解压 ePub…',
@@ -1695,6 +1757,8 @@ const I18N = {
     'toast.storageError':   '⚠️ 保存失败（可能存储空间不足）',
     'toast.resumeHint':     '请打开「{title}」',
     'toast.driveUploaded':       '☁️ 书签已保存至 Drive（{count} 本书）',
+    'toast.driveSaveFailed':     '书签保存至 Drive 失败（请检查网络连接）',
+    'toast.driveSyncAvailable':  '☁️ 有来自其他设备的较新阅读位置（点击跳转）',
     'toast.driveDownloaded':     '☁️ 已从 Drive 加载书签（{count} 本书）',
     'toast.driveJumped':         '☁️ 已从 Drive 加载书签，跳转至第 {n} 章',
     'toast.driveNoFile':         'Drive 上找不到书签文件',
@@ -1809,6 +1873,16 @@ const I18N = {
     'readingData.durM':           '{m}分',
     'readingData.speed':          '{n}字/分',
     'readingData.timeToFinish':   '剩余约{t}',
+    'readingData.continuity':     '连续记录',
+    'readingData.streakDayLabel': '日连续',
+    'readingData.streakWeekLabel':'周连续',
+    'readingData.streakMonthLabel':'月连续',
+    'readingData.calendar':       '阅读日历',
+    'readingData.calLess':        '少',
+    'readingData.calMore':        '多',
+    'readingData.pace':           '阅读节奏',
+    'readingData.paceWeekly':     '每周',
+    'readingData.paceMonthly':    '每月',
   },
 };
 
@@ -2937,7 +3011,7 @@ let _editMode          = false;    // 読みかけリスト編集モード
 const _RL_SORTS        = ['recent', 'title', 'author', 'progressHigh', 'progressLow'];
 let _rlPrefs           = _rlLoadPrefs(); // 読みかけリスト表示設定 {view, sort, filterReady, showFinished}
 let _rlQuery           = '';       // 読みかけリスト検索文字列（非永続・セッション内のみ）
-const _RD_DEFAULTS     = { authorScope: 'finished', authorLimit: 8 };
+const _RD_DEFAULTS     = { authorScope: 'finished', authorLimit: 8, paceUnit: 'week', calWeeks: 53 };
 let _rdPrefs           = _rdLoadPrefs(); // 読書データ表示設定（非同期・端末ローカル）
 const _RD_IDLE_THRESHOLD = 180000; // 180秒（3分）以上の無活動は放置とみなし読書時間に加算しない（G2）
 const _RD_FLUSH_DEBOUNCE = 5000;   // 計測値を localStorage に書き出すデバウンス（5秒・G2）
@@ -5218,6 +5292,7 @@ function updateCloseBookBtnVisibility() {
 function closeBook() {
   if (!state.epub) return;
   savePos(_bookFinished ? 1.0 : _intraChapterRatio);
+  driveSaveNow(); // 保留中の Drive 自動保存を即時確定（結果はトースト表示・ページ生存中なので確実）
   _rdFlush(); _rdResetMeasure(); // G2: 計測を確定フラッシュして停止
   dismissFinishedBanner();
   // フルスクリーン解除
@@ -5295,8 +5370,14 @@ function _rdLoadPrefs() {
       authorScope: p.authorScope === 'finished' ? 'finished' : _RD_DEFAULTS.authorScope,
       authorLimit: (typeof p.authorLimit === 'number' && p.authorLimit >= 3 && p.authorLimit <= 30)
         ? p.authorLimit : _RD_DEFAULTS.authorLimit,
+      paceUnit: (p.paceUnit === 'week' || p.paceUnit === 'month') ? p.paceUnit : _RD_DEFAULTS.paceUnit,
+      calWeeks: (typeof p.calWeeks === 'number' && p.calWeeks >= 8 && p.calWeeks <= 158)
+        ? p.calWeeks : _RD_DEFAULTS.calWeeks,
     };
   } catch (e) { return { ..._RD_DEFAULTS }; }
+}
+function _rdSavePrefs() {
+  try { localStorage.setItem('epub_reading_data_prefs', JSON.stringify(_rdPrefs)); } catch (e) {}
 }
 
 function _rdComputeStats(items) {
@@ -5463,6 +5544,149 @@ function _rdLastBook(items) {
   return { key: best.key, title: best.title, cover: best.cover, pct, finished: best.finished };
 }
 
+// ── G3: 連続記録・カレンダー・ペース（すべて epub_reading_days から導出） ──
+const _RD_CAL_BUCKETS = [15, 30, 60]; // 分。5段階量子化の境界（0 / >0-15 / 15-30 / 30-60 / ≥60）
+const _RD_DAYS_KEEP   = 1100;         // reading_days 保持窓（≒3年）
+
+function _rdDateKey(d) { const p = n => String(n).padStart(2, '0'); return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); }
+function _rdParseDayKey(k) { const a = k.split('-').map(Number); return new Date(a[0], a[1] - 1, a[2], 12, 0, 0); } // 正午固定で DST 安全
+function _rdAddDays(k, n) { const d = _rdParseDayKey(k); d.setDate(d.getDate() + n); return _rdDateKey(d); }
+function _rdWeekStartKey(k) { const d = _rdParseDayKey(k); const dow = (d.getDay() + 6) % 7; d.setDate(d.getDate() - dow); return _rdDateKey(d); } // ISO 月曜起点
+function _rdDayTotals() { const days = _rdLoadDays(); const o = {}; for (const k in days) { let s = 0; for (const dev in days[k]) s += (+days[k][dev] || 0); if (s > 0) o[k] = s; } return o; }
+
+// 連続日数（昨日まで連続なら継続表示＝猶予あり）
+function _rdStreakDays(totals) {
+  const has = k => (totals[k] || 0) > 0;
+  let cur = _rdTodayKey();
+  if (!has(cur)) { cur = _rdAddDays(cur, -1); if (!has(cur)) return 0; }
+  let n = 0; while (has(cur)) { n++; cur = _rdAddDays(cur, -1); } return n;
+}
+// 連続週数（ISO 月曜週。各週に1日でも読書日があれば読書週・今週未読書なら先週へ猶予）
+function _rdStreakWeeks(totals) {
+  const weeks = new Set(); for (const k in totals) weeks.add(_rdWeekStartKey(k));
+  const has = mon => weeks.has(mon);
+  let cur = _rdWeekStartKey(_rdTodayKey());
+  if (!has(cur)) { cur = _rdAddDays(cur, -7); if (!has(cur)) return 0; }
+  let n = 0; while (has(cur)) { n++; cur = _rdAddDays(cur, -7); } return n;
+}
+// 連続月数（各月に1日でも読書日があれば読書月・今月未読書なら先月へ猶予）
+function _rdStreakMonths(totals) {
+  const months = new Set(); for (const k in totals) months.add(k.slice(0, 7));
+  const has = mk => months.has(mk);
+  const now = new Date(); let y = now.getFullYear(), m = now.getMonth();
+  const mk = () => y + '-' + String(m + 1).padStart(2, '0');
+  const prev = () => { m--; if (m < 0) { m = 11; y--; } };
+  if (!has(mk())) { prev(); if (!has(mk())) return 0; }
+  let n = 0; while (has(mk())) { n++; prev(); } return n;
+}
+
+function _rdCalBucket(ms) { if (ms <= 0) return 0; const min = ms / 60000; const b = _RD_CAL_BUCKETS; if (min < b[0]) return 1; if (min < b[1]) return 2; if (min < b[2]) return 3; return 4; }
+
+// カレンダー列データ：[{mon, monthLabel, cells:[{date, ms, bucket, future}]×7}]（古い→新しい）
+function _rdCalendarColumns(totals) {
+  const today = _rdTodayKey();
+  const thisMon = _rdWeekStartKey(today);
+  let span = _rdPrefs.calWeeks; // 既定 53（≒1年枠）
+  let oldest = null;
+  for (const k in totals) { if (!oldest || k < oldest) oldest = k; }
+  if (oldest) {
+    const wks = Math.round((_rdParseDayKey(thisMon) - _rdParseDayKey(_rdWeekStartKey(oldest))) / (7 * 86400000)) + 1;
+    span = Math.max(span, wks);
+  }
+  span = Math.max(1, Math.min(Math.floor(_RD_DAYS_KEEP / 7), span));
+  const start = _rdAddDays(thisMon, -(span - 1) * 7);
+  const cols = [];
+  let prevMonth = '';
+  for (let w = 0; w < span; w++) {
+    const mon = _rdAddDays(start, w * 7);
+    const cells = [];
+    for (let d = 0; d < 7; d++) {
+      const date = _rdAddDays(mon, d);
+      const ms = totals[date] || 0;
+      cells.push({ date, ms, bucket: _rdCalBucket(ms), future: date > today });
+    }
+    const mLabel = mon.slice(0, 7);
+    const monthLabel = (mLabel !== prevMonth) ? String(_rdParseDayKey(mon).getMonth() + 1) : '';
+    prevMonth = mLabel;
+    cols.push({ mon, monthLabel, cells });
+  }
+  return cols;
+}
+
+// 週次/月次ペース：[{label, ms}]（古い→新しい）
+function _rdPaceWeekly(totals, n) {
+  const res = []; let mon = _rdWeekStartKey(_rdTodayKey());
+  for (let i = 0; i < n; i++) {
+    let ms = 0; for (let d = 0; d < 7; d++) ms += totals[_rdAddDays(mon, d)] || 0;
+    const dt = _rdParseDayKey(mon);
+    res.unshift({ label: (dt.getMonth() + 1) + '/' + dt.getDate(), ms });
+    mon = _rdAddDays(mon, -7);
+  }
+  return res;
+}
+function _rdPaceMonthly(totals, n) {
+  const res = []; const now = new Date(); let y = now.getFullYear(), m = now.getMonth();
+  for (let i = 0; i < n; i++) {
+    const mk = y + '-' + String(m + 1).padStart(2, '0');
+    let ms = 0; for (const k in totals) if (k.slice(0, 7) === mk) ms += totals[k];
+    res.unshift({ label: String(y).slice(2) + '/' + (m + 1), ms });
+    m--; if (m < 0) { m = 11; y--; }
+  }
+  return res;
+}
+function _rdSetPaceUnit(u) { if (u !== 'week' && u !== 'month') return; _rdPrefs.paceUnit = u; _rdSavePrefs(); buildReadingData(); }
+
+// 継続セクション（連続 日/週/月 タイル＋カレンダー草グラフ）の HTML
+function _rdContinuitySectionHtml(totals) {
+  const sd = _rdStreakDays(totals), sw = _rdStreakWeeks(totals), sm = _rdStreakMonths(totals);
+  let h = `<div class="rd-section"><h4>${t('readingData.continuity')}</h4>` +
+    `<div class="rd-tiles">` +
+      `<div class="rd-tile"><div class="rd-num">${sd}</div><div class="rd-lbl">${t('readingData.streakDayLabel')}</div></div>` +
+      `<div class="rd-tile"><div class="rd-num">${sw}</div><div class="rd-lbl">${t('readingData.streakWeekLabel')}</div></div>` +
+      `<div class="rd-tile"><div class="rd-num">${sm}</div><div class="rd-lbl">${t('readingData.streakMonthLabel')}</div></div>` +
+    `</div>`;
+  // カレンダー草グラフ
+  const cols = _rdCalendarColumns(totals);
+  let months = '<div class="rd-cal-months">';
+  let grid = '<div class="rd-cal">';
+  cols.forEach(col => {
+    months += `<span class="rd-cal-mlbl">${col.monthLabel}</span>`;
+    col.cells.forEach(c => {
+      if (c.future) { grid += `<span class="rd-cal-cell rd-cal-future"></span>`; return; }
+      const lvl = c.bucket ? ` l${c.bucket}` : '';
+      const min = Math.round(c.ms / 60000);
+      grid += `<span class="rd-cal-cell${lvl}" title="${c.date}・${_rdFmtDuration(c.ms)}" data-d="${c.date}" data-m="${min}"></span>`;
+    });
+  });
+  months += '</div>'; grid += '</div>';
+  h += `<div class="rd-cal-caption">${t('readingData.calendar')}</div>` +
+    `<div class="rd-cal-wrap">${months}${grid}</div>` +
+    `<div class="rd-cal-legend"><span>${t('readingData.calLess')}</span>` +
+      `<span class="rd-cal-cell"></span><span class="rd-cal-cell l1"></span><span class="rd-cal-cell l2"></span><span class="rd-cal-cell l3"></span><span class="rd-cal-cell l4"></span>` +
+      `<span>${t('readingData.calMore')}</span></div>`;
+  h += `</div>`;
+  return h;
+}
+// ペースセクション（週次/月次の棒グラフ＋トグル）の HTML
+function _rdPaceSectionHtml(totals) {
+  const unit = _rdPrefs.paceUnit;
+  const data = unit === 'month' ? _rdPaceMonthly(totals, 12) : _rdPaceWeekly(totals, 12);
+  const maxMs = Math.max(1, ...data.map(d => d.ms));
+  let bars = '<div class="rd-pace">';
+  data.forEach(d => {
+    const px = d.ms > 0 ? Math.max(2, Math.round(d.ms / maxMs * 80)) : 0;
+    bars += `<div class="rd-pace-col" title="${d.label}・${_rdFmtDuration(d.ms)}">` +
+      `<div class="rd-pace-bar" style="height:${px}px"></div>` +
+      `<div class="rd-pace-lbl">${esc(d.label)}</div></div>`;
+  });
+  bars += '</div>';
+  return `<div class="rd-section"><h4>${t('readingData.pace')}</h4>` +
+    `<div class="rd-pace-tabs">` +
+      `<button class="rd-pace-tab${unit === 'week' ? ' active' : ''}" data-unit="week" onclick="_rdSetPaceUnit(this.dataset.unit)">${t('readingData.paceWeekly')}</button>` +
+      `<button class="rd-pace-tab${unit === 'month' ? ' active' : ''}" data-unit="month" onclick="_rdSetPaceUnit(this.dataset.unit)">${t('readingData.paceMonthly')}</button>` +
+    `</div>${bars}</div>`;
+}
+
 function openReadingData() {
   buildReadingData();
   document.getElementById('reading-data-overlay').classList.add('show');
@@ -5504,6 +5728,12 @@ function buildReadingData() {
           `</div>` +
         `</div>` +
       `</div></div>`;
+  }
+  // 継続（連続 日/週/月＋カレンダー）＋ ペース（G3・時間が貯まっていれば）
+  if (_rdHasDays()) {
+    const totals = _rdDayTotals();
+    html += _rdContinuitySectionHtml(totals);
+    html += _rdPaceSectionHtml(totals);
   }
   // すべての本（読了率ドーナツ＋読了/読みかけ/累計時間タイル）
   const totalMs = _rdTotalTime();
@@ -5548,6 +5778,8 @@ function buildReadingData() {
     html += `</div>`;
   }
   body.innerHTML = html;
+  // カレンダーは最新（右端＝今週）を初期表示。オーバーレイ表示後に測れるよう rAF で実行。
+  requestAnimationFrame(() => { const cw = body.querySelector('.rd-cal-wrap'); if (cw) cw.scrollLeft = cw.scrollWidth; });
 }
 
 function dismissFinishedBanner() {
@@ -6117,8 +6349,15 @@ function _rdSaveBookStats(m) {
   } catch (e) {}
 }
 function _rdLoadDays() { try { const o = JSON.parse(localStorage.getItem(_READING_DAYS_KEY)); return (o && o.days && typeof o.days === 'object') ? o.days : {}; } catch (e) { return {}; } }
+// 保持窓（_RD_DAYS_KEEP 日）より古い日付を破棄。保存前に適用。
+function _rdPruneDays(d) {
+  const cutoff = _rdAddDays(_rdTodayKey(), -_RD_DAYS_KEEP);
+  for (const k in d) if (k < cutoff) delete d[k];
+  return d;
+}
 function _rdSaveDays(d) {
   try {
+    if (d) _rdPruneDays(d);
     if (d && Object.keys(d).length) localStorage.setItem(_READING_DAYS_KEY, JSON.stringify({ days: d }));
     else localStorage.removeItem(_READING_DAYS_KEY);
   } catch (e) {}
@@ -6151,9 +6390,11 @@ function _rdMergeBookStats(remote) {
 function _rdMergeDays(remote) {
   if (!remote || typeof remote !== 'object') return;
   const local = _rdLoadDays();
+  const cutoff = _rdAddDays(_rdTodayKey(), -_RD_DAYS_KEEP); // 保持窓より古い受信日はスキップ（剪定が再流入で無効化されないように）
   let changed = false;
   for (const date in remote) {
     if (!Object.prototype.hasOwnProperty.call(remote, date)) continue;
+    if (date < cutoff) continue;
     const r = remote[date]; if (!r || typeof r !== 'object') continue;
     const cur = { ...(local[date] || {}) };
     for (const dev in r) { const v = +r[dev] || 0; if (!(dev in cur) || v > cur[dev]) cur[dev] = v; }
@@ -6288,6 +6529,7 @@ async function driveUpload() {
 // ──────────────────────────────────────────
 function scheduleAutoSave() {
   if (!state.driveAutoSave || !GOOGLE_CLIENT_ID) return;
+  _autoSaveDirty = true;
   if (_autoSaveBusy) return;
   clearTimeout(_autoSaveTimer);
   const elapsed = Date.now() - _lastAutoSaveAt;
@@ -6295,9 +6537,20 @@ function scheduleAutoSave() {
   _autoSaveTimer = setTimeout(runAutoSave, delay);
 }
 
+// タブ非表示・ページ離脱時に、デバウンス待ちの自動保存を即時 flush する（best-effort）。
+// 本を閉じる時はページが生存するため driveSaveNow() の確実版を使う。
+function flushAutoSave() {
+  if (!state.driveAutoSave || !GOOGLE_CLIENT_ID) return;
+  if (!_autoSaveDirty || _autoSaveBusy) return;
+  clearTimeout(_autoSaveTimer);
+  _autoSaveTimer = null;
+  runAutoSave();
+}
+
 async function runAutoSave() {
   if (!state.driveAutoSave || _autoSaveBusy) return;
   _autoSaveBusy = true;
+  _autoSaveDirty = false;
   try {
     const token = await driveAuth();
     await driveUploadCore(token);
@@ -6312,13 +6565,51 @@ async function runAutoSave() {
         _lastAutoSaveAt = Date.now();
       } catch(e2) {
         // Googleセッション切れなど回復不能 → 自動保存を停止してユーザーに通知
+        _autoSaveDirty = true; // 未送信のまま持ち越し
         state.driveAutoSave = false;
         saveSettings();
         updateAutoSaveToggleUI();
         showToast(t('toast.driveAutoSaveExpired'));
       }
+    } else {
+      // ネットワーク断など → 未送信のまま持ち越して後で再試行
+      _autoSaveDirty = true;
     }
-    // その他のエラー（ネットワーク断など）は silent
+  } finally {
+    _autoSaveBusy = false;
+    // アップロード中に新たな変更が来ていた（busy で弾かれた）分を追従
+    if (_autoSaveDirty && state.driveAutoSave) {
+      clearTimeout(_autoSaveTimer);
+      _autoSaveTimer = setTimeout(runAutoSave, Math.max(0, AUTO_SAVE_INTERVAL - (Date.now() - _lastAutoSaveAt)));
+    }
+  }
+}
+
+// 本を閉じる時に確実に Drive へ反映する（デバウンスを無視し、結果をトースト表示）。
+// closeBook 後もページは生存しているため await でき、結果をユーザーに見せられる。
+async function driveSaveNow() {
+  if (!state.driveAutoSave || !GOOGLE_CLIENT_ID) return;
+  clearTimeout(_autoSaveTimer);
+  _autoSaveTimer = null;
+  // 進行中の自動保存があれば終わるまで待つ（最大 ~3 秒）。古いデータでの上書きを防ぐ。
+  for (let i = 0; i < 20 && _autoSaveBusy; i++) { await new Promise(r => setTimeout(r, 150)); }
+  if (!_autoSaveDirty || _autoSaveBusy) return; // 直近の自動保存で既に最新が上がっている
+  _autoSaveBusy = true;
+  _autoSaveDirty = false;
+  try {
+    let token = await driveAuth();
+    let count;
+    try {
+      count = await driveUploadCore(token);
+    } catch(e) {
+      if (e.message && e.message.startsWith('401')) { _driveToken = null; token = await driveAuth(); count = await driveUploadCore(token); }
+      else throw e;
+    }
+    _lastAutoSaveAt = Date.now();
+    showToast(t('toast.driveUploaded', { count }));
+  } catch(e) {
+    _autoSaveDirty = true; // 失敗 → 次回に持ち越し
+    if (e.message !== 'no_client_id') showToast(t('toast.driveSaveFailed') + (e && e.message ? ' ［' + e.message + '］' : ''));
   } finally {
     _autoSaveBusy = false;
   }
@@ -6451,6 +6742,98 @@ async function driveDownload() {
   }
 }
 
+// 進捗比較マージ: ローカルとリモートで「より進んだ位置のみ採用」する（サイレント同期用）。
+// _rdMergePos はリモート無条件採用なので、確認なしの自動同期では使えない（位置後退の恐れ）。
+function _rdMergePosBest(key, remoteRaw) {
+  let remote;
+  try { remote = typeof remoteRaw === 'string' ? JSON.parse(remoteRaw) : remoteRaw; } catch (e) { return; }
+  if (!remote || typeof remote !== 'object') return;
+  let local = null;
+  try { local = JSON.parse(localStorage.getItem(key)); } catch (e) {}
+  if (!local || typeof local !== 'object') { _rdMergePos(key, remoteRaw); return; } // ローカル無し → リモート採用
+  const prog = o => (typeof o.spineIdx === 'number' ? o.spineIdx : 0) + (typeof o.ratio === 'number' ? o.ratio : 0);
+  const lp = prog(local), rp = prog(remote);
+  let base;
+  if (rp > lp + 1e-9) base = remote;
+  else if (lp > rp + 1e-9) base = local;
+  else base = (Date.parse(remote.lastOpenedAt) || 0) >= (Date.parse(local.lastOpenedAt) || 0) ? remote : local;
+  const merged = { ...local, ...remote, spineIdx: base.spineIdx, ratio: base.ratio, lastOpenedAt: base.lastOpenedAt };
+  // finishedAt は「最初に読了した時刻」を採用
+  const lf = local.finishedAt, rf = remote.finishedAt;
+  if (lf && rf) merged.finishedAt = (Date.parse(lf) <= Date.parse(rf)) ? lf : rf; else merged.finishedAt = lf || rf;
+  if (!merged.finishedAt) delete merged.finishedAt;
+  if (!remote.cover && local.cover) merged.cover = local.cover; // 表紙はどちらかにあれば残す
+  if (!(Array.isArray(remote.creators) && remote.creators.length) && Array.isArray(local.creators) && local.creators.length)
+    merged.creators = local.creators;
+  const lsc = +local.spineCount || 0, rsc = +remote.spineCount || 0;
+  if (lsc || rsc) merged.spineCount = Math.max(lsc, rsc);
+  localStorage.setItem(key, JSON.stringify(merged));
+}
+
+// 自動保存ON時のサイレント双方向同期（Drive→端末）。確認ダイアログなし。
+// opts.force=true で復帰スロットリングを無視（起動時用）。
+async function driveSyncPull(opts) {
+  opts = opts || {};
+  if (!state.driveAutoSave || !GOOGLE_CLIENT_ID) return;
+  if (_driveSyncBusy || _autoSaveBusy) return;
+  if (!opts.force && Date.now() - _lastSyncPullAt < SYNC_PULL_THROTTLE) return;
+  // GIS が未ロードなら少し待つ（起動直後は async ロード未完のことがある）
+  for (let i = 0; i < 30 && (typeof google === 'undefined' || !google.accounts); i++) {
+    await new Promise(r => setTimeout(r, 200));
+  }
+  if (typeof google === 'undefined' || !google.accounts) return;
+  _driveSyncBusy = true;
+  try {
+    const token = await driveAuth();
+    const fileId = await driveFindFile(token);
+    if (!fileId) return;
+    const res = await fetch(
+      'https://www.googleapis.com/drive/v3/files/' + fileId + '?alt=media',
+      { headers: { Authorization: 'Bearer ' + token } }
+    );
+    if (res.status === 401) { _driveToken = null; state.driveFileId = null; return; }
+    if (!res.ok) return;
+    const json = await res.json();
+    if (!json.bookmarks || typeof json.bookmarks !== 'object') return;
+
+    const tomb = _rlApplyTombstones(json.purged);
+    for (const [key, val] of Object.entries(json.bookmarks)) {
+      if (!key.startsWith('epub_pos_')) continue; // last_book は同期で勝手に変えない（復帰先を保持）
+      let opened = 0;
+      try { const o = typeof val === 'string' ? JSON.parse(val) : val; opened = Date.parse(o && o.lastOpenedAt) || 0; } catch (e) {}
+      const tms = tomb.get(_rlHashKey(key));
+      if (tms !== undefined && tms >= opened) continue; // 墓標尊重（削除済みの復活防止）
+      try { _rdMergePosBest(key, val); } catch (e) { break; }
+    }
+    try { localStorage.removeItem('epub_consolidate_v1'); } catch (e) {}
+    consolidateBookmarks();
+    _rlCleanupLastBook();
+    _rdMergeBookStats(json.bookStats);
+    _rdMergeDays(json.readingDays);
+    _rdPruneOrphanStats();
+    _lastSyncPullAt = Date.now();
+
+    // 開いている本が Drive 側で進んでいたら「タップで移動」を提案（自動ジャンプしない）
+    if (state.epub && state.bookKey) {
+      let saved; try { saved = JSON.parse(localStorage.getItem(state.bookKey)); } catch (e) {}
+      if (saved && typeof saved.spineIdx === 'number') {
+        const newIdx = saved.spineIdx;
+        const newRatio = typeof saved.ratio === 'number' ? saved.ratio : 0;
+        const isAhead = newIdx > state.currentSpineIdx ||
+                        (newIdx === state.currentSpineIdx && newRatio > _intraChapterRatio + 0.01);
+        const isNotFinal = newIdx < state.spine.length - 1;
+        if (isAhead && isNotFinal) showSyncMoveToast(newIdx, newRatio);
+      }
+    } else {
+      buildReadingList(); // ウェルカム画面なら読みかけリストを最新に
+    }
+  } catch (e) {
+    // サイレント失敗（オフライン等）。次の機会に再試行。
+  } finally {
+    _driveSyncBusy = false;
+  }
+}
+
 function notifyStorageError() {
   if (window._storageWarnShown) return;
   window._storageWarnShown = true;
@@ -6458,10 +6841,38 @@ function notifyStorageError() {
 }
 function showToast(msg) {
   const t = document.getElementById('toast');
+  _clearToastAction(t);
   t.textContent = msg;
   t.classList.add('show');
   clearTimeout(t._timer);
   t._timer = setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+// アクション付きトースト（クリックで移動）の後始末
+function _clearToastAction(el) {
+  if (el._actionHandler) { el.removeEventListener('click', el._actionHandler); el._actionHandler = null; }
+  el.style.cursor = '';
+  el.classList.remove('toast-action');
+}
+
+// 別端末で進んだ位置への「タップで移動」トースト（読書中の不意なジャンプを避ける）
+function showSyncMoveToast(idx, ratio) {
+  const el = document.getElementById('toast');
+  _clearToastAction(el);
+  el.textContent = t('toast.driveSyncAvailable');
+  el.classList.add('show', 'toast-action');
+  el.style.cursor = 'pointer';
+  clearTimeout(el._timer);
+  const handler = () => {
+    _clearToastAction(el);
+    el.classList.remove('show');
+    pushJumpHistory();
+    renderPage(idx, ratio);
+    showToast(t('toast.driveJumped', { n: idx + 1 }));
+  };
+  el._actionHandler = handler;
+  el.addEventListener('click', handler);
+  el._timer = setTimeout(() => { _clearToastAction(el); el.classList.remove('show'); }, 8000);
 }
 
 // ══════════════════════════════════════════
@@ -6591,8 +7002,11 @@ window.addEventListener('popstate', () => {
 });
 
 // G2: 読書時間計測の確定フラッシュ。タブ非表示で即確定し、復帰時に離席時間を加算しないよう計測を一時停止
-document.addEventListener('visibilitychange', () => { if (document.hidden) { _rdFlush(); _rdLastActivityTs = 0; } });
-window.addEventListener('pagehide', _rdFlush);
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { _rdFlush(); _rdLastActivityTs = 0; flushAutoSave(); }
+  else driveSyncPull(); // タブ復帰時に Drive の最新しおりを取り込む（自動保存ON時のみ・スロットリングあり）
+});
+window.addEventListener('pagehide', () => { _rdFlush(); flushAutoSave(); });
 
 // Toolbar horizontal scroll via mouse wheel
 document.getElementById('toolbar').addEventListener('wheel', e => {
@@ -6637,6 +7051,9 @@ if (location.protocol !== 'http:' && location.protocol !== 'https:') {
   document.getElementById('drive-auto-group').style.display = 'none';
   state.driveAutoSave = false;  // file:// 環境では強制 OFF
 }
+
+// 起動時: 自動保存ON なら Drive の最新しおりをサイレント取り込み（本を開く前に最新化）
+if (state.driveAutoSave) driveSyncPull({ force: true });
 
 </script>
 </body>
