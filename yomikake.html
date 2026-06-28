@@ -434,6 +434,15 @@
   .rd-tile { text-align:center; }
   .rd-tile .rd-num { font-size:30px; font-weight:700; line-height:1.1; }
   .rd-tile .rd-lbl { font-size:12px; opacity:.65; margin-top:4px; }
+  .rd-last-book { display:flex; gap:14px; align-items:center; border:1px solid var(--ui-border); border-radius:12px; padding:12px 14px; cursor:pointer; transition:filter .15s; }
+  .rd-last-book:hover { filter:brightness(1.04); }
+  .rd-lb-cover { width:44px; height:62px; border-radius:4px; object-fit:cover; flex-shrink:0; box-shadow:0 1px 4px rgba(0,0,0,.2); }
+  .rd-lb-nocover { background:var(--ui-border); }
+  .rd-lb-info { flex:1; min-width:0; }
+  .rd-lb-title { font-size:14px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .rd-lb-bar { background:var(--ui-border); border-radius:4px; height:8px; overflow:hidden; margin:8px 0 6px; }
+  .rd-lb-bar > span { display:block; height:100%; background:var(--accent); border-radius:4px; }
+  .rd-lb-meta { display:flex; gap:16px; font-size:12px; opacity:.7; font-variant-numeric:tabular-nums; }
   .rd-author-row { display:flex; align-items:center; gap:10px; margin-bottom:8px; font-size:13px; }
   .rd-author-name { width:38%; flex-shrink:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .rd-author-bar-wrap { flex:1; background:var(--ui-border); border-radius:5px; height:14px; overflow:hidden; }
@@ -1168,6 +1177,12 @@ const I18N = {
     'readingData.recentFinished': '最近読了',
     'readingData.empty':          'まだ読書記録がありません',
     'readingData.close':          '閉じる',
+    'readingData.lastBook':       '最後に開いた本',
+    'readingData.totalTime':      '累計時間',
+    'readingData.thisBookTime':   'この本',
+    'readingData.progress':       '進行',
+    'readingData.durHM':          '{h}時間{m}分',
+    'readingData.durM':           '{m}分',
   },
   en: {
     'btn.open':             'Open',
@@ -1368,6 +1383,12 @@ const I18N = {
     'readingData.recentFinished': 'Recently finished',
     'readingData.empty':          'No reading records yet',
     'readingData.close':          'Close',
+    'readingData.lastBook':       'Last opened',
+    'readingData.totalTime':      'Total time',
+    'readingData.thisBookTime':   'This book',
+    'readingData.progress':       'Progress',
+    'readingData.durHM':          '{h}h {m}m',
+    'readingData.durM':           '{m}m',
   },
   'zh-TW': {
     'btn.open':             '開啟',
@@ -1568,6 +1589,12 @@ const I18N = {
     'readingData.recentFinished': '最近讀完',
     'readingData.empty':          '尚無閱讀記錄',
     'readingData.close':          '關閉',
+    'readingData.lastBook':       '最近開啟',
+    'readingData.totalTime':      '累計時間',
+    'readingData.thisBookTime':   '這本書',
+    'readingData.progress':       '進度',
+    'readingData.durHM':          '{h}小時{m}分',
+    'readingData.durM':           '{m}分',
   },
   'zh-CN': {
     'btn.open':             '打开',
@@ -1768,6 +1795,12 @@ const I18N = {
     'readingData.recentFinished': '最近读完',
     'readingData.empty':          '尚无阅读记录',
     'readingData.close':          '关闭',
+    'readingData.lastBook':       '最近打开',
+    'readingData.totalTime':      '累计时间',
+    'readingData.thisBookTime':   '这本书',
+    'readingData.progress':       '进度',
+    'readingData.durHM':          '{h}小时{m}分',
+    'readingData.durM':           '{m}分',
   },
 };
 
@@ -2046,6 +2079,7 @@ document.body.addEventListener('drop', async e => {
 });
 
 async function loadEpub(file, fileHandle = null) {
+  _rdFlush(); _rdResetMeasure(); // G2: 前の本の取りこぼしを確定してから新しい本へ
   if (file) {
     showLoading(file.name, file.size);
     // ブラウザがオーバーレイを描画する猶予を与えてから重い処理に入る
@@ -2237,7 +2271,7 @@ function navigateToToc(href) {
     s.absPath === state.opfDir + base ||
     s.absPath.endsWith('/' + base)
   );
-  if (idx >= 0) { pushJumpHistory(); renderPage(idx, hash || 'start'); }
+  if (idx >= 0) { _rdRecordActivity(); pushJumpHistory(); renderPage(idx, hash || 'start'); }
 }
 function updateTocHighlight() {
   const cur = state.spine[state.currentSpineIdx];
@@ -2895,6 +2929,12 @@ let _rlPrefs           = _rlLoadPrefs(); // 読みかけリスト表示設定 {v
 let _rlQuery           = '';       // 読みかけリスト検索文字列（非永続・セッション内のみ）
 const _RD_DEFAULTS     = { authorScope: 'finished', authorLimit: 8 };
 let _rdPrefs           = _rdLoadPrefs(); // 読書データ表示設定（非同期・端末ローカル）
+const _RD_IDLE_THRESHOLD = 180000; // 180秒（3分）以上の無活動は放置とみなし読書時間に加算しない（G2）
+const _RD_FLUSH_DEBOUNCE = 5000;   // 計測値を localStorage に書き出すデバウンス（5秒・G2）
+let _rdLastActivityTs  = 0;         // 直近の活動シグナル時刻（0 = 計測停止中・G2）
+let _rdPendingMs       = 0;         // 未フラッシュの加算待ち時間（ms・G2）
+let _rdActiveBookKey   = '';        // _rdPendingMs が帰属する bookKey（フラッシュ先を固定・G2）
+let _rdFlushTimer      = null;      // _RD_FLUSH_DEBOUNCE のタイマー（G2）
 let _rlSearchTimer     = null;     // 読みかけリスト検索入力のデバウンスタイマー
 let _mobileProgressTimer = null;  // モバイル進捗ピル 非表示タイマー
 let _sidebarTab        = 'toc';    // 'toc' | 'search' — サイドバーの現在タブ
@@ -3387,6 +3427,7 @@ function advanceFxlZoomSpine(dir) {
 
 // ズーム時の Next/Back 動作（scrollPage から呼ばれる）
 function advanceFxlZoomStep(dir) {
+  _rdRecordActivity();
   const z = state.fxlZoom;
   const maxIdx = getZoomStepMaxIdx();
   if (z.mode === 'free') {
@@ -3498,6 +3539,7 @@ async function renderFxlPair(spineIdx) {
 
 // ページ送り: spread はペア単位（次/前ペア先頭 spineIdx）、single は spine 単位で遷移
 function advanceFxlPage(dir) {
+  _rdRecordActivity();
   if (!state.fxlPairs) return;
   if (isEffectiveSpread()) {
     const next = state.currentPairIdx + dir;
@@ -3718,6 +3760,7 @@ function prevChapter() {
 }
 
 function scrollPage(direction) {
+  _rdRecordActivity();
   // フォーカス中のボタンから :focus-visible 枠を外す（キーボード移動時の残留防止）
   if (document.activeElement && document.activeElement.blur) {
     try { document.activeElement.blur(); } catch(e) {}
@@ -3751,6 +3794,7 @@ window.addEventListener('message', e => {
     return;
   }
   if (e.data.type === 'EPUB_EDGE') {
+    _rdRecordActivity();
     const dir = e.data.direction;
     if (_isRendering) {
       // 旧 iframe からの EPUB_EDGE：章送りせずスクロールをキューして次チャプター冒頭で1ページ進める
@@ -3769,6 +3813,7 @@ window.addEventListener('message', e => {
     // _isRendering 中は旧 iframe からの遅延 EPUB_POS を無視し、
     // 新章インデックスに古い ratio が上書きされるのを防ぐ
     if (!_isRendering) {
+      _rdRecordActivity();
       _intraChapterRatio = e.data.ratio;
       savePos(e.data.ratio);
       updatePageInfo();
@@ -4576,12 +4621,18 @@ async function cacheEpubFile(file, bookKey) {
         if (!evicted) break;
       }
     }
+    // iOS Safari は IDB に保存した Blob/File の実体を後で失う既知バグ（取り出した Blob を読むと
+    // "The object can not be found here." が発生）がある。バイト列を ArrayBuffer として保存すれば
+    // 構造化複製で値ごと格納され失効しない。ArrayBuffer 取得不可の古い環境のみ Blob で代替。
+    let buf = null;
+    try { buf = await file.arrayBuffer(); } catch (e) {}
     const value = {
-      blob:    file,                                  // File は Blob のサブクラス
       name:    file.name || (bookKey + '.epub'),
-      size:    file.size || 0,
+      size:    file.size || (buf ? buf.byteLength : 0),
+      type:    file.type || 'application/epub+zip',
       savedAt: new Date().toISOString(),
     };
+    if (buf) value.buf = buf; else value.blob = file;
     try {
       await _idbPut(bookKey, value);
       _cachedKeys.add(bookKey);
@@ -4648,19 +4699,24 @@ async function loadEpubFromCache(bookKey) {
   showLoadingPreSelect();
   try {
     const cached = await _idbGet(bookKey);
-    if (!cached || !cached.blob) {
+    let data = cached && (cached.buf || cached.blob);
+    if (!cached || !data) {
       _cachedKeys.delete(bookKey);
       hideLoading();
       showToast(t('toast.cacheLoadFailed'));
       openFilePicker();
       return;
     }
+    // 旧 Blob エントリ（iOS で実体が失効している可能性あり）は読めるか検証しつつ ArrayBuffer 化する。
+    // 失効していれば arrayBuffer() が throw し、下の catch でピッカーへフォールバックする。
+    if (!(data instanceof ArrayBuffer)) data = await data.arrayBuffer();
     const fname = cached.name || (bookKey + '.epub');
+    const ftype = cached.type || 'application/epub+zip';
     let file;
     try {
-      file = new File([cached.blob], fname, { type: 'application/epub+zip' });
+      file = new File([data], fname, { type: ftype });
     } catch (e) {
-      file = cached.blob;
+      file = new Blob([data], { type: ftype });
       try { Object.defineProperty(file, 'name', { value: fname, configurable: true }); } catch (e2) {}
     }
     await loadEpub(file);
@@ -5148,6 +5204,7 @@ function updateCloseBookBtnVisibility() {
 function closeBook() {
   if (!state.epub) return;
   savePos(_bookFinished ? 1.0 : _intraChapterRatio);
+  _rdFlush(); _rdResetMeasure(); // G2: 計測を確定フラッシュして停止
   dismissFinishedBanner();
   // フルスクリーン解除
   if (state.fullscreen) toggleFullscreen();
@@ -5270,6 +5327,79 @@ function _rdFmtDate(iso) {
   return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
 }
 
+// ── G2: 読書時間の計測（idle フィルタ付きアキュムレータ）──
+// すべての「ページめくり相当」シグナルから呼ぶ単一入口。直近からの経過(delta)を
+// idle 閾値未満なら加算する。delta>=閾値は放置として加算しない（時刻だけ更新）。
+function _rdRecordActivity() {
+  if (!state.bookKey) return;
+  const now = Date.now();
+  if (_rdLastActivityTs && _rdActiveBookKey === state.bookKey) {
+    const delta = now - _rdLastActivityTs;
+    if (delta > 0 && delta < _RD_IDLE_THRESHOLD) {
+      _rdPendingMs += delta;
+      _rdScheduleFlush();
+    }
+  }
+  _rdLastActivityTs = now;
+  _rdActiveBookKey  = state.bookKey;
+}
+function _rdScheduleFlush() {
+  if (_rdFlushTimer) return;
+  _rdFlushTimer = setTimeout(_rdFlush, _RD_FLUSH_DEBOUNCE);
+}
+// 加算待ち時間を epub_book_stats（本ごと）と epub_reading_days（日ごと＝累計の単一ソース）へ書き出す。
+// self 欄（_rdDeviceId）だけを加算＝単調増加。受信側の max マージで取りこぼし/二重計上ゼロ。
+function _rdFlush() {
+  if (_rdFlushTimer) { clearTimeout(_rdFlushTimer); _rdFlushTimer = null; }
+  const add = _rdPendingMs; _rdPendingMs = 0;
+  const key = _rdActiveBookKey;
+  if (add <= 0 || !key || localStorage.getItem(key) === null) return; // 墓標／削除済みには書かない
+  const dev = _rdDeviceId();
+  const m = _rdLoadBookStats();
+  const e = m[key] || {};
+  e.ms = e.ms || {};
+  e.ms[dev] = (+e.ms[dev] || 0) + add;
+  if (!e.firstAt) e.firstAt = new Date().toISOString();
+  m[key] = e; _rdSaveBookStats(m);
+  const today = _rdTodayKey();
+  const d = _rdLoadDays();
+  d[today] = d[today] || {};
+  d[today][dev] = (+d[today][dev] || 0) + add;
+  _rdSaveDays(d);
+}
+function _rdTodayKey() { // 端末ローカル時刻の YYYY-MM-DD
+  const dt = new Date(), p = n => String(n).padStart(2, '0');
+  return dt.getFullYear() + '-' + p(dt.getMonth() + 1) + '-' + p(dt.getDate());
+}
+// 計測を完全リセット（本切替・閉じる時）。フラッシュは呼び出し側で先に行う
+function _rdResetMeasure() {
+  if (_rdFlushTimer) { clearTimeout(_rdFlushTimer); _rdFlushTimer = null; }
+  _rdLastActivityTs = 0; _rdPendingMs = 0; _rdActiveBookKey = '';
+}
+
+// ── G2: 派生指標 ──
+function _rdBookTime(stat) { return stat && stat.ms ? Object.values(stat.ms).reduce((a, b) => a + (+b || 0), 0) : 0; }
+function _rdTotalTime() { const d = _rdLoadDays(); let s = 0; for (const k in d) for (const dev in d[k]) s += (+d[k][dev] || 0); return s; }
+function _rdFmtDuration(ms) {
+  if (!ms || ms < 0) return '—';
+  const totalMin = Math.round(ms / 60000);
+  if (totalMin < 1) return t('readingData.durM', { m: '<1' });
+  const h = Math.floor(totalMin / 60), mm = totalMin % 60;
+  return h > 0 ? t('readingData.durHM', { h, m: mm }) : t('readingData.durM', { m: mm });
+}
+// 最後に開いた本（lastOpenedAt 最大）の {key, title, cover, pct, finished} を返す
+function _rdLastBook(items) {
+  let best = null;
+  items.forEach(it => {
+    const at = Date.parse(it.lastOpenedAt) || 0;
+    if (!best || at > best._at) best = { ...it, _at: at };
+  });
+  if (!best) return null;
+  const sc = best.spineCount || 1;
+  const pct = Math.min(100, Math.max(0, Math.round((best.spineIdx + (best.ratio || 0)) / Math.max(1, sc) * 100)));
+  return { key: best.key, title: best.title, cover: best.cover, pct, finished: best.finished };
+}
+
 function openReadingData() {
   buildReadingData();
   document.getElementById('reading-data-overlay').classList.add('show');
@@ -5286,15 +5416,39 @@ function buildReadingData() {
     return;
   }
   const s = _rdComputeStats(items);
-  const unit = t('readingData.booksUnit');
-  // すべての本
-  let html =
+  let html = '';
+  // 最後に開いた本（G2・時間が貯まっていれば「この本の時間」も表示）
+  const lb = _rdLastBook(items);
+  if (lb) {
+    const stat = _rdLoadBookStats()[lb.key];
+    const bookMs = _rdBookTime(stat);
+    const coverHtml = lb.cover
+      ? `<img class="rd-lb-cover" src="${esc(lb.cover)}" alt="">`
+      : `<div class="rd-lb-cover rd-lb-nocover"></div>`;
+    html +=
+      `<div class="rd-section"><h4>${t('readingData.lastBook')}</h4>` +
+      `<div class="rd-last-book" data-key="${esc(lb.key)}" onclick="closeReadingData();openFilePickerForBook(this.dataset.key)">` +
+        coverHtml +
+        `<div class="rd-lb-info">` +
+          `<div class="rd-lb-title">${esc(lb.title)}</div>` +
+          `<div class="rd-lb-bar"><span style="width:${lb.pct}%"></span></div>` +
+          `<div class="rd-lb-meta">` +
+            `<span>${t('readingData.progress')} ${lb.pct}%</span>` +
+            (bookMs > 0 ? `<span>${t('readingData.thisBookTime')} ${_rdFmtDuration(bookMs)}</span>` : '') +
+          `</div>` +
+        `</div>` +
+      `</div></div>`;
+  }
+  // すべての本（読了率ドーナツ＋読了/読みかけ/累計時間タイル）
+  const totalMs = _rdTotalTime();
+  html +=
     `<div class="rd-section"><h4>${t('readingData.allBooks')}</h4>` +
     `<div class="rd-stat-row">` +
       `<div class="rd-donut" style="background:conic-gradient(var(--accent) 0 ${s.rate}%, var(--ui-border) 0);"><div>${s.rate}%</div></div>` +
       `<div class="rd-tiles">` +
         `<div class="rd-tile"><div class="rd-num">${s.finished}</div><div class="rd-lbl">${t('readingData.finishedCount')}</div></div>` +
         `<div class="rd-tile"><div class="rd-num">${s.reading}</div><div class="rd-lbl">${t('readingData.readingCount')}</div></div>` +
+        (totalMs > 0 ? `<div class="rd-tile"><div class="rd-num">${_rdFmtDuration(totalMs)}</div><div class="rd-lbl">${t('readingData.totalTime')}</div></div>` : '') +
       `</div>` +
     `</div></div>`;
   // よく読む著者
@@ -5486,7 +5640,7 @@ function consolidateBookmarks() {
     try { const lb = JSON.parse(localStorage.getItem('epub_last_book')); if (lb && lb.bookKey) oldLbKey = lb.bookKey; } catch(e) {}
     let lbHit = false;
     for (const ent of entries) {
-      if (ent.key !== newKey) { try { localStorage.removeItem(ent.key); } catch(e) {} if (ent.key === oldLbKey) lbHit = true; }
+      if (ent.key !== newKey) { _rdRekeyStats(ent.key, newKey); try { localStorage.removeItem(ent.key); } catch(e) {} if (ent.key === oldLbKey) lbHit = true; }
     }
     if (lbHit) { try { localStorage.setItem('epub_last_book', JSON.stringify({title, bookKey: newKey})); } catch(e) {} }
   }
@@ -5513,6 +5667,7 @@ function migrateLegacyBookmark(title, creator, newKey) {
     if (p && p.spineCount) migrated.spineCount = p.spineCount;
   }
   try { localStorage.setItem(newKey, JSON.stringify(migrated)); } catch(e) { return null; }
+  _rdRekeyStats(bestKey, newKey);
   try { localStorage.removeItem(bestKey); } catch(e) {}
   try {
     const lb = JSON.parse(localStorage.getItem('epub_last_book'));
@@ -5959,6 +6114,30 @@ function _rdMergePos(key, remoteRaw) {
   localStorage.setItem(key, JSON.stringify(merged));
 }
 
+// G2: 本キー改名時に epub_book_stats を付け替える。oldKey の統計を newKey へデバイス別 max でマージし oldKey を削除。
+// consolidate / migrate のキー改名と連動させ、本ごと読書時間の孤児化（_rdPruneOrphanStats での消失）を防ぐ。
+function _rdRekeyStats(oldKey, newKey) {
+  if (!oldKey || !newKey || oldKey === newKey) return;
+  try {
+    const m = _rdLoadBookStats();
+    const src = m[oldKey];
+    if (!src) return;
+    if (!m[newKey]) {
+      m[newKey] = src;
+    } else {
+      const dst = m[newKey];
+      dst.ms = dst.ms || {};
+      if (src.ms) for (const dev in src.ms) { const v = +src.ms[dev] || 0; if (!(dev in dst.ms) || v > dst.ms[dev]) dst.ms[dev] = v; }
+      if (src.chars) dst.chars = Math.max(+dst.chars || 0, +src.chars || 0);
+      if (src.total) dst.total = Math.max(+dst.total || 0, +src.total || 0);
+      const fa = [dst.firstAt, src.firstAt].map(x => Date.parse(x)).filter(x => !isNaN(x));
+      if (fa.length) dst.firstAt = new Date(Math.min(...fa)).toISOString();
+    }
+    delete m[oldKey];
+    _rdSaveBookStats(m);
+  } catch (e) {}
+}
+
 // epub_book_stats のうち対応する epub_pos が無いエントリを掃除（purge・墓標・consolidate 改名の後始末）
 function _rdPruneOrphanStats() {
   const m = _rdLoadBookStats();
@@ -6344,6 +6523,10 @@ document.addEventListener('fullscreenchange', () => {
 window.addEventListener('popstate', () => {
   if (state.fullscreen) toggleFullscreen();
 });
+
+// G2: 読書時間計測の確定フラッシュ。タブ非表示で即確定し、復帰時に離席時間を加算しないよう計測を一時停止
+document.addEventListener('visibilitychange', () => { if (document.hidden) { _rdFlush(); _rdLastActivityTs = 0; } });
+window.addEventListener('pagehide', _rdFlush);
 
 // Toolbar horizontal scroll via mouse wheel
 document.getElementById('toolbar').addEventListener('wheel', e => {

@@ -24,7 +24,7 @@ yomikake（`yomikake.html` / `yomikake_ios.html`）に kobo / justread 風の **
 | グループ | 内容 | 時間計測 | 今回 |
 |---|---|---|---|
 | **G1** | 読了率・読了冊数・読みかけ冊数・著者グラフ・最近読了 | 不要 | **実装する（画面込み）** |
-| **G2** | 累計読書時間・本ごと読書時間・読書スピード・読了所要時間・「最後の本」パネル | 必要 | 設計のみ（同期項目確定） |
+| **G2** | 累計読書時間・本ごと読書時間・「最後の本」パネル（読書スピード・所要時間は G2.1 へ繰延） | 必要 | **実装済み（時間のみ・§14）** |
 | **G3** | 連続 日/週/月・読書カレンダー・週次/月次ペース | 必要 | 設計のみ（同期項目確定） |
 
 - G1 で追加する保存項目は **`epub_pos_*` への `finishedAt` と `creators` の2フィールドだけ**。時間計測インフラ（`epub_book_stats` / `epub_reading_days`）は G1 では作らない。
@@ -574,6 +574,204 @@ G1 追加（`I18N` へ・両ファイル）:
 - [ ] 同期：`collectBookmarks` 直下フィールド、`_rdMergeBookStats` / `_rdMergeDays` / `_rdMergePos`、`_rlPurgeLocalData` stats 削除、`_rdPruneOrphanStats`
 - [ ] i18n 4言語ぶん
 - [ ] iOS 版（`yomikake_ios.html`）へ同等反映（LF・再オープンは IDB 経由）
+
+## 14. G2 詳細実装設計（現行コードベース・2026-06-28）
+
+> **実装状況（2026-06-28）**: G2を**時間計測のみ**で両ファイル（`yomikake.html` CRLF / `yomikake_ios.html` LF）に実装済み（**コミット前**）。ユーザー判断で **①文字数系（速度・残り時間）は初版に含めず G2.1 へ繰延**（§14.4 簡素化オプション採用）、②デバウンス 5 秒、③consolidate/migrate の stats 付け替え（`_rdRekeyStats`）あり。実装したのは：計測中核（`_rdRecordActivity`/`_rdScheduleFlush`/`_rdFlush`/`_rdTodayKey`/`_rdResetMeasure`）、活動シグナル6箇所フック、`visibilitychange`/`pagehide`リスナー、`closeBook`/`loadEpub`のフラッシュ＋リセット、派生指標（`_rdBookTime`/`_rdTotalTime`/`_rdFmtDuration`/`_rdLastBook`）、画面（最後に開いた本パネル＋累計時間タイル＋CSS）、i18n 6キー×4言語、`_rdRekeyStats`。**未実装（G2.1）**: `_rdComputeBookChars`/`_rdUpdateReadChars`/`chars`/`total`蓄積、`_rdSpeed`/`_rdTimeToFinish`、速度・残り時間の表示。同期スキーマは G1 ロック分のまま無変更。JS構文チェック＋コア計測ロジックの単体テスト22件（idleフィルタ／self欄のみ加算・単調増加／デバイス別max＋和／reading_days合算／rekey移設・マージ／墓標スキップ／所要時間整形／本切替の帰属分離）通過。ブラウザ実機の目視確認は未実施。
+
+> **前提（G1 で確定済み）**: 同期スキーマ（`bookStats` / `readingDays` 直下フィールド・デバイス別 max マージ）、保存ヘルパ（`_rdLoadBookStats` / `_rdSaveBookStats` / `_rdLoadDays` / `_rdSaveDays` / `_rdDeviceId`）、受信マージ（`_rdMergeBookStats` / `_rdMergeDays` / `_rdMergePos`）、孤児掃除（`_rdPruneOrphanStats`）、purge 連動削除（`_rlPurgeLocalData` 内 stats 削除）は **すべて実装済み（`yomikake.html` ~5871–5970／`collectBookmarks` ~5973）**。**G2 で新規に実装するのは「①時間の計測・書き込み」「②文字数の計測」「③派生指標」「④画面（最後に開いた本パネル＋累計時間タイル）」「⑤i18n」の5点のみ**。同期ペイロード構造・マージ規則は一切変更しない（§0-3 の約束）。命名は G1 同様 `_rd` / `rd` プレフィックス。両ファイル共通（本体 CRLF・iOS 版 LF）。
+
+行番号は G1 実装後の現行コード（`yomikake.html`）の目安。iOS 版の対応行は §14.9 に併記。
+
+### 14.1 計測の中核：活動シグナル＋idle フィルタ
+
+**モジュール変数**（`yomikake.html` の `let _intraChapterRatio = 0;`（~2887）付近に追加）:
+```js
+const _RD_IDLE_THRESHOLD = 180000;  // 180秒（3分）= 確定値（§11）。これ以上の無活動は放置とみなし加算しない
+const _RD_FLUSH_DEBOUNCE = 5000;    // 計測値を localStorage に書き出すデバウンス（5秒）。体感は実装後調整
+let _rdLastActivityTs = 0;          // 直近の活動シグナル時刻（0 = 計測停止中）
+let _rdPendingMs      = 0;          // 未フラッシュの加算待ち時間（ms）
+let _rdActiveBookKey  = '';         // _rdPendingMs / chars が帰属する bookKey（フラッシュ先を固定するため）
+let _rdFlushTimer     = null;       // _RD_FLUSH_DEBOUNCE のタイマー
+```
+
+**`_rdRecordActivity()`** — すべての「ページめくり相当」シグナルから呼ぶ単一入口:
+```js
+function _rdRecordActivity() {
+  if (!state.bookKey) return;                  // 本が開いていない＝計測対象外
+  const now = Date.now();
+  if (_rdLastActivityTs && _rdActiveBookKey === state.bookKey) {
+    const delta = now - _rdLastActivityTs;
+    if (delta > 0 && delta < _RD_IDLE_THRESHOLD) {
+      _rdPendingMs += delta;
+      _rdScheduleFlush();
+    }
+    // delta >= IDLE_THRESHOLD は放置＝加算しない（_rdLastActivityTs だけ更新して継続）
+  }
+  _rdLastActivityTs = now;
+  _rdActiveBookKey  = state.bookKey;
+}
+```
+- **idle 判定**：直近シグナルからの経過が 180 秒以上なら、その間は読んでいないとみなして加算しない（kobo 等の自動スリープ相当をブラウザで再現）。
+- **本の取り違え防止**：`_rdActiveBookKey !== state.bookKey`（本切替直後）なら delta を加算せず時刻だけ更新。`_rdPendingMs` は必ず `_rdActiveBookKey` に帰属する（フラッシュ先が混ざらない）。
+
+**`_rdScheduleFlush()` / `_rdFlush()`**:
+```js
+function _rdScheduleFlush() {
+  if (_rdFlushTimer) return;
+  _rdFlushTimer = setTimeout(_rdFlush, _RD_FLUSH_DEBOUNCE);
+}
+function _rdFlush() {
+  if (_rdFlushTimer) { clearTimeout(_rdFlushTimer); _rdFlushTimer = null; }
+  const add = _rdPendingMs; _rdPendingMs = 0;
+  const key = _rdActiveBookKey;
+  if (add <= 0 || !key || localStorage.getItem(key) === null) return; // 墓標／削除済みには書かない
+  const dev = _rdDeviceId();
+  // ① 本ごと（epub_book_stats）
+  const m = _rdLoadBookStats();
+  const e = m[key] || {};
+  e.ms = e.ms || {};
+  e.ms[dev] = (+e.ms[dev] || 0) + add;          // self 欄のみ加算（単調増加→max マージで安全）
+  if (!e.firstAt) e.firstAt = new Date().toISOString();
+  m[key] = e; _rdSaveBookStats(m);
+  // ② 日ごと（epub_reading_days）＝累計時間の単一ソース
+  const today = _rdTodayKey();
+  const d = _rdLoadDays();
+  d[today] = d[today] || {};
+  d[today][dev] = (+d[today][dev] || 0) + add;
+  _rdSaveDays(d);
+}
+function _rdTodayKey() {  // 端末ローカル時刻の YYYY-MM-DD（§3.3）
+  const dt = new Date(), p = n => String(n).padStart(2, '0');
+  return dt.getFullYear() + '-' + p(dt.getMonth() + 1) + '-' + p(dt.getDate());
+}
+```
+- **self 欄だけ書く**＝自端末の値は単調増加。受信側の max マージ（実装済み `_rdMergeBookStats` / `_rdMergeDays`）で取りこぼし・二重計上ゼロ（§2）。
+- **quota**：`_rdSaveBookStats` / `_rdSaveDays` は既に try/catch 済み。stats は読書位置より優先度が低いので、失敗は黙って捨てて良い（位置保存を阻害しない）。
+
+### 14.2 活動シグナルのフック箇所（全モード網羅）
+
+`_rdRecordActivity()` を以下に1行ずつ挿入する。重複呼び出しは「直近からの delta」を足すだけなので二重計上にならない。
+
+| 経路 | 関数 / ハンドラ | 行 | 対象モード |
+|---|---|---|---|
+| スクロール位置報告 | `EPUB_POS` ハンドラ（`if (!_isRendering){…}` 内） | ~3771 | reflow（PC スクロール・iOS スワイプ） |
+| ボタン/キーめくり | `scrollPage()` 冒頭 | ~3720 | reflow / FXL 共通 |
+| 章境界越え | `EPUB_EDGE` ハンドラ冒頭（`_isRendering` 判定の前） | ~3753 | reflow |
+| 目次ジャンプ | `navigateToToc()` 冒頭（`base` 検証後） | ~2231 | 全モード |
+| FXL ページ送り | `advanceFxlPage()` 冒頭 | ~3500 | FXL（非ズーム） |
+| FXL ズームステップ | `advanceFxlZoomStep()` 冒頭 | ~3389 | FXL（コマ読み） |
+
+- `handleIframeLink()`（内部リンク）も `renderPage` を呼ぶので任意で追加可（必須ではない＝直後の EPUB_POS で拾える）。
+- **`scrollPage()` は FXL ズーム分岐の前**（`return` より上）に置くこと。FXL は EPUB_POS を出さないため、`scrollPage` と FXL advance の2系統が FXL の唯一の計測源になる。
+
+### 14.3 確定フラッシュとタイマー停止（ライフサイクル）
+
+| タイミング | 処理 |
+|---|---|
+| `visibilitychange` → `hidden` | `_rdFlush()` 即時 → `_rdLastActivityTs = 0`（復帰時に離席時間を加算しないため） |
+| `pagehide`（タブ破棄・iOS Safari は `beforeunload` 不発のため必須） | `_rdFlush()` 即時（best-effort） |
+| `closeBook()`（~5148・`savePos` の直後） | `_rdFlush()` → `_rdLastActivityTs = 0; _rdPendingMs = 0; _rdActiveBookKey = ''`、`clearTimeout(_rdFlushTimer)` |
+| `loadEpub()` 冒頭（旧本の取りこぼし回収） | `_rdFlush()`（旧 `_rdActiveBookKey` 宛に確定）→ 上記同様リセット |
+
+- **新規リスナー2本**（init ブロックに追加・両ファイル）:
+  ```js
+  document.addEventListener('visibilitychange', () => { if (document.hidden) { _rdFlush(); _rdLastActivityTs = 0; } });
+  window.addEventListener('pagehide', _rdFlush);
+  ```
+- 復帰（`visible`）時は `_rdLastActivityTs = 0` のままなので、次の活動シグナルで delta が加算されない＝離席ぶんが自然に除外される（idle 閾値に依らず確実）。
+
+### 14.4 文字数の計測（chars / total）
+
+**方針**：opening をブロックしないよう、**総文字数は初回描画後にバックグラウンドで算出**する（design §7.2 の「loadEpub 時算出」を、体感ハング回避のため非同期化）。
+
+```js
+let _rdSpineChars = [];   // spineIdx -> 本文文字数（未計測は undefined）
+let _rdTotalChars = 0;    // Σ _rdSpineChars（算出完了後に確定）
+```
+
+- **算出 `_rdComputeBookChars()`**：`loadEpub()` の初回 `renderPage` 完了後に `setTimeout(_rdComputeBookChars, 0)`（または `requestIdleCallback`）で起動。各 spine の XHTML を `zip.file(absPath).async('text')` で読み、既存 `htmlToText()`（~4060）で本文抽出→ `.length` を `_rdSpineChars[idx]` に格納。`_renderSeq` を握って本切替時に中断。完了時 `_rdTotalChars = Σ` を確定し、`epub_book_stats[bookKey].total` に **max** で書き込む（章追加で増えうるため min ではなく max・§3.2）。
+- **FXL（画像本）は本文文字数が無い**ため、`htmlToText` の結果が概ね空になる。FXL では chars/total/速度・残り時間の表示を出さない（§14.6 で本パネルは時間のみ表示）。
+- **既読文字数 `_rdUpdateReadChars()`**：`chars = Σ(完了 spine の _rdSpineChars) + _rdSpineChars[currentSpineIdx] × _intraChapterRatio`。`epub_book_stats[bookKey].chars` に **max** で書く（戻り読みで減らさない）。呼び出しは `_rdFlush()` の末尾（時間と同じデバウンスに相乗り）＋章遷移時。`_rdTotalChars` 未確定（算出途中）の間は chars 更新をスキップしてよい（total 確定後に自己修復）。
+
+> 簡素化オプション：G2 初版は **chars/total/速度/残り時間を省き、累計時間・本ごと時間・読書日数だけ**を出す案も可（時間計測だけで「最後の本パネル」「累計時間タイル」は成立する）。文字数系は派生指標が一つ増えるだけで同期スキーマは不変（`chars`/`total` フィールドは G1 でロック済み）。**実装判断はユーザー確認事項**（§14.10）。
+
+### 14.5 派生指標
+
+```js
+function _rdBookTime(stat)  { return stat && stat.ms ? Object.values(stat.ms).reduce((a,b)=>a+(+b||0),0) : 0; } // 本の総読書時間(ms)
+function _rdTotalTime()     { const d=_rdLoadDays(); let s=0; for(const k in d) for(const dev in d[k]) s+=(+d[k][dev]||0); return s; } // 累計（単一ソース＝reading_days）
+function _rdSpeed(stat)     { const ms=_rdBookTime(stat); return (stat&&stat.chars&&ms>60000)?(stat.chars/(ms/60000)):0; } // 文字/分（分母ガード）
+function _rdTimeToFinish(stat){ const sp=_rdSpeed(stat); return (sp>0&&stat.total>stat.chars)?((stat.total-stat.chars)/sp*60000):0; } // ms
+```
+- **累計読書時間の単一ソースは `epub_reading_days`**（§7 注記）。`epub_book_stats.ms` は本別内訳用で、合計が日次合計と完全一致しなくても許容（方針 §0-1）。
+- **「最後に開いた本」** = `_rlCollect()` の items から `lastOpenedAt` 最大のエントリ。その `key` で `_rdLoadBookStats()[key]` を引いてパネル描画。stat が無ければ（時間未蓄積）進行%のみ表示。
+- **整形ヘルパ `_rdFmtDuration(ms)`** → i18n 対応で `"3時間12分"` / `"3h 12m"` / `"45分"` 等。0 は `"—"`。`_rdFmtDate`（~5265）と同じ場所に追加。
+
+### 14.6 画面：G2 枠の有効化
+
+G1 で `#reading-data-body`（~916）に innerHTML を流し込む `buildReadingData()`（~5281）を拡張する。**DOM は G1 同様 `buildReadingData()` 内で文字列生成**（`#rd-last-book` / `#rd-streak` のような静的プレースホルダは置かない方針＝G1 のまま）。
+
+1. **「最後に開いた本」パネル**を `rd-section`「すべての本」の **前**に挿入:
+   ```
+   ╔══ 最後に開いた本 ════════╗
+   ║ [表紙] タイトル                ║
+   ║  進行 42% / この本 1時間12分    ║
+   ║  速度 480字/分 / 残り 約35分     ║   ← 文字数を実装した場合のみ
+   ╚════════════════════════╝
+   ```
+   - タップで `closeReadingData(); openFilePickerForBook(key)`（G1 の最近読了行と同じ `data-key` 規約・インライン埋め込み禁止）。
+   - FXL 本・stat 無しは「速度／残り」行を出さない。
+2. **累計時間タイル**を「すべての本」行（`rd-tiles`）の末尾に追加: `<div class="rd-tile"><div class="rd-num">${_rdFmtDuration(_rdTotalTime())}</div><div class="rd-lbl">${t('readingData.totalTime')}</div></div>`。ドーナツ＋3タイル（読了・読みかけ・累計時間）構成になる。
+3. CSS：新クラス `.rd-last-book`（カード枠 `border:1px solid var(--ui-border); border-radius:12px; padding:14px`）・`.rd-lb-prog` 等。既存テーマ変数のみ使用。
+
+> 「継続」枠（連続日/週/月・草グラフ）は **G3** で有効化（G2 では出さない）。
+
+### 14.7 同期：変更なし（確認のみ）
+
+- `collectBookmarks()`（~5973）は既に `_rdHasStats()` / `_rdHasDays()` で `bookStats` / `readingDays` を条件付き同梱する。**G2 で時間が貯まり始めれば自動的にペイロードへ載る**。
+- 受信側 `_rdMergeBookStats` / `_rdMergeDays` / `_rdPruneOrphanStats` / `_rlPurgeLocalData` の stats 削除は実装済み。**G2 で追加のマージ実装は不要**。
+- **唯一の追加候補（§12-F 推奨・必須ではない）**：`consolidateBookmarks()`（~5450）と `migrateLegacyBookmark()` の **キー改名箇所に `epub_book_stats[old]→[new]` の付け替え**を入れる。入れないと旧形式キーの本を G2 で開いた直後に consolidate/migrate が走った場合、本ごと内訳時間が孤児化して `_rdPruneOrphanStats` で消える（累計時間は reading_days 側に残るので §12-E のとおり減らない）。大半の端末は consolidate 実行済み（一度きり）なので影響は限定的。
+  ```js
+  // 改名直後に:
+  try { const sm=_rdLoadBookStats(); if(sm[oldKey]){ sm[newKey]=sm[newKey]||sm[oldKey]; delete sm[oldKey]; _rdSaveBookStats(sm); } } catch(e){}
+  ```
+
+### 14.8 i18n キー（4言語：ja / en / zh-TW / zh-CN）
+
+G2 追加（`I18N` へ・両ファイル）:
+`readingData.lastBook`（最後に開いた本）, `readingData.totalTime`（累計読書時間）,
+`readingData.thisBookTime`（この本）, `readingData.progress`（進行）, `readingData.speed`（速度・{n}字/分）,
+`readingData.timeToFinish`（残り 約{t}）, `readingData.durHM`（{h}時間{m}分）, `readingData.durM`（{m}分）, `readingData.cps`（{n}字/分）。
+- G3 用（`streakDay` / `streakWeek` / `streakMonth` / `calendar` / `pace`）は G3 実装時に追加。
+
+### 14.9 iOS 版（`yomikake_ios.html`）差分
+
+ロジックは共通。フック箇所の対応行（現行）:
+- `scrollPage()` ~3805、`EPUB_POS` ハンドラ ~3850、`advanceFxlZoomStep` ~3476、`advanceFxlPage` ~3580、`navigateToToc`（要確認）、`closeBook` ~4928、`loadEpub` ~2170、`buildReadingData` ~5056、sync ヘルパ ~5641+。
+- **iOS は本文スクロールが CSS transform** だが EPUB_POS は同プロトコルで飛ぶ（~3850）ので計測源は共通。スワイプ＝touchend→ EPUB_POS。
+- `visibilitychange` / `pagehide` リスナーは iOS Safari で特に重要（バックグラウンド遷移が頻繁）。`pagehide` は iOS で `beforeunload` の代替として必須。
+- 「最後に開いた本」再オープンは IDB キャッシュ経由（`openFilePickerForBook` が iOS では cache 分岐・既存）。改行 LF。
+
+### 14.10 実装前のユーザー確認事項
+
+1. **文字数系（速度・残り時間）を G2 初版に含めるか**（§14.4 簡素化オプション）。含めない場合は時間のみ（累計・本ごと・最後の本パネルの進行%＋時間）で先行し、文字数は G2.1 に切り出せる。同期スキーマは不変。
+2. **デバウンス間隔 5 秒**の体感（短いほど取りこぼし減・書込頻度増）。実装後に調整可。
+3. **consolidate/migrate の stats 付け替え（§14.7）** を入れるか（推奨・コスト小）。
+
+### 14.11 実装チェックリスト（両ファイル）
+
+- [ ] `_RD_IDLE_THRESHOLD` / `_RD_FLUSH_DEBOUNCE` / 計測モジュール変数追加
+- [ ] `_rdRecordActivity` / `_rdScheduleFlush` / `_rdFlush` / `_rdTodayKey`
+- [ ] 活動シグナル6箇所へ `_rdRecordActivity()` 挿入（§14.2）
+- [ ] `visibilitychange` / `pagehide` リスナー、`closeBook` / `loadEpub` のフラッシュ＋リセット
+- [ ]（採用時）`_rdComputeBookChars` / `_rdUpdateReadChars` / `_rdSpineChars` / `_rdTotalChars`
+- [ ] 派生指標 `_rdBookTime` / `_rdTotalTime` / `_rdSpeed` / `_rdTimeToFinish` / `_rdFmtDuration`
+- [ ] `buildReadingData` に「最後に開いた本」パネル＋累計時間タイル、CSS
+- [ ]（採用時）`consolidateBookmarks` / `migrateLegacyBookmark` の stats 付け替え
+- [ ] i18n 4言語（§14.8）
+- [ ] iOS 版へ同等反映（§14.9・LF）
+- [ ] 動作確認：3分超放置で加算停止／タブ切替フラッシュ／本切替で帰属が混ざらない／累計＝reading_days 単一ソース
 
 ## 11. 未決事項 / 将来
 
