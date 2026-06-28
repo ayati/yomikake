@@ -24,7 +24,8 @@ yomikake（`yomikake.html` / `yomikake_ios.html`）に kobo / justread 風の **
 | グループ | 内容 | 時間計測 | 今回 |
 |---|---|---|---|
 | **G1** | 読了率・読了冊数・読みかけ冊数・著者グラフ・最近読了 | 不要 | **実装する（画面込み）** |
-| **G2** | 累計読書時間・本ごと読書時間・「最後の本」パネル（読書スピード・所要時間は G2.1 へ繰延） | 必要 | **実装済み（時間のみ・§14）** |
+| **G2** | 累計読書時間・本ごと読書時間・「最後の本」パネル | 必要 | **実装済み（v1.13.0・§14）** |
+| **G2.1** | 文字数（既読/総）・読書スピード・読了所要時間 | 必要 | **実装済み（§14.4）** |
 | **G3** | 連続 日/週/月・読書カレンダー・週次/月次ペース | 必要 | 設計のみ（同期項目確定） |
 
 - G1 で追加する保存項目は **`epub_pos_*` への `finishedAt` と `creators` の2フィールドだけ**。時間計測インフラ（`epub_book_stats` / `epub_reading_days`）は G1 では作らない。
@@ -577,7 +578,11 @@ G1 追加（`I18N` へ・両ファイル）:
 
 ## 14. G2 詳細実装設計（現行コードベース・2026-06-28）
 
-> **実装状況（2026-06-28）**: G2を**時間計測のみ**で両ファイル（`yomikake.html` CRLF / `yomikake_ios.html` LF）に実装済み（**コミット前**）。ユーザー判断で **①文字数系（速度・残り時間）は初版に含めず G2.1 へ繰延**（§14.4 簡素化オプション採用）、②デバウンス 5 秒、③consolidate/migrate の stats 付け替え（`_rdRekeyStats`）あり。実装したのは：計測中核（`_rdRecordActivity`/`_rdScheduleFlush`/`_rdFlush`/`_rdTodayKey`/`_rdResetMeasure`）、活動シグナル6箇所フック、`visibilitychange`/`pagehide`リスナー、`closeBook`/`loadEpub`のフラッシュ＋リセット、派生指標（`_rdBookTime`/`_rdTotalTime`/`_rdFmtDuration`/`_rdLastBook`）、画面（最後に開いた本パネル＋累計時間タイル＋CSS）、i18n 6キー×4言語、`_rdRekeyStats`。**未実装（G2.1）**: `_rdComputeBookChars`/`_rdUpdateReadChars`/`chars`/`total`蓄積、`_rdSpeed`/`_rdTimeToFinish`、速度・残り時間の表示。同期スキーマは G1 ロック分のまま無変更。JS構文チェック＋コア計測ロジックの単体テスト22件（idleフィルタ／self欄のみ加算・単調増加／デバイス別max＋和／reading_days合算／rekey移設・マージ／墓標スキップ／所要時間整形／本切替の帰属分離）通過。ブラウザ実機の目視確認は未実施。
+> **実装状況（2026-06-28）**: G2（時間計測）を **v1.13.0 としてコミット済み**、G2.1（文字数・速度・所要時間）を続けて両ファイル（`yomikake.html` CRLF / `yomikake_ios.html` LF）に実装済み（**G2.1 はコミット前**）。ユーザー判断：①文字数系は G2.1 として後続実装（本節で完了）、②デバウンス 5 秒、③consolidate/migrate の stats 付け替え（`_rdRekeyStats`）あり。
+>
+> **G2 実装分（v1.13.0）**: 計測中核（`_rdRecordActivity`/`_rdScheduleFlush`/`_rdFlush`/`_rdTodayKey`/`_rdResetMeasure`）、活動シグナル6箇所フック、`visibilitychange`/`pagehide`リスナー、`closeBook`/`loadEpub`のフラッシュ＋リセット、派生指標（`_rdBookTime`/`_rdTotalTime`/`_rdFmtDuration`/`_rdLastBook`）、画面（最後に開いた本パネル＋累計時間タイル＋CSS）、i18n 6キー×4言語、`_rdRekeyStats`。
+>
+> **G2.1 実装分（本節・未コミット）**: `_rdComputeBookChars`（reflow のみ・初回描画 1.5 秒後にバックグラウンド起動・本切替で中断・`htmlToText` 流用・`total` を max 書込み）、`_rdUpdateReadChars`（既読＝Σ完了 spine＋現 spine×`_intraChapterRatio`・`chars` を max 書込み・`_rdFlush` 冒頭から毎回呼出）、`_rdSpeed`/`_rdTimeToFinish`（極小分母ガード）、最後に開いた本パネルに速度・残り時間を追加表示（reflow・stat があるときのみ）、i18n `readingData.speed`/`readingData.timeToFinish`×4言語。FXL は本文文字数が無いため文字数系は出さない。同期スキーマは G1 ロック分のまま無変更（`chars`/`total` は G1 でロック済みフィールド）。JS構文OK＋単体テスト：G2計測22件・G2.1文字数13件（per-spine文字数／total書込み／既読＝完了＋ratio／戻り読みmax非減少／速度22.5cpm・残り40000ms／極小分母ガード／FXLスキップ／本切替中断）通過。ブラウザ実機の目視確認は未実施。
 
 > **前提（G1 で確定済み）**: 同期スキーマ（`bookStats` / `readingDays` 直下フィールド・デバイス別 max マージ）、保存ヘルパ（`_rdLoadBookStats` / `_rdSaveBookStats` / `_rdLoadDays` / `_rdSaveDays` / `_rdDeviceId`）、受信マージ（`_rdMergeBookStats` / `_rdMergeDays` / `_rdMergePos`）、孤児掃除（`_rdPruneOrphanStats`）、purge 連動削除（`_rlPurgeLocalData` 内 stats 削除）は **すべて実装済み（`yomikake.html` ~5871–5970／`collectBookmarks` ~5973）**。**G2 で新規に実装するのは「①時間の計測・書き込み」「②文字数の計測」「③派生指標」「④画面（最後に開いた本パネル＋累計時間タイル）」「⑤i18n」の5点のみ**。同期ペイロード構造・マージ規則は一切変更しない（§0-3 の約束）。命名は G1 同様 `_rd` / `rd` プレフィックス。両ファイル共通（本体 CRLF・iOS 版 LF）。
 
