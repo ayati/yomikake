@@ -49,6 +49,7 @@
   .set-group h4 { font-size:12px; font-weight:600; color:var(--ui-text); opacity:0.6; text-transform:uppercase; margin:0 8px 12px; letter-spacing:0.5px; }
   .set-row { display:flex; align-items:center; justify-content:space-between; padding:8px; border-radius:8px; }
   .set-row:hover { background:var(--hover-bg); }
+  .set-row-disabled { opacity:.4; pointer-events:none; }
   .set-label { font-size:14px; color:var(--ui-text); }
   
   select.modern-select { appearance:none; background:var(--ui-bg); border:1px solid var(--ui-border); color:var(--ui-text); padding:8px 32px 8px 12px; border-radius:8px; font-size:13px; cursor:pointer; outline:none; font-family:inherit; background-image:url('data:image/svg+xml;utf8,<svg viewBox="0 0 24 24" fill="none" stroke="%23888" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>'); background-repeat:no-repeat; background-position:right 8px center; background-size:14px; min-width:140px; box-shadow:inset 0 1px 2px rgba(0,0,0,0.02); }
@@ -683,6 +684,20 @@
           <option value="2.8" data-i18n="lh.veryWide">かなり広い</option>
         </select>
       </div>
+      <div class="set-row">
+        <span class="set-label" data-i18n="settings.fontBold">太字表示</span>
+        <button id="font-bold-toggle" onclick="toggleFontBold()"
+                style="border:1px solid var(--ui-border);border-radius:8px;padding:6px 16px;min-width:60px;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;">OFF</button>
+      </div>
+      <div class="set-row" id="font-stroke-row">
+        <span class="set-label" data-i18n="settings.fontStroke">縁取りの強さ</span>
+        <select class="modern-select" id="font-stroke-select" onchange="changeFontStrokeLevel(this.value)">
+          <option value="0" data-i18n="stroke.none">なし</option>
+          <option value="1" data-i18n="stroke.weak">弱</option>
+          <option value="2" data-i18n="stroke.medium">中</option>
+          <option value="3" data-i18n="stroke.strong">強</option>
+        </select>
+      </div>
     </div>
 
     <div class="set-group">
@@ -1044,6 +1059,12 @@ const I18N = {
     'lh.normal':            '標準',
     'lh.wide':              '広い',
     'lh.veryWide':          'かなり広い',
+    'settings.fontBold':    '太字表示',
+    'settings.fontStroke':  '縁取りの強さ',
+    'stroke.none':          'なし',
+    'stroke.weak':          '弱',
+    'stroke.medium':        '中',
+    'stroke.strong':        '強',
     'settings.layout':      'レイアウト',
     'settings.writingMode': '組方向',
     'wm.vertical':          '縦書き',
@@ -1264,6 +1285,12 @@ const I18N = {
     'lh.normal':            'Normal',
     'lh.wide':              'Wide',
     'lh.veryWide':          'Extra wide',
+    'settings.fontBold':    'Bold text',
+    'settings.fontStroke':  'Outline weight',
+    'stroke.none':          'None',
+    'stroke.weak':          'Light',
+    'stroke.medium':        'Medium',
+    'stroke.strong':        'Strong',
     'settings.layout':      'Layout',
     'settings.writingMode': 'Writing mode',
     'wm.vertical':          'Vertical',
@@ -1484,6 +1511,12 @@ const I18N = {
     'lh.normal':            '標準',
     'lh.wide':              '寬鬆',
     'lh.veryWide':          '非常寬鬆',
+    'settings.fontBold':    '粗體顯示',
+    'settings.fontStroke':  '描邊強度',
+    'stroke.none':          '無',
+    'stroke.weak':          '弱',
+    'stroke.medium':        '中',
+    'stroke.strong':        '強',
     'settings.layout':      '版面',
     'settings.writingMode': '書寫方向',
     'wm.vertical':          '直排',
@@ -1704,6 +1737,12 @@ const I18N = {
     'lh.normal':            '标准',
     'lh.wide':              '宽松',
     'lh.veryWide':          '非常宽松',
+    'settings.fontBold':    '粗体显示',
+    'settings.fontStroke':  '描边强度',
+    'stroke.none':          '无',
+    'stroke.weak':          '弱',
+    'stroke.medium':        '中',
+    'stroke.strong':        '强',
     'settings.layout':      '版面',
     'settings.writingMode': '书写方向',
     'wm.vertical':          '竖排',
@@ -1950,6 +1989,8 @@ const state = {
   fontMode:'publisher', fontSize:100, lineHeight:2.0, theme:'', margin:'full',
   writingMode:'vertical',  // 'vertical' | 'horizontal' | 'publisher'
   fwdBtnSize:'small',      // 'small' | 'medium' | 'large'
+  fontBold:false,          // 太字表示トグル（epub_settings に永続化）
+  fontStrokeLevel:0,       // 縁取りの強さ 0=なし/1=弱/2=中/3=強（epub_settings に永続化）
   sidebarOpen:false,
   bookKey:'',
   driveFileId:null,      // epub_bookmarks.json の Drive ファイルID（ページ滞在中キャッシュ）
@@ -2124,6 +2165,9 @@ const FONT_SAMPLE = {
   'zh-TW': '讀了一半的書',
   'zh-CN': '读了一半的书',
 };
+
+// 縁取り太字（2-C）の -webkit-text-stroke 幅。em単位で font-size に比例スケール。
+const STROKE_WIDTHS = { 1: '0.02em', 2: '0.035em', 3: '0.05em' };
 
 // ══════════════════════════════════════════
 //  File Open
@@ -2601,6 +2645,15 @@ async function buildSrcdoc(xhtmlText, xhtmlAbsPath, scrollTarget, readySeq) {
   const fontRule = font
     ? 'html,body,p,h1,h2,h3,h4,h5,h6,div,span{font-family:' + font + '!important;}'
     : '';
+  // 太字トグル（2-A）: fontRule と独立に font-weight を指定（publisher×フォント未指定でも効かせる）
+  const weightRule = state.fontBold
+    ? 'html,body,p,h1,h2,h3,h4,h5,h6,div,span{font-weight:bold!important;}'
+    : '';
+  // 縁取り太字（2-C）: 太字ON かつ strokeLevel>0 のときのみ。ルビ(rt/rp)は継承px値で潰れるため除外。
+  const strokeRule = (state.fontBold && state.fontStrokeLevel > 0)
+    ? 'html,body,p,h1,h2,h3,h4,h5,h6,div,span{-webkit-text-stroke:' + STROKE_WIDTHS[state.fontStrokeLevel] + ' currentColor!important;}' +
+      'rt,rp{-webkit-text-stroke-width:0!important;}'
+    : '';
   const overrideStyle = doc.createElement('style');
   overrideStyle.id = 'epub-viewer-inject';
   const wm = state.writingMode;
@@ -2645,6 +2698,8 @@ async function buildSrcdoc(xhtmlText, xhtmlAbsPath, scrollTarget, readySeq) {
     'img{max-width:100%!important;max-height:95vh!important;object-fit:contain!important;}',
     'svg{max-width:100%!important;max-height:95vh!important;}',  // scale down full-page SVG in manga/image ePub
     fontRule,
+    weightRule,
+    strokeRule,
   ].join('');
   doc.head.appendChild(overrideStyle);
 
@@ -4081,6 +4136,8 @@ function saveSettings() {
       writingMode:   state.writingMode,
       fwdBtnSize:    state.fwdBtnSize,
       driveAutoSave: state.driveAutoSave,
+      fontBold:      state.fontBold,
+      fontStrokeLevel: state.fontStrokeLevel,
       spreadMode:    state.spreadMode,
       fxlZoomLevel:  state.fxlZoomLevel,
       fxlRegionOrder:state.fxlRegionOrder,
@@ -4103,6 +4160,12 @@ function loadSettings() {
     if (s.writingMode)           { state.writingMode = s.writingMode;   const el = document.getElementById('writing-mode-select'); if(el) el.value = s.writingMode; }
     if (s.fwdBtnSize)            { state.fwdBtnSize = s.fwdBtnSize;     const el = document.getElementById('fwd-btn-size-select'); if(el) el.value = s.fwdBtnSize; applyFwdBtnSize(s.fwdBtnSize); }
     if (s.driveAutoSave !== undefined) { state.driveAutoSave = !!s.driveAutoSave; updateAutoSaveToggleUI(); }
+    if (typeof s.fontBold === 'boolean') { state.fontBold = s.fontBold; updateFontBoldToggleUI(); }
+    if (typeof s.fontStrokeLevel === 'number' && [0,1,2,3].indexOf(s.fontStrokeLevel) >= 0) {
+      state.fontStrokeLevel = s.fontStrokeLevel;
+      const el = document.getElementById('font-stroke-select'); if (el) el.value = String(s.fontStrokeLevel);
+    }
+    updateFontStrokeRowUI();
     if (s.spreadMode)            { state.spreadMode = s.spreadMode;     const el = document.getElementById('spread-mode-select'); if(el) el.value = s.spreadMode; }
     if (typeof s.fxlZoomLevel === 'number' && [1.5, 2.0, 2.5].indexOf(s.fxlZoomLevel) >= 0) {
       state.fxlZoomLevel = s.fxlZoomLevel;
@@ -4464,11 +4527,17 @@ function updateFontPickerUI() {
   }
 }
 
+// 設定変更による再レンダーで章内位置を保持する（design_font_extension.md 0-R）。
+// renderPage は数値 scrollTarget を受理し savePos(ratio) も同値保存するため、
+// 章頭リセット・しおりの 0 上書きの両方が同時に解消される。
+function rerenderKeepPos() {
+  if (state.spine.length) renderPage(state.currentSpineIdx, _intraChapterRatio);
+}
 function changeFont(v) {
   state.fontMode = v;
   saveSettings();
   updateFontPickerUI();
-  if (state.spine.length) renderPage(state.currentSpineIdx);
+  rerenderKeepPos();
 }
 function changeFontSize(d) {
   // スモールサイズは10%刻み、大サイズは20%刻みで操作しやすく
@@ -4476,12 +4545,12 @@ function changeFontSize(d) {
   state.fontSize = Math.max(60, Math.min(400, state.fontSize + d * step));
   document.getElementById('font-size-display').textContent = state.fontSize + '%';
   saveSettings();
-  if (state.spine.length) renderPage(state.currentSpineIdx);
+  rerenderKeepPos();
 }
 function changeLineHeight(v) {
   state.lineHeight = parseFloat(v);
   saveSettings();
-  if (state.spine.length) renderPage(state.currentSpineIdx);
+  rerenderKeepPos();
 }
 function changeTheme(v) {
   state.theme = v;
@@ -4492,7 +4561,7 @@ function changeTheme(v) {
   Array.from(cls).forEach(c => { if (c.indexOf('theme-') === 0) cls.remove(c); });
   if (v) cls.add('theme-' + v);
   saveSettings();
-  if (state.spine.length) renderPage(state.currentSpineIdx);
+  rerenderKeepPos();
 }
 function applyMargin(v) {
   const presets = {
@@ -4513,7 +4582,40 @@ function changeMargin(v) {
 function changeWritingMode(v) {
   state.writingMode = v;
   saveSettings();
-  if (state.spine.length) renderPage(state.currentSpineIdx);
+  rerenderKeepPos();
+}
+// 太字トグル（2-A）
+function toggleFontBold() {
+  state.fontBold = !state.fontBold;
+  saveSettings();
+  updateFontBoldToggleUI();
+  updateFontStrokeRowUI();   // 太字OFFで縁取り行を disabled 化（2-C 連動）
+  rerenderKeepPos();
+}
+function updateFontBoldToggleUI() {
+  const btn = document.getElementById('font-bold-toggle');
+  if (!btn) return;
+  const on = !!state.fontBold;
+  btn.textContent = on ? 'ON' : 'OFF';
+  btn.style.background  = on ? 'var(--accent)' : '';
+  btn.style.color       = on ? '#fff' : '';
+  btn.style.borderColor = on ? 'var(--accent)' : 'var(--ui-border)';
+}
+// 縁取り強度（2-C）。太字ON時のみ視覚効果を持つ（buildSrcdoc 側で state.fontBold ガード）。
+function changeFontStrokeLevel(v) {
+  const lv = parseInt(v, 10);
+  if ([0,1,2,3].indexOf(lv) < 0) return;
+  state.fontStrokeLevel = lv;
+  saveSettings();
+  rerenderKeepPos();
+}
+function updateFontStrokeRowUI() {
+  const row = document.getElementById('font-stroke-row');
+  const sel = document.getElementById('font-stroke-select');
+  if (!row || !sel) return;
+  row.classList.toggle('set-row-disabled', !state.fontBold);
+  sel.disabled = !state.fontBold;   // pointer-events:none はキーボードフォーカスを防げないため併用
+  sel.value = String(state.fontStrokeLevel || 0);
 }
 function applyFwdBtnSize(v) {
   const btn = document.getElementById('btn-scroll-fwd');
@@ -7022,6 +7124,8 @@ document.getElementById('toc-btn').classList.add('active');
 loadSettings();
 consolidateBookmarks();
 updateFxlLtrAutoFlipUI();
+updateFontBoldToggleUI();
+updateFontStrokeRowUI();
 showResumeBanner();
 updateThemeBtnUI();
 loadPreviewFonts();
