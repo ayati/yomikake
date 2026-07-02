@@ -22,6 +22,8 @@
 - **ページジャンプパネル**：サイドバー上部に常時表示のジャンプ UI（スライダー・表紙/末尾/±10 ボタン・ページ番号直接入力）。FXL 本・リフロー本どちらでも使え、スマホでも簡単に表紙・末尾・任意ページへ遷移可能
 - ドラッグ＆ドロップでファイルを開く（`yomikake.html` のみ）
 - **フォント選択**：22種類（游明朝・ゴシック・Google Fonts 各種など）をドロップダウンでプレビュー付き選択。file:// 環境ではウェブフォントが利用不可の場合あり
+- **フォント機能の拡張（v2.1.0・v2.2.0）**：本文の**太字表示**トグルと、太字をさらに強調する**縁取りの強さ**（なし/弱/中/強・ルビは除外）に対応。さらに**ローカルフォント読み込み**（`.ttf`/`.otf`/`.woff`/`.woff2` を最大5件、IndexedDB に端末内保存。オフライン・`file://` でも利用可、Drive 同期・エクスポート対象外）でお好みの書体を追加できる
+- **設定変更時の読書位置保持（v2.1.0）**：フォント・文字サイズ・行間・テーマ・組方向を変更しても章の先頭に戻らず、読書中の位置を保持
 - **テーマ**：8色（標準・セピア・白紙・ダーク・さくら・星空・抹茶・月夜）
 - 文字サイズ・行間・テーマ・余白・**次へボタンのサイズ**のカスタマイズ（設定は自動保存）
 - **設定ポップオーバー**：ツールバーのボタンから開くフローティングパネルで全設定を一元管理
@@ -318,6 +320,9 @@ LTR 書籍（洋書マンガ・英文雑誌など `page-progression-direction="l
 | 設定 | 選択肢 | 対象 |
 |------|--------|------|
 | **フォント** | 22種：パブリッシャー / 明朝体 / ゴシック / Google Fonts（Noto Serif JP・Shippori Mincho・Klee One・Hina Mincho 他）/ 中文・欧文フォントなど | リフロー型 |
+| **ローカルフォント**（v2.2.0） | 端末内の `.ttf`/`.otf`/`.woff`/`.woff2` を最大5件追加（オフライン可・Drive 同期対象外）。フォントピッカー末尾の「＋ フォントを追加」から選択、× で削除 | リフロー型 |
+| **太字表示**（v2.1.0） | ON / OFF（本文全体を太字化。実体 Bold 書体があればそれを使用） | リフロー型 |
+| **縁取りの強さ**（v2.1.0） | なし / 弱 / 中 / 強（太字ON時に文字を縁取りしてさらに強調・ルビは除外） | リフロー型 |
 | **文字サイズ** | A－ / A＋ボタンで 60〜400%（10%刻み、200%超は20%刻み） | リフロー型 |
 | **行間** | 狭い（1.6） / 標準（2.0） / 広い（2.4） / 最広（2.8） | リフロー型 |
 | **組方向** | 縦書き（強制 vertical-rl） / 横書き（強制 horizontal-tb） / ePub指定（ePubのCSS優先） | リフロー型 |
@@ -367,7 +372,8 @@ yomikake.html / yomikake_ios.html（単一ファイル）
     ├── switchSidebarTab()                                サイドバータブ切り替え（目次/検索）
     ├── startSearch() / runSearch() / htmlToText()        全文検索（非同期ストリーミング）
     ├── findMatchSnippets() / appendSearchResult()        検索結果スニペット生成・表示
-    ├── loadPreviewFonts() / buildFontPickerList()        フォントピッカー（22種プレビュー付き）
+    ├── loadPreviewFonts() / buildFontPickerList()        フォントピッカー（22種＋ローカルフォント）
+    ├── cfHandleFile() / cfGetFontSrc() / cfRegisterPreviewFace()  ローカルフォント（追加・埋め込み・プレビュー登録）
     ├── driveAuth() / scheduleTokenRefresh()                            OAuth トークン取得・自動更新
     ├── driveFindFile() / driveUpload() / driveDownload()              Google Drive同期
     ├── buildReadingList() / formatRelativeDate()         読みかけリスト構築・日付フォーマット
@@ -442,7 +448,8 @@ iOS Safari の iframe 内では `scrollLeft` 代入・`window.scrollTo` が正�
 |-----|------|
 | `epub_pos_{タイトル}__{著者}` | 章/ページインデックス＋スクロール比率（0〜1、FXLは常に0）＋著者名・spine数・表紙サムネイル（base64）・最終閲覧日時・読了日時。区切りは二重アンダースコア（v1.8.11+。旧形式 `_{spine数}` も読み取り互換） |
 | `epub_last_book` | 最後に読んだ本のタイトルと bookKey |
-| `epub_settings` | フォント・文字サイズ・行間・テーマ・余白・組方向・次へボタンサイズ・**見開き表示**（FXL用） |
+| `epub_settings` | フォント・文字サイズ・行間・テーマ・余白・組方向・次へボタンサイズ・**見開き表示**（FXL用）・**太字表示**・**縁取りの強さ** |
+| `epub_custom_fonts` | （ローカルフォント）追加したフォントのメタ情報（id・ファイル名・サイズ・追加日時）。実体は IndexedDB。**Drive同期しない**（端末ローカル） |
 | `epub_lang` | 選択中の表示言語（`ja` / `en` / `zh-TW` / `zh-CN`） |
 | `epub_book_stats` | （読書データ）本ごとの読書時間（デバイス別）・既読/総文字数・初回読書日。Drive同期対象 |
 | `epub_reading_days` | （読書データ）日ごとの読書時間（デバイス別）。連続記録・カレンダー・ペースの単一ソース。最低3年保持。Drive同期対象 |
@@ -454,6 +461,8 @@ iOS Safari の iframe 内では `scrollLeft` 代入・`window.scrollTo` が正�
 スクロール位置はデバウンス500msで保存します。保存に失敗した場合（ストレージ容量不足等）はトースト通知で警告します。
 
 **ePub 本体キャッシュ（IndexedDB）**：オフライン読書のため、直近に開いた ePub 本体（最大 3 冊・LRU）を IndexedDB（`epub_viewer_files`）に自動保存します。`localStorage` のしおりとは独立したストレージで、設定パネルの「📂 ePub キャッシュ」からクリアできます（しおりは保持）。起動時に `navigator.storage.persist()` で永続化を要求します。本体キャッシュはオリジン単位のため、オンライン時に読んだのと同じ URL での再オープンが前提です。
+
+**ローカルフォント（IndexedDB）**：追加したフォントの実体は IndexedDB（`epub_viewer_fonts`・最大 5 件）に `ArrayBuffer` で保存します（iOS Safari の Blob 失効バグ回避のため Blob ではなく ArrayBuffer）。本文への適用は http(s) では `blob:` URL、`file://` では data URI として `@font-face` で埋め込みます（章送りごとの再エンコードを避けるためメモリキャッシュ）。フォントは端末ローカル機能のため、Drive 同期・しおりエクスポートには一切含まれません。
 
 ### スクロール制御（yomikake.html）
 

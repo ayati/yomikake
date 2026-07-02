@@ -93,6 +93,9 @@
   .fp-item.fp-selected .fp-name::before { content:'✓ '; }
   .fp-name { font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .fp-sample { font-size:13px; white-space:nowrap; color:var(--ui-text); opacity:.55; flex-shrink:0; }
+  .fp-del-btn { flex-shrink:0; border:none; background:none; color:inherit; opacity:.45; font-size:12px; cursor:pointer; padding:2px 6px; border-radius:4px; line-height:1; }
+  .fp-del-btn:hover { opacity:1; background:rgba(0,0,0,.18); }
+  .fp-add-custom { justify-content:center; color:var(--accent); font-size:13px; font-weight:600; }
 
   .lang-select { appearance:none; background:var(--ui-bg); border:1px solid var(--ui-border); color:var(--ui-text); padding:4px 20px 4px 8px; border-radius:6px; font-size:12px; cursor:pointer; font-family:inherit; font-weight:500; background-image:url('data:image/svg+xml;utf8,<svg viewBox="0 0 24 24" fill="none" stroke="%23888" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>'); background-repeat:no-repeat; background-position:right 4px center; background-size:12px; outline:none; }
   .lang-select:hover { background-color:var(--hover-bg); }
@@ -571,6 +574,7 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" stroke-dasharray="3 2"/><polyline points="16 12 12 8 8 12"/><line x1="12" y1="16" x2="12" y2="8"/></svg>
   </button>
   <input type="file" id="bookmark-input" accept=".json" style="display:none">
+  <input type="file" id="custom-font-input" accept=".ttf,.otf,.woff,.woff2" style="display:none">
 
   <div class="tb-sep"></div>
 
@@ -1081,13 +1085,23 @@ const I18N = {
     'help.author':          '著者：{creator}',
     'help.chapters':        'チャプター数：{n}',
     'help.tocItems':        '目次項目数：{n}',
-    'help.body':            '<p><strong>📱 ページスクロール（主操作）</strong></p><p>　左スワイプ：1画面分 前進スクロール</p><p>　右スワイプ：1画面分 後退スクロール</p><p>　画面下「次へ」・上「前へ」ボタン</p><p>　※章末尾/先頭で自動的に章移動</p><br><p><strong>📖 章切り替え（リフロー型のみ）</strong></p><p>　右「›」ボタン：前の章</p><p>　左「‹」ボタン：次の章</p><br><p><strong>🔵 Bluetoothキーボード</strong></p><p>　スペース：次へ　Shift+スペース：前へ</p><p>　← 次の章　→ 前の章（リフロー型のみ）</p><br><p><strong>🎯 ページジャンプ（サイドバー）</strong></p><p>　サイドバー（☰ 目次ボタン）最上部の「ジャンプ」パネル</p><p>　スライダー：ドラッグで任意位置にプレビュー＆ジャンプ</p><p>　📖 表紙 / -10 / +10 / 🏁 末尾 の4ボタン</p><p>　ページ番号（リフロー型は章番号）を入力して Go または Enter</p><p>　ジャンプ前の位置は自動的にジャンプ履歴（↩）に記録、タップで戻れます</p><br><p><strong>🖼️ マンガ・雑誌モード（FXL / Fixed Layout）</strong></p><p>　pre-paginated 指定の ePub を自動検出し、画像1枚/ページ を画面内フィット表示</p><p>　iPad 横画面では2ページ見開き自動表示</p><p>　組方向・フォント等は無効化、代わりに⚙設定の「見開き表示」で自動/単ページ/見開きを切替</p><p>　マンガ（RTL）は右ページから順に表示、見開き時は中央で隣接</p><p>　スマホでは☰→ジャンプパネルで表紙・末尾・任意ページへ遷移</p><br><p><strong>🔍 コマ読みズーム（FXLのみ）</strong></p><p>　ツールバー🔍ボタン または 画面をダブルタップ で ON／OFF</p><p>　⚙設定「ズームモード」で4種から選択：</p><p>　<b>ストーリーまんが</b>＝1ページを2列×3行=6領域に分け、右上→左上→右中→左中→右下→左下 の順（5タップで1ページ読了→次ページへ）</p><p>　<b>4コマまんが</b>＝右列3個→左列3個 の順（縦4コマ用）</p><p>　<b>縦合わせ・横スクロール</b>（v1.8.4）＝縦持ちスマホ×縦書き紙本スキャンに最適。画像を縦いっぱいに拡大、Nextで横ステップ→末尾で次ページ冒頭へ</p><p>　<b>横合わせ・縦スクロール</b>（v1.8.5）＝横倒しスマホ×横書き紙本スキャンに最適。画像を横いっぱいに拡大、Nextで上→下ステップ→末尾で次ページ冒頭へ</p><p>　LTR書籍（洋書）は自動で左右反転（⚙でOFF可能、6領域モード時のみ）</p><p>　ズーム中の任意ドラッグで自由パン（🌀）へ移行。右下のピル（🎯/↔/↕/🌀）をタップで復帰/次領域へ</p><p>　画面端からさらに読み進み方向へ引っ張る（ラバーバンド）で次/前ページへジャンプ</p><p>　⚙「拡大倍率」：1.5x / 2.0x / 2.5x（6領域モード専用。軸モードは画像比から自動算出）</p><p>　軸モードは全画面モードと併用で上下/左右の余白が完全消滅</p><br><p><strong>🔍 全文検索（リフロー型のみ）</strong></p><p>　サイドバー（目次ボタン）→「検索」タブにキーワードを入力してEnter</p><p>　タップするとその章に移動（ジャンプ履歴にも記録）</p><p>　画像形式の本（FXL）では全文検索は利用できません</p><br><p><strong>🎨 表示設定（歯車アイコン）</strong></p><p>　フォント：22種（游明朝・ゴシック・Google Fonts など）※リフロー型のみ</p><p>　テーマ：8色（標準・セピア・白紙・ダーク・さくら・星空・抹茶・月夜）</p><p>　文字サイズ・行間・余白・書字方向 ※リフロー型のみ</p><p>　見開き表示（FXL時のみ）：自動 / 単ページ / 見開き</p><br><p><strong>🔖 しおり・ジャンプ履歴</strong></p><p>　読み位置は自動記録。サイドバーの目次タブでジャンプ履歴と元の位置に戻れます</p><p>　📥 ローカル読込　📤 ローカル書出　☁↓ Drive読込　☁↑ Drive保存</p><p>　⚙設定「しおり自動保存」ON：読書位置を自動でDriveに保存し、起動時・タブ復帰時に他端末の続きを自動取得します（より進んだ位置を採用。読書中はトーストで通知→タップで移動）</p><p style="font-size:12px;opacity:.6;">　※ Drive機能はHTTP/HTTPSサーバー経由の起動とGoogle Client IDの設定が必要です</p><br><p><strong>📚 読みかけリスト</strong></p><p>　本を開いていないとき、ウェルカム画面に読みかけの本を一覧表示します</p><p>　各カードに表紙・タイトル・著者名・進捗バー・最終閲覧日を表示</p><p>　カード右下「このファイルを開く」でファイルを選ぶと前回の続きから自動再開</p><p>　最終章の末尾まで読み進めると画面下部に読了バナーが表示されます</p><p>　「読みかけリストへ」：本を閉じてリストへ戻る。読了済みとしてリストから自動除外</p><p>　「閉じない」：バナーを閉じてそのまま読み続けられます</p><p>　⚙ 設定パネル末尾「本を閉じる」でいつでもリストへ戻れます（読み位置を自動保存）</p><p>　リスト右上「編集」ボタンで編集モードに切り替え、各カードの × で削除できます</p><br><p><strong>📊 読書データ</strong></p><p>　ツールバー📊ボタン（またはウェルカム画面のボタン）で読書統計を表示</p><p>　読了率・読了冊数・読みかけ冊数／よく読む著者／最近読了（タップで再オープン）</p><p>　累計読書時間・本ごとの読書時間・読書スピード・読了までの目安（リフロー型）</p><p>　連続読書（日／週／月）・読書カレンダー（草グラフ）・週次／月次の読書ペース</p><p style="font-size:12px;opacity:.6;">　※ 読書時間はこの端末での実読のみ計測。Drive自動保存ONで端末間の合算・同期に対応</p><br><p><strong>ファイル形式</strong></p><p>　.epub / .kepub（Kobo）対応。リフロー型・固定レイアウト型（マンガ・雑誌）どちらも自動判別</p>',
+    'help.body':            '<p><strong>📱 ページスクロール（主操作）</strong></p><p>　左スワイプ：1画面分 前進スクロール</p><p>　右スワイプ：1画面分 後退スクロール</p><p>　画面下「次へ」・上「前へ」ボタン</p><p>　※章末尾/先頭で自動的に章移動</p><br><p><strong>📖 章切り替え（リフロー型のみ）</strong></p><p>　右「›」ボタン：前の章</p><p>　左「‹」ボタン：次の章</p><br><p><strong>🔵 Bluetoothキーボード</strong></p><p>　スペース：次へ　Shift+スペース：前へ</p><p>　← 次の章　→ 前の章（リフロー型のみ）</p><br><p><strong>🎯 ページジャンプ（サイドバー）</strong></p><p>　サイドバー（☰ 目次ボタン）最上部の「ジャンプ」パネル</p><p>　スライダー：ドラッグで任意位置にプレビュー＆ジャンプ</p><p>　📖 表紙 / -10 / +10 / 🏁 末尾 の4ボタン</p><p>　ページ番号（リフロー型は章番号）を入力して Go または Enter</p><p>　ジャンプ前の位置は自動的にジャンプ履歴（↩）に記録、タップで戻れます</p><br><p><strong>🖼️ マンガ・雑誌モード（FXL / Fixed Layout）</strong></p><p>　pre-paginated 指定の ePub を自動検出し、画像1枚/ページ を画面内フィット表示</p><p>　iPad 横画面では2ページ見開き自動表示</p><p>　組方向・フォント等は無効化、代わりに⚙設定の「見開き表示」で自動/単ページ/見開きを切替</p><p>　マンガ（RTL）は右ページから順に表示、見開き時は中央で隣接</p><p>　スマホでは☰→ジャンプパネルで表紙・末尾・任意ページへ遷移</p><br><p><strong>🔍 コマ読みズーム（FXLのみ）</strong></p><p>　ツールバー🔍ボタン または 画面をダブルタップ で ON／OFF</p><p>　⚙設定「ズームモード」で4種から選択：</p><p>　<b>ストーリーまんが</b>＝1ページを2列×3行=6領域に分け、右上→左上→右中→左中→右下→左下 の順（5タップで1ページ読了→次ページへ）</p><p>　<b>4コマまんが</b>＝右列3個→左列3個 の順（縦4コマ用）</p><p>　<b>縦合わせ・横スクロール</b>（v1.8.4）＝縦持ちスマホ×縦書き紙本スキャンに最適。画像を縦いっぱいに拡大、Nextで横ステップ→末尾で次ページ冒頭へ</p><p>　<b>横合わせ・縦スクロール</b>（v1.8.5）＝横倒しスマホ×横書き紙本スキャンに最適。画像を横いっぱいに拡大、Nextで上→下ステップ→末尾で次ページ冒頭へ</p><p>　LTR書籍（洋書）は自動で左右反転（⚙でOFF可能、6領域モード時のみ）</p><p>　ズーム中の任意ドラッグで自由パン（🌀）へ移行。右下のピル（🎯/↔/↕/🌀）をタップで復帰/次領域へ</p><p>　画面端からさらに読み進み方向へ引っ張る（ラバーバンド）で次/前ページへジャンプ</p><p>　⚙「拡大倍率」：1.5x / 2.0x / 2.5x（6領域モード専用。軸モードは画像比から自動算出）</p><p>　軸モードは全画面モードと併用で上下/左右の余白が完全消滅</p><br><p><strong>🔍 全文検索（リフロー型のみ）</strong></p><p>　サイドバー（目次ボタン）→「検索」タブにキーワードを入力してEnter</p><p>　タップするとその章に移動（ジャンプ履歴にも記録）</p><p>　画像形式の本（FXL）では全文検索は利用できません</p><br><p><strong>🎨 表示設定（歯車アイコン）</strong></p><p>　フォント：22種（游明朝・ゴシック・Google Fonts など）＋ ローカルフォント追加（.ttf/.otf/.woff/.woff2、最大5件・端末内に保存されオフラインでも利用可）※リフロー型のみ</p><p>　太字表示：本文全体を太字化（実体Bold書体があればそれを使用）※リフロー型のみ</p><p>　縁取りの強さ：太字表示ON時に文字を縁取りしてさらに強調（なし/弱/中/強。ルビは除外）※リフロー型のみ</p><p>　テーマ：8色（標準・セピア・白紙・ダーク・さくら・星空・抹茶・月夜）</p><p>　文字サイズ・行間・余白・書字方向 ※リフロー型のみ</p><p>　見開き表示（FXL時のみ）：自動 / 単ページ / 見開き</p><br><p><strong>🔖 しおり・ジャンプ履歴</strong></p><p>　読み位置は自動記録。サイドバーの目次タブでジャンプ履歴と元の位置に戻れます</p><p>　📥 ローカル読込　📤 ローカル書出　☁↓ Drive読込　☁↑ Drive保存</p><p>　⚙設定「しおり自動保存」ON：読書位置を自動でDriveに保存し、起動時・タブ復帰時に他端末の続きを自動取得します（より進んだ位置を採用。読書中はトーストで通知→タップで移動）</p><p style="font-size:12px;opacity:.6;">　※ Drive機能はHTTP/HTTPSサーバー経由の起動とGoogle Client IDの設定が必要です</p><br><p><strong>📚 読みかけリスト</strong></p><p>　本を開いていないとき、ウェルカム画面に読みかけの本を一覧表示します</p><p>　各カードに表紙・タイトル・著者名・進捗バー・最終閲覧日を表示</p><p>　カード右下「このファイルを開く」でファイルを選ぶと前回の続きから自動再開</p><p>　最終章の末尾まで読み進めると画面下部に読了バナーが表示されます</p><p>　「読みかけリストへ」：本を閉じてリストへ戻る。読了済みとしてリストから自動除外</p><p>　「閉じない」：バナーを閉じてそのまま読み続けられます</p><p>　⚙ 設定パネル末尾「本を閉じる」でいつでもリストへ戻れます（読み位置を自動保存）</p><p>　リスト右上「編集」ボタンで編集モードに切り替え、各カードの × で削除できます</p><br><p><strong>📊 読書データ</strong></p><p>　ツールバー📊ボタン（またはウェルカム画面のボタン）で読書統計を表示</p><p>　読了率・読了冊数・読みかけ冊数／よく読む著者／最近読了（タップで再オープン）</p><p>　累計読書時間・本ごとの読書時間・読書スピード・読了までの目安（リフロー型）</p><p>　連続読書（日／週／月）・読書カレンダー（草グラフ）・週次／月次の読書ペース</p><p style="font-size:12px;opacity:.6;">　※ 読書時間はこの端末での実読のみ計測。Drive自動保存ONで端末間の合算・同期に対応</p><br><p><strong>ファイル形式</strong></p><p>　.epub / .kepub（Kobo）対応。リフロー型・固定レイアウト型（マンガ・雑誌）どちらも自動判別</p>',
     'loading.fetching':     '📂 ファイルを取得しています…',
     'loading.opening':      '「{filename}」を開いています…',
     'loading.unzipping':    '📦 ePubを展開中…',
     'loading.parsing':      '📖 目次を構築中…',
     'loading.rendering':    '🎨 表示を準備中…',
     'toast.webFontFile':    '☁ ウェブフォントはオフラインまたはfile://環境で表示されない場合があります',
+    'font.customGroup':     'カスタムフォント',
+    'font.addCustom':       'フォントを追加',
+    'cf.deleteConfirm':     'このフォントを削除しますか？',
+    'toast.cfInvalidType':  '対応していないファイル形式です',
+    'toast.cfTooLarge':     'ファイルサイズが大きすぎます（上限20MB）',
+    'toast.cfLimitReached': 'カスタムフォントの上限に達しました。先に削除してください',
+    'toast.cfDuplicate':    'このフォントは既に追加されています',
+    'toast.cfMissing':      'フォントデータが見つかりません。標準フォントに戻しました',
+    'toast.cfDeleted':      'フォントを削除しました',
+    'toast.cfSaveFailed':   'フォントの保存に失敗しました',
     'toast.resume':         '📖 前回の続きから再開（{n} / {total}章）',
     'toast.fileMissing':    '⚠️ ファイルが見つかりません: {path}',
     'toast.noBookmarks':    '書き出せるしおりがありません',
@@ -1306,13 +1320,23 @@ const I18N = {
     'help.author':          'Author: {creator}',
     'help.chapters':        'Chapters: {n}',
     'help.tocItems':        'TOC items: {n}',
-    'help.body':            '<p><strong>📱 Page scroll (main operation)</strong></p><p>&nbsp;Swipe left: scroll forward one page</p><p>&nbsp;Swipe right: scroll back one page</p><p>&nbsp;"Next" button (bottom) / "Prev" button (top)</p><p>&nbsp;※ Automatically advances chapter at boundaries</p><br><p><strong>📖 Chapter navigation (reflow only)</strong></p><p>&nbsp;"›" button (right): previous chapter</p><p>&nbsp;"‹" button (left): next chapter</p><br><p><strong>🔵 Bluetooth keyboard</strong></p><p>&nbsp;Space: forward　Shift+Space: back</p><p>&nbsp;← next chapter　→ previous chapter (reflow only)</p><br><p><strong>🎯 Page Jump (sidebar)</strong></p><p>&nbsp;Jump panel at the top of the sidebar (☰ Contents button)</p><p>&nbsp;Slider: drag to preview, release to jump</p><p>&nbsp;📖 Cover / -10 / +10 / 🏁 End buttons</p><p>&nbsp;Type a page number (or chapter # in reflow mode) and tap Go or press Enter</p><p>&nbsp;Previous position is saved to jump history (↩); tap to return</p><br><p><strong>🖼️ Manga / Magazine mode (FXL / Fixed Layout)</strong></p><p>&nbsp;Auto-detects pre-paginated ePubs; displays one image per page, fit to screen</p><p>&nbsp;iPad landscape shows two-page spreads automatically</p><p>&nbsp;Writing mode & font settings are disabled; use "Spread layout" in ⚙ settings (Auto / Single / Two-page)</p><p>&nbsp;Manga (RTL) displays the right page first; spread pairs are adjacent at the center</p><p>&nbsp;On iPhone, use the sidebar jump panel to navigate to cover / end / any page</p><br><p><strong>🔍 Panel zoom (FXL only)</strong></p><p>&nbsp;Toggle with the 🔍 toolbar button or double-tap the page.</p><p>&nbsp;Choose one of 4 modes in ⚙ "Zoom mode":</p><p>&nbsp;<b>Story manga</b> — 2×3 = 6 regions per page. Next walks TR→TL→MR→ML→BR→BL (5 taps then next page).</p><p>&nbsp;<b>4-panel manga</b> — Right column ×3 → left column ×3 (for 4-panel strips).</p><p>&nbsp;<b>Fit height, scroll H</b> (v1.8.4) — Best for vertical-text scans on portrait phones. Image fills viewport height; Next steps horizontally → top of next page at end.</p><p>&nbsp;<b>Fit width, scroll V</b> (v1.8.5) — Best for horizontal-text scans on landscape phones. Image fills viewport width; Next steps top → bottom → top of next page at end.</p><p>&nbsp;LTR books auto-mirror (toggle off via "Flip for LTR books"; 6-region modes only).</p><p>&nbsp;Drag to enter free pan (🌀). Tap the pill (🎯/↔/↕/🌀) to snap back / step to next region.</p><p>&nbsp;Keep dragging past the edge ("rubber band") to jump to next/prev page.</p><p>&nbsp;⚙ "Zoom level": 1.5x / 2.0x / 2.5x (6-region only; axis modes auto-compute).</p><p>&nbsp;Pair axis modes with fullscreen to remove all page margins.</p><br><p><strong>🔍 Full-text search (reflow only)</strong></p><p>&nbsp;Open sidebar (Contents button) → "Search" tab, type a keyword and press Enter</p><p>&nbsp;Tap a result to jump to that chapter (also recorded in jump history)</p><p>&nbsp;Image-based books (FXL) do not support full-text search</p><br><p><strong>🎨 Display settings (⚙ icon)</strong></p><p>&nbsp;Font: 22 options (Mincho, Gothic, Google Fonts, etc.) — reflow only</p><p>&nbsp;Theme: 8 colors (Standard, Sepia, White, Dark, Sakura, Starry Night, Matcha, Moonlit)</p><p>&nbsp;Font size, line height, margin, and writing mode — reflow only</p><p>&nbsp;Spread layout (FXL only): Auto / Single page / Two-page</p><br><p><strong>🔖 Bookmarks &amp; jump history</strong></p><p>&nbsp;Reading position is saved automatically. Sidebar TOC tab shows jump history.</p><p>&nbsp;📥 Local import　📤 Local export　☁↓ Drive load　☁↑ Drive save</p><p>&nbsp;⚙ "Auto-save bookmarks" ON: position is saved to Drive automatically and the latest position from other devices is pulled on startup / tab focus (more-advanced position wins; while reading you get a toast — tap to move)</p><p style="font-size:12px;opacity:.6;">&nbsp;※ Drive features require HTTP/HTTPS server and Google Client ID configuration</p><br><p><strong>📚 Reading list</strong></p><p>&nbsp;When no book is open, the welcome screen shows a list of books in progress</p><p>&nbsp;Each card shows the cover, title, author, progress bar, and last read date</p><p>&nbsp;Tap "Open this file" on a card to pick the file and resume where you left off</p><p>&nbsp;When you reach the end of the last chapter, a "Finished" banner appears</p><p>&nbsp;"Back to reading list": close the book and return to the list (marked as completed)</p><p>&nbsp;"Stay": dismiss the banner and keep reading</p><p>&nbsp;"Close book" at the bottom of ⚙ Settings closes the book anytime (position is saved)</p><p>&nbsp;Tap "Edit" (top right of list) to enter edit mode; tap × on a card to remove it from the list</p><br><p><strong>📊 Reading Data</strong></p><p>&nbsp;Open reading stats from the 📊 toolbar button (or the welcome screen button)</p><p>&nbsp;Completion rate, finished / in-progress counts, top authors, recently finished (tap to reopen)</p><p>&nbsp;Total reading time, per-book time, reading speed, estimated time to finish (reflow only)</p><p>&nbsp;Reading streaks (day / week / month), reading calendar (heatmap), weekly / monthly pace</p><p style="font-size:12px;opacity:.6;">&nbsp;※ Time is measured for actual reading on this device only; with Drive auto-save it is combined across devices</p><br><p><strong>File formats</strong></p><p>&nbsp;.epub / .kepub (Kobo) supported. Both reflowable and fixed-layout (manga / magazine) books are auto-detected</p>',
+    'help.body':            '<p><strong>📱 Page scroll (main operation)</strong></p><p>&nbsp;Swipe left: scroll forward one page</p><p>&nbsp;Swipe right: scroll back one page</p><p>&nbsp;"Next" button (bottom) / "Prev" button (top)</p><p>&nbsp;※ Automatically advances chapter at boundaries</p><br><p><strong>📖 Chapter navigation (reflow only)</strong></p><p>&nbsp;"›" button (right): previous chapter</p><p>&nbsp;"‹" button (left): next chapter</p><br><p><strong>🔵 Bluetooth keyboard</strong></p><p>&nbsp;Space: forward　Shift+Space: back</p><p>&nbsp;← next chapter　→ previous chapter (reflow only)</p><br><p><strong>🎯 Page Jump (sidebar)</strong></p><p>&nbsp;Jump panel at the top of the sidebar (☰ Contents button)</p><p>&nbsp;Slider: drag to preview, release to jump</p><p>&nbsp;📖 Cover / -10 / +10 / 🏁 End buttons</p><p>&nbsp;Type a page number (or chapter # in reflow mode) and tap Go or press Enter</p><p>&nbsp;Previous position is saved to jump history (↩); tap to return</p><br><p><strong>🖼️ Manga / Magazine mode (FXL / Fixed Layout)</strong></p><p>&nbsp;Auto-detects pre-paginated ePubs; displays one image per page, fit to screen</p><p>&nbsp;iPad landscape shows two-page spreads automatically</p><p>&nbsp;Writing mode & font settings are disabled; use "Spread layout" in ⚙ settings (Auto / Single / Two-page)</p><p>&nbsp;Manga (RTL) displays the right page first; spread pairs are adjacent at the center</p><p>&nbsp;On iPhone, use the sidebar jump panel to navigate to cover / end / any page</p><br><p><strong>🔍 Panel zoom (FXL only)</strong></p><p>&nbsp;Toggle with the 🔍 toolbar button or double-tap the page.</p><p>&nbsp;Choose one of 4 modes in ⚙ "Zoom mode":</p><p>&nbsp;<b>Story manga</b> — 2×3 = 6 regions per page. Next walks TR→TL→MR→ML→BR→BL (5 taps then next page).</p><p>&nbsp;<b>4-panel manga</b> — Right column ×3 → left column ×3 (for 4-panel strips).</p><p>&nbsp;<b>Fit height, scroll H</b> (v1.8.4) — Best for vertical-text scans on portrait phones. Image fills viewport height; Next steps horizontally → top of next page at end.</p><p>&nbsp;<b>Fit width, scroll V</b> (v1.8.5) — Best for horizontal-text scans on landscape phones. Image fills viewport width; Next steps top → bottom → top of next page at end.</p><p>&nbsp;LTR books auto-mirror (toggle off via "Flip for LTR books"; 6-region modes only).</p><p>&nbsp;Drag to enter free pan (🌀). Tap the pill (🎯/↔/↕/🌀) to snap back / step to next region.</p><p>&nbsp;Keep dragging past the edge ("rubber band") to jump to next/prev page.</p><p>&nbsp;⚙ "Zoom level": 1.5x / 2.0x / 2.5x (6-region only; axis modes auto-compute).</p><p>&nbsp;Pair axis modes with fullscreen to remove all page margins.</p><br><p><strong>🔍 Full-text search (reflow only)</strong></p><p>&nbsp;Open sidebar (Contents button) → "Search" tab, type a keyword and press Enter</p><p>&nbsp;Tap a result to jump to that chapter (also recorded in jump history)</p><p>&nbsp;Image-based books (FXL) do not support full-text search</p><br><p><strong>🎨 Display settings (⚙ icon)</strong></p><p>&nbsp;Font: 22 options (Mincho, Gothic, Google Fonts, etc.) + add your own local fonts (.ttf/.otf/.woff/.woff2, up to 5, stored on this device and usable offline) — reflow only</p><p>&nbsp;Bold text: makes the whole body bold (uses a real Bold face when available) — reflow only</p><p>&nbsp;Outline weight: adds an outline to further strengthen text when Bold is ON (None / Light / Medium / Strong; ruby excluded) — reflow only</p><p>&nbsp;Theme: 8 colors (Standard, Sepia, White, Dark, Sakura, Starry Night, Matcha, Moonlit)</p><p>&nbsp;Font size, line height, margin, and writing mode — reflow only</p><p>&nbsp;Spread layout (FXL only): Auto / Single page / Two-page</p><br><p><strong>🔖 Bookmarks &amp; jump history</strong></p><p>&nbsp;Reading position is saved automatically. Sidebar TOC tab shows jump history.</p><p>&nbsp;📥 Local import　📤 Local export　☁↓ Drive load　☁↑ Drive save</p><p>&nbsp;⚙ "Auto-save bookmarks" ON: position is saved to Drive automatically and the latest position from other devices is pulled on startup / tab focus (more-advanced position wins; while reading you get a toast — tap to move)</p><p style="font-size:12px;opacity:.6;">&nbsp;※ Drive features require HTTP/HTTPS server and Google Client ID configuration</p><br><p><strong>📚 Reading list</strong></p><p>&nbsp;When no book is open, the welcome screen shows a list of books in progress</p><p>&nbsp;Each card shows the cover, title, author, progress bar, and last read date</p><p>&nbsp;Tap "Open this file" on a card to pick the file and resume where you left off</p><p>&nbsp;When you reach the end of the last chapter, a "Finished" banner appears</p><p>&nbsp;"Back to reading list": close the book and return to the list (marked as completed)</p><p>&nbsp;"Stay": dismiss the banner and keep reading</p><p>&nbsp;"Close book" at the bottom of ⚙ Settings closes the book anytime (position is saved)</p><p>&nbsp;Tap "Edit" (top right of list) to enter edit mode; tap × on a card to remove it from the list</p><br><p><strong>📊 Reading Data</strong></p><p>&nbsp;Open reading stats from the 📊 toolbar button (or the welcome screen button)</p><p>&nbsp;Completion rate, finished / in-progress counts, top authors, recently finished (tap to reopen)</p><p>&nbsp;Total reading time, per-book time, reading speed, estimated time to finish (reflow only)</p><p>&nbsp;Reading streaks (day / week / month), reading calendar (heatmap), weekly / monthly pace</p><p style="font-size:12px;opacity:.6;">&nbsp;※ Time is measured for actual reading on this device only; with Drive auto-save it is combined across devices</p><br><p><strong>File formats</strong></p><p>&nbsp;.epub / .kepub (Kobo) supported. Both reflowable and fixed-layout (manga / magazine) books are auto-detected</p>',
     'loading.fetching':     '📂 Fetching file…',
     'loading.opening':      'Opening "{filename}"…',
     'loading.unzipping':    '📦 Unzipping ePub…',
     'loading.parsing':      '📖 Building table of contents…',
     'loading.rendering':    '🎨 Preparing display…',
     'toast.webFontFile':    '☁ Web fonts may not display in offline or file:// environments',
+    'font.customGroup':     'Custom fonts',
+    'font.addCustom':       'Add a font',
+    'cf.deleteConfirm':     'Delete this font?',
+    'toast.cfInvalidType':  'Unsupported file format',
+    'toast.cfTooLarge':     'File is too large (max 20MB)',
+    'toast.cfLimitReached': 'Custom font limit reached. Please delete one first',
+    'toast.cfDuplicate':    'This font has already been added',
+    'toast.cfMissing':      'Font data not found. Reverted to the default font',
+    'toast.cfDeleted':      'Font deleted',
+    'toast.cfSaveFailed':   'Failed to save the font',
     'toast.resume':         '📖 Resumed from chapter {n} of {total}',
     'toast.fileMissing':    '⚠️ File not found: {path}',
     'toast.noBookmarks':    'No bookmarks to export',
@@ -1531,13 +1555,23 @@ const I18N = {
     'help.author':          '作者：{creator}',
     'help.chapters':        '章節數：{n}',
     'help.tocItems':        '目錄項目數：{n}',
-    'help.body':            '<p><strong>📱 頁面捲動（主要操作）</strong></p><p>　向左滑動：前進一頁</p><p>　向右滑動：後退一頁</p><p>　畫面下方「下一頁」・上方「上一頁」按鈕</p><p>　※章節末尾/開頭時自動切換章節</p><br><p><strong>📖 章節切換（僅限流式排版）</strong></p><p>　右側「›」按鈕：上一章</p><p>　左側「‹」按鈕：下一章</p><br><p><strong>🔵 藍牙鍵盤</strong></p><p>　空白鍵：前進　Shift+空白：後退</p><p>　← 下一章　→ 上一章（僅限流式排版）</p><br><p><strong>🎯 頁面跳轉（側邊欄）</strong></p><p>　側邊欄（☰ 目錄按鈕）最上方的「跳轉」面板</p><p>　滑桿：拖曳預覽並跳至任意位置</p><p>　📖 封面 / -10 / +10 / 🏁 末頁 四個按鈕</p><p>　輸入頁碼（流式排版為章節號）後按 Go 或 Enter</p><p>　跳轉前位置自動記錄於跳轉歷史（↩），點選即可返回</p><br><p><strong>🖼️ 漫畫・雜誌模式（FXL / Fixed Layout）</strong></p><p>　自動偵測 pre-paginated ePub，每頁單張圖片等比縮放顯示</p><p>　iPad 橫向畫面自動顯示跨頁（兩頁並排）</p><p>　書寫方向・字型等設定停用，改以⚙設定「跨頁顯示」切換自動/單頁/跨頁</p><p>　漫畫（RTL）依右頁起始顯示，跨頁時於畫面中央相鄰</p><p>　iPhone 可透過☰→跳轉面板瀏覽封面・末頁・任意頁</p><br><p><strong>🔍 分格閱讀縮放（僅 FXL）</strong></p><p>　工具列🔍按鈕 或 雙擊頁面 開啟／關閉</p><p>　⚙「縮放模式」可選 4 種：</p><p>　<b>故事型漫畫</b>＝單頁劃分為 2欄×3列=6個區域，Next 按右上→左上→右中→左中→右下→左下 順序（5次到達下一頁）</p><p>　<b>四格漫畫</b>＝右欄3個→左欄3個 順序（縱向四格用）</p><p>　<b>配合高度・橫向捲動</b>（v1.8.4）＝直立手機 × 直書紙本掃描最佳。圖像縱向填滿，Next 橫向捲動，到末端跳至下一頁開頭</p><p>　<b>配合寬度・縱向捲動</b>（v1.8.5）＝橫向手機 × 橫書紙本掃描最佳。圖像橫向填滿，Next 上→下捲動，到末端跳至下一頁開頭</p><p>　LTR 書籍自動左右反轉（可於⚙關閉，僅 6 區域模式）</p><p>　拖曳進入🌀自由模式，右下膠囊（🎯/↔/↕/🌀）點擊回到預設/下個區域</p><p>　邊緣再拉（橡皮筋）跳至下一／前一頁</p><p>　⚙「縮放倍率」：1.5x / 2.0x / 2.5x（僅 6 區域模式，軸模式自動計算）</p><p>　軸模式搭配全螢幕可消除上下／左右邊距</p><br><p><strong>🔍 全文搜尋（僅限流式排版）</strong></p><p>　側邊欄（目錄按鈕）→「搜尋」索引標籤，輸入關鍵字後按 Enter</p><p>　點擊結果即可跳轉至該章（同時記錄於跳轉歷史）</p><p>　圖片格式書籍（FXL）無法使用全文搜尋</p><br><p><strong>🎨 顯示設定（⚙圖示）</strong></p><p>　字型：22 種（明朝體・黑體・Google Fonts 等）※僅限流式排版</p><p>　主題：8 色（標準・棕褐・白紙・暗色・櫻花・星空・抹茶・月夜）</p><p>　字型大小・行距・邊距・書寫方向 ※僅限流式排版</p><p>　跨頁顯示（僅 FXL）：自動 / 單頁 / 跨頁</p><br><p><strong>🔖 書籤・跳轉歷史</strong></p><p>　閱讀位置自動記錄。側邊欄目錄索引標籤可查看跳轉歷史</p><p>　📥 本機匯入　📤 本機匯出　☁↓ Drive 載入　☁↑ Drive 儲存</p><p>　⚙設定「自動儲存書籤」開啟：自動將閱讀位置儲存至 Drive，並於啟動・切回分頁時自動取得其他裝置的最新位置（採用較前進的位置；閱讀中以提示通知→點擊跳轉）</p><p style="font-size:12px;opacity:.6;">　※ Drive 功能需透過 HTTP/HTTPS 伺服器啟動並設定 Google Client ID</p><br><p><strong>📚 閱讀中清單</strong></p><p>　未開啟書籍時，歡迎畫面顯示正在閱讀的書籍清單</p><p>　書卡顯示封面、書名、作者、進度列及最後閱讀日期</p><p>　點選書卡右下角「開啟此檔案」，選擇檔案後從上次位置繼續閱讀</p><p>　讀到最後一章末尾時，畫面下方會出現讀完提示橫幅</p><p>　「回到閱讀清單」：關閉書籍並返回清單（標記為已讀完並自動移除）</p><p>　「繼續閱讀」：關閉橫幅，繼續閱讀</p><p>　⚙ 設定面板底部的「關閉書籍」可隨時返回清單（自動儲存閱讀位置）</p><p>　點選清單右上角「編輯」進入編輯模式，點選書卡 × 可從清單移除</p><br><p><strong>📊 閱讀數據</strong></p><p>　工具列📊按鈕（或歡迎畫面按鈕）顯示閱讀統計</p><p>　讀完率・讀完本數・閱讀中本數／常讀作者／最近讀完（點擊重新開啟）</p><p>　累計閱讀時間・每本閱讀時間・閱讀速度・預計讀完時間（流式排版）</p><p>　連續閱讀（日／週／月）・閱讀日曆（草圖）・每週／每月閱讀步調</p><p style="font-size:12px;opacity:.6;">　※ 閱讀時間僅計算本裝置的實際閱讀；開啟 Drive 自動儲存後可跨裝置合計同步</p><br><p><strong>支援格式</strong></p><p>　.epub / .kepub（Kobo）。流式排版與固定版式（漫畫・雜誌）均自動偵測</p>',
+    'help.body':            '<p><strong>📱 頁面捲動（主要操作）</strong></p><p>　向左滑動：前進一頁</p><p>　向右滑動：後退一頁</p><p>　畫面下方「下一頁」・上方「上一頁」按鈕</p><p>　※章節末尾/開頭時自動切換章節</p><br><p><strong>📖 章節切換（僅限流式排版）</strong></p><p>　右側「›」按鈕：上一章</p><p>　左側「‹」按鈕：下一章</p><br><p><strong>🔵 藍牙鍵盤</strong></p><p>　空白鍵：前進　Shift+空白：後退</p><p>　← 下一章　→ 上一章（僅限流式排版）</p><br><p><strong>🎯 頁面跳轉（側邊欄）</strong></p><p>　側邊欄（☰ 目錄按鈕）最上方的「跳轉」面板</p><p>　滑桿：拖曳預覽並跳至任意位置</p><p>　📖 封面 / -10 / +10 / 🏁 末頁 四個按鈕</p><p>　輸入頁碼（流式排版為章節號）後按 Go 或 Enter</p><p>　跳轉前位置自動記錄於跳轉歷史（↩），點選即可返回</p><br><p><strong>🖼️ 漫畫・雜誌模式（FXL / Fixed Layout）</strong></p><p>　自動偵測 pre-paginated ePub，每頁單張圖片等比縮放顯示</p><p>　iPad 橫向畫面自動顯示跨頁（兩頁並排）</p><p>　書寫方向・字型等設定停用，改以⚙設定「跨頁顯示」切換自動/單頁/跨頁</p><p>　漫畫（RTL）依右頁起始顯示，跨頁時於畫面中央相鄰</p><p>　iPhone 可透過☰→跳轉面板瀏覽封面・末頁・任意頁</p><br><p><strong>🔍 分格閱讀縮放（僅 FXL）</strong></p><p>　工具列🔍按鈕 或 雙擊頁面 開啟／關閉</p><p>　⚙「縮放模式」可選 4 種：</p><p>　<b>故事型漫畫</b>＝單頁劃分為 2欄×3列=6個區域，Next 按右上→左上→右中→左中→右下→左下 順序（5次到達下一頁）</p><p>　<b>四格漫畫</b>＝右欄3個→左欄3個 順序（縱向四格用）</p><p>　<b>配合高度・橫向捲動</b>（v1.8.4）＝直立手機 × 直書紙本掃描最佳。圖像縱向填滿，Next 橫向捲動，到末端跳至下一頁開頭</p><p>　<b>配合寬度・縱向捲動</b>（v1.8.5）＝橫向手機 × 橫書紙本掃描最佳。圖像橫向填滿，Next 上→下捲動，到末端跳至下一頁開頭</p><p>　LTR 書籍自動左右反轉（可於⚙關閉，僅 6 區域模式）</p><p>　拖曳進入🌀自由模式，右下膠囊（🎯/↔/↕/🌀）點擊回到預設/下個區域</p><p>　邊緣再拉（橡皮筋）跳至下一／前一頁</p><p>　⚙「縮放倍率」：1.5x / 2.0x / 2.5x（僅 6 區域模式，軸模式自動計算）</p><p>　軸模式搭配全螢幕可消除上下／左右邊距</p><br><p><strong>🔍 全文搜尋（僅限流式排版）</strong></p><p>　側邊欄（目錄按鈕）→「搜尋」索引標籤，輸入關鍵字後按 Enter</p><p>　點擊結果即可跳轉至該章（同時記錄於跳轉歷史）</p><p>　圖片格式書籍（FXL）無法使用全文搜尋</p><br><p><strong>🎨 顯示設定（⚙圖示）</strong></p><p>　字型：22 種（明朝體・黑體・Google Fonts 等）＋ 可新增本機字型（.ttf/.otf/.woff/.woff2，最多 5 個・儲存於本裝置並可離線使用）※僅限流式排版</p><p>　粗體顯示：將整篇內文加粗（若有實際 Bold 字重則使用）※僅限流式排版</p><p>　描邊強度：粗體開啟時為文字加上描邊以進一步強調（無/弱/中/強；不含注音）※僅限流式排版</p><p>　主題：8 色（標準・棕褐・白紙・暗色・櫻花・星空・抹茶・月夜）</p><p>　字型大小・行距・邊距・書寫方向 ※僅限流式排版</p><p>　跨頁顯示（僅 FXL）：自動 / 單頁 / 跨頁</p><br><p><strong>🔖 書籤・跳轉歷史</strong></p><p>　閱讀位置自動記錄。側邊欄目錄索引標籤可查看跳轉歷史</p><p>　📥 本機匯入　📤 本機匯出　☁↓ Drive 載入　☁↑ Drive 儲存</p><p>　⚙設定「自動儲存書籤」開啟：自動將閱讀位置儲存至 Drive，並於啟動・切回分頁時自動取得其他裝置的最新位置（採用較前進的位置；閱讀中以提示通知→點擊跳轉）</p><p style="font-size:12px;opacity:.6;">　※ Drive 功能需透過 HTTP/HTTPS 伺服器啟動並設定 Google Client ID</p><br><p><strong>📚 閱讀中清單</strong></p><p>　未開啟書籍時，歡迎畫面顯示正在閱讀的書籍清單</p><p>　書卡顯示封面、書名、作者、進度列及最後閱讀日期</p><p>　點選書卡右下角「開啟此檔案」，選擇檔案後從上次位置繼續閱讀</p><p>　讀到最後一章末尾時，畫面下方會出現讀完提示橫幅</p><p>　「回到閱讀清單」：關閉書籍並返回清單（標記為已讀完並自動移除）</p><p>　「繼續閱讀」：關閉橫幅，繼續閱讀</p><p>　⚙ 設定面板底部的「關閉書籍」可隨時返回清單（自動儲存閱讀位置）</p><p>　點選清單右上角「編輯」進入編輯模式，點選書卡 × 可從清單移除</p><br><p><strong>📊 閱讀數據</strong></p><p>　工具列📊按鈕（或歡迎畫面按鈕）顯示閱讀統計</p><p>　讀完率・讀完本數・閱讀中本數／常讀作者／最近讀完（點擊重新開啟）</p><p>　累計閱讀時間・每本閱讀時間・閱讀速度・預計讀完時間（流式排版）</p><p>　連續閱讀（日／週／月）・閱讀日曆（草圖）・每週／每月閱讀步調</p><p style="font-size:12px;opacity:.6;">　※ 閱讀時間僅計算本裝置的實際閱讀；開啟 Drive 自動儲存後可跨裝置合計同步</p><br><p><strong>支援格式</strong></p><p>　.epub / .kepub（Kobo）。流式排版與固定版式（漫畫・雜誌）均自動偵測</p>',
     'loading.fetching':     '📂 正在取得檔案…',
     'loading.opening':      '正在開啟「{filename}」…',
     'loading.unzipping':    '📦 正在解壓 ePub…',
     'loading.parsing':      '📖 正在建立目錄…',
     'loading.rendering':    '🎨 正在準備顯示…',
     'toast.webFontFile':    '☁ 離線或 file:// 環境下，網路字型可能無法顯示',
+    'font.customGroup':     '自訂字型',
+    'font.addCustom':       '新增字型',
+    'cf.deleteConfirm':     '確定要刪除這個字型嗎？',
+    'toast.cfInvalidType':  '不支援的檔案格式',
+    'toast.cfTooLarge':     '檔案太大（上限 20MB）',
+    'toast.cfLimitReached': '自訂字型已達上限，請先刪除一個',
+    'toast.cfDuplicate':    '這個字型已經新增過了',
+    'toast.cfMissing':      '找不到字型資料，已還原為預設字型',
+    'toast.cfDeleted':      '已刪除字型',
+    'toast.cfSaveFailed':   '字型儲存失敗',
     'toast.resume':         '📖 從第 {n} 章（共 {total} 章）繼續閱讀',
     'toast.fileMissing':    '⚠️ 找不到檔案：{path}',
     'toast.noBookmarks':    '沒有可匯出的書籤',
@@ -1756,13 +1790,23 @@ const I18N = {
     'help.author':          '作者：{creator}',
     'help.chapters':        '章节数：{n}',
     'help.tocItems':        '目录项目数：{n}',
-    'help.body':            '<p><strong>📱 页面滚动（主要操作）</strong></p><p>　向左滑动：前进一页</p><p>　向右滑动：后退一页</p><p>　画面下方「下一页」・上方「上一页」按钮</p><p>　※章节末尾/开头时自动切换章节</p><br><p><strong>📖 章节切换（仅限流式排版）</strong></p><p>　右侧「›」按钮：上一章</p><p>　左侧「‹」按钮：下一章</p><br><p><strong>🔵 蓝牙键盘</strong></p><p>　空格键：前进　Shift+空格：后退</p><p>　← 下一章　→ 上一章（仅限流式排版）</p><br><p><strong>🎯 页面跳转（侧边栏）</strong></p><p>　侧边栏（☰ 目录按钮）最上方的「跳转」面板</p><p>　滑块：拖动预览并跳至任意位置</p><p>　📖 封面 / -10 / +10 / 🏁 末页 四个按钮</p><p>　输入页码（流式排版为章节号）后按 Go 或 Enter</p><p>　跳转前位置自动记录于跳转历史（↩），点击即可返回</p><br><p><strong>🖼️ 漫画・杂志模式（FXL / Fixed Layout）</strong></p><p>　自动检测 pre-paginated ePub，每页单张图片等比缩放显示</p><p>　iPad 横向画面自动显示跨页（两页并排）</p><p>　书写方向・字体等设置停用，改以⚙设置「跨页显示」切换自动/单页/跨页</p><p>　漫画（RTL）依右页起始显示，跨页时于画面中央相邻</p><p>　iPhone 可通过☰→跳转面板浏览封面・末页・任意页</p><br><p><strong>🔍 分格阅读缩放（仅 FXL）</strong></p><p>　工具栏🔍按钮 或 双击页面 开启/关闭</p><p>　⚙「缩放模式」可选 4 种：</p><p>　<b>故事型漫画</b>＝单页划分为 2列×3行=6个区域，Next 按右上→左上→右中→左中→右下→左下 顺序（5次到达下一页）</p><p>　<b>四格漫画</b>＝右列3个→左列3个 顺序（纵向四格用）</p><p>　<b>适合高度·横向滚动</b>（v1.8.4）＝竖持手机 × 竖排纸本扫描最佳。图像纵向填满，Next 横向滚动，到末端跳至下一页开头</p><p>　<b>适合宽度·纵向滚动</b>（v1.8.5）＝横放手机 × 横排纸本扫描最佳。图像横向填满，Next 上→下滚动，到末端跳至下一页开头</p><p>　LTR 书籍自动左右反转（可于⚙关闭，仅 6 区域模式）</p><p>　拖动进入🌀自由模式，右下胶囊（🎯/↔/↕/🌀）点击回到预设/下个区域</p><p>　边缘再拉（橡皮筋）跳至下一／前一页</p><p>　⚙「缩放倍率」：1.5x / 2.0x / 2.5x（仅 6 区域模式，轴模式自动计算）</p><p>　轴模式搭配全屏可消除上下／左右边距</p><br><p><strong>🔍 全文搜索（仅限流式排版）</strong></p><p>　侧边栏（目录按钮）→「搜索」选项卡，输入关键词后按 Enter</p><p>　点击结果即可跳转至该章（同时记录于跳转历史）</p><p>　图片格式书籍（FXL）无法使用全文搜索</p><br><p><strong>🎨 显示设置（⚙图标）</strong></p><p>　字体：22 种（明朝体・黑体・Google Fonts 等）※仅限流式排版</p><p>　主题：8 色（标准・棕褐・白纸・深色・樱花・星空・抹茶・月夜）</p><p>　字体大小・行距・边距・书写方向 ※仅限流式排版</p><p>　跨页显示（仅 FXL）：自动 / 单页 / 跨页</p><br><p><strong>🔖 书签・跳转历史</strong></p><p>　阅读位置自动记录。侧边栏目录选项卡可查看跳转历史</p><p>　📥 本地导入　📤 本地导出　☁↓ Drive 加载　☁↑ Drive 保存</p><p>　⚙设置「自动保存书签」开启：自动将阅读位置保存至 Drive，并在启动・切回标签页时自动获取其他设备的最新位置（采用更前进的位置；阅读中以提示通知→点击跳转）</p><p style="font-size:12px;opacity:.6;">　※ Drive 功能需通过 HTTP/HTTPS 服务器启动并配置 Google Client ID</p><br><p><strong>📚 阅读中列表</strong></p><p>　未打开书籍时，欢迎页面显示正在阅读的书籍列表</p><p>　书卡显示封面、书名、作者、进度条及最后阅读日期</p><p>　点击书卡右下角「打开此文件」，选择文件后从上次位置继续阅读</p><p>　读到最后一章末尾时，画面下方会出现读完提示横幅</p><p>　「回到阅读列表」：关闭书籍并返回列表（标记为已读完并自动移除）</p><p>　「继续阅读」：关闭横幅，继续阅读</p><p>　⚙ 设置面板底部的「关闭书籍」可随时返回列表（自动保存阅读位置）</p><p>　点击列表右上角「编辑」进入编辑模式，点击书卡 × 可从列表中删除</p><br><p><strong>📊 阅读数据</strong></p><p>　工具栏📊按钮（或欢迎页面按钮）显示阅读统计</p><p>　读完率・读完本数・阅读中本数／常读作者／最近读完（点击重新打开）</p><p>　累计阅读时间・每本阅读时间・阅读速度・预计读完时间（流式排版）</p><p>　连续阅读（日／周／月）・阅读日历（草图）・每周／每月阅读节奏</p><p style="font-size:12px;opacity:.6;">　※ 阅读时间仅计算本设备的实际阅读；开启 Drive 自动保存后可跨设备合计同步</p><br><p><strong>支持格式</strong></p><p>　.epub / .kepub（Kobo）。流式排版与固定版式（漫画・杂志）均自动检测</p>',
+    'help.body':            '<p><strong>📱 页面滚动（主要操作）</strong></p><p>　向左滑动：前进一页</p><p>　向右滑动：后退一页</p><p>　画面下方「下一页」・上方「上一页」按钮</p><p>　※章节末尾/开头时自动切换章节</p><br><p><strong>📖 章节切换（仅限流式排版）</strong></p><p>　右侧「›」按钮：上一章</p><p>　左侧「‹」按钮：下一章</p><br><p><strong>🔵 蓝牙键盘</strong></p><p>　空格键：前进　Shift+空格：后退</p><p>　← 下一章　→ 上一章（仅限流式排版）</p><br><p><strong>🎯 页面跳转（侧边栏）</strong></p><p>　侧边栏（☰ 目录按钮）最上方的「跳转」面板</p><p>　滑块：拖动预览并跳至任意位置</p><p>　📖 封面 / -10 / +10 / 🏁 末页 四个按钮</p><p>　输入页码（流式排版为章节号）后按 Go 或 Enter</p><p>　跳转前位置自动记录于跳转历史（↩），点击即可返回</p><br><p><strong>🖼️ 漫画・杂志模式（FXL / Fixed Layout）</strong></p><p>　自动检测 pre-paginated ePub，每页单张图片等比缩放显示</p><p>　iPad 横向画面自动显示跨页（两页并排）</p><p>　书写方向・字体等设置停用，改以⚙设置「跨页显示」切换自动/单页/跨页</p><p>　漫画（RTL）依右页起始显示，跨页时于画面中央相邻</p><p>　iPhone 可通过☰→跳转面板浏览封面・末页・任意页</p><br><p><strong>🔍 分格阅读缩放（仅 FXL）</strong></p><p>　工具栏🔍按钮 或 双击页面 开启/关闭</p><p>　⚙「缩放模式」可选 4 种：</p><p>　<b>故事型漫画</b>＝单页划分为 2列×3行=6个区域，Next 按右上→左上→右中→左中→右下→左下 顺序（5次到达下一页）</p><p>　<b>四格漫画</b>＝右列3个→左列3个 顺序（纵向四格用）</p><p>　<b>适合高度·横向滚动</b>（v1.8.4）＝竖持手机 × 竖排纸本扫描最佳。图像纵向填满，Next 横向滚动，到末端跳至下一页开头</p><p>　<b>适合宽度·纵向滚动</b>（v1.8.5）＝横放手机 × 横排纸本扫描最佳。图像横向填满，Next 上→下滚动，到末端跳至下一页开头</p><p>　LTR 书籍自动左右反转（可于⚙关闭，仅 6 区域模式）</p><p>　拖动进入🌀自由模式，右下胶囊（🎯/↔/↕/🌀）点击回到预设/下个区域</p><p>　边缘再拉（橡皮筋）跳至下一／前一页</p><p>　⚙「缩放倍率」：1.5x / 2.0x / 2.5x（仅 6 区域模式，轴模式自动计算）</p><p>　轴模式搭配全屏可消除上下／左右边距</p><br><p><strong>🔍 全文搜索（仅限流式排版）</strong></p><p>　侧边栏（目录按钮）→「搜索」选项卡，输入关键词后按 Enter</p><p>　点击结果即可跳转至该章（同时记录于跳转历史）</p><p>　图片格式书籍（FXL）无法使用全文搜索</p><br><p><strong>🎨 显示设置（⚙图标）</strong></p><p>　字体：22 种（明朝体・黑体・Google Fonts 等）＋ 可添加本地字体（.ttf/.otf/.woff/.woff2，最多 5 个・保存于本设备并可离线使用）※仅限流式排版</p><p>　粗体显示：将整篇正文加粗（若有实际 Bold 字重则使用）※仅限流式排版</p><p>　描边强度：粗体开启时为文字添加描边以进一步强调（无/弱/中/强；不含拼音）※仅限流式排版</p><p>　主题：8 色（标准・棕褐・白纸・深色・樱花・星空・抹茶・月夜）</p><p>　字体大小・行距・边距・书写方向 ※仅限流式排版</p><p>　跨页显示（仅 FXL）：自动 / 单页 / 跨页</p><br><p><strong>🔖 书签・跳转历史</strong></p><p>　阅读位置自动记录。侧边栏目录选项卡可查看跳转历史</p><p>　📥 本地导入　📤 本地导出　☁↓ Drive 加载　☁↑ Drive 保存</p><p>　⚙设置「自动保存书签」开启：自动将阅读位置保存至 Drive，并在启动・切回标签页时自动获取其他设备的最新位置（采用更前进的位置；阅读中以提示通知→点击跳转）</p><p style="font-size:12px;opacity:.6;">　※ Drive 功能需通过 HTTP/HTTPS 服务器启动并配置 Google Client ID</p><br><p><strong>📚 阅读中列表</strong></p><p>　未打开书籍时，欢迎页面显示正在阅读的书籍列表</p><p>　书卡显示封面、书名、作者、进度条及最后阅读日期</p><p>　点击书卡右下角「打开此文件」，选择文件后从上次位置继续阅读</p><p>　读到最后一章末尾时，画面下方会出现读完提示横幅</p><p>　「回到阅读列表」：关闭书籍并返回列表（标记为已读完并自动移除）</p><p>　「继续阅读」：关闭横幅，继续阅读</p><p>　⚙ 设置面板底部的「关闭书籍」可随时返回列表（自动保存阅读位置）</p><p>　点击列表右上角「编辑」进入编辑模式，点击书卡 × 可从列表中删除</p><br><p><strong>📊 阅读数据</strong></p><p>　工具栏📊按钮（或欢迎页面按钮）显示阅读统计</p><p>　读完率・读完本数・阅读中本数／常读作者／最近读完（点击重新打开）</p><p>　累计阅读时间・每本阅读时间・阅读速度・预计读完时间（流式排版）</p><p>　连续阅读（日／周／月）・阅读日历（草图）・每周／每月阅读节奏</p><p style="font-size:12px;opacity:.6;">　※ 阅读时间仅计算本设备的实际阅读；开启 Drive 自动保存后可跨设备合计同步</p><br><p><strong>支持格式</strong></p><p>　.epub / .kepub（Kobo）。流式排版与固定版式（漫画・杂志）均自动检测</p>',
     'loading.fetching':     '📂 正在获取文件…',
     'loading.opening':      '正在打开「{filename}」…',
     'loading.unzipping':    '📦 正在解压 ePub…',
     'loading.parsing':      '📖 正在建立目录…',
     'loading.rendering':    '🎨 正在准备显示…',
     'toast.webFontFile':    '☁ 离线或 file:// 环境下，网络字体可能无法显示',
+    'font.customGroup':     '自定义字体',
+    'font.addCustom':       '添加字体',
+    'cf.deleteConfirm':     '确定要删除这个字体吗？',
+    'toast.cfInvalidType':  '不支持的文件格式',
+    'toast.cfTooLarge':     '文件太大（上限 20MB）',
+    'toast.cfLimitReached': '自定义字体已达上限，请先删除一个',
+    'toast.cfDuplicate':    '这个字体已经添加过了',
+    'toast.cfMissing':      '找不到字体数据，已还原为默认字体',
+    'toast.cfDeleted':      '已删除字体',
+    'toast.cfSaveFailed':   '字体保存失败',
     'toast.resume':         '📖 从第 {n} 章（共 {total} 章）继续阅读',
     'toast.fileMissing':    '⚠️ 找不到文件：{path}',
     'toast.noBookmarks':    '没有可导出的书签',
@@ -1966,6 +2010,7 @@ const state = {
   fwdBtnSize:'small',      // 'small' | 'medium' | 'large'
   fontBold:false,          // 太字表示トグル（epub_settings に永続化）
   fontStrokeLevel:0,       // 縁取りの強さ 0=なし/1=弱/2=中/3=強（epub_settings に永続化）
+  customFonts:[],          // ローカルフォント メタ配列（epub_custom_fonts から起動時ロード。1-A）
   sidebarOpen:false,
   bookKey:'',
   driveFileId:null,      // epub_bookmarks.json の Drive ファイルID（ページ滞在中キャッシュ）
@@ -2214,6 +2259,172 @@ _idbGetAllKeys().then(keys => {
 }).catch(() => {});
 if (navigator.storage && navigator.storage.persist) {
   navigator.storage.persist().catch(() => {});
+}
+
+// ══════════════════════════════════════════
+//  カスタムフォント（1-A）: ローカル .ttf/.otf/.woff/.woff2 を IDB(ArrayBuffer)に保存し、
+//  フォントピッカーに追加して本文に適用する。http(s) は Blob URL、file:// は data URI で
+//  @font-face 埋め込み。Drive 同期・しおりエクスポートには含めない（端末ローカル機能）。
+// ══════════════════════════════════════════
+const CF_DB_NAME    = 'epub_viewer_fonts';
+const CF_STORE_NAME = 'fonts';
+const CF_MAX_COUNT  = 5;                 // 保持できる件数上限
+const CF_MAX_SIZE   = 20 * 1024 * 1024;  // 1ファイルあたりの上限（20MB）
+let _cfBlobUrlCache = new Map();          // id → blob: URL（http(s) 用・タブ寿命）
+let _cfDataUriCache = new Map();          // id → data URI（file:// フォールバック・直近1件のみ）
+let _cfPreviewRegistered = new Set();     // FontFace 登録済み id（プレビュー用・二重登録防止）
+let _cfIdbAvailable = true;               // false なら全操作 no-op（Private Browsing 等）
+
+function _cfIdbOpen() {
+  return new Promise((resolve, reject) => {
+    if (!_cfIdbAvailable || !window.indexedDB) { _cfIdbAvailable = false; reject(new Error('idb unavailable')); return; }
+    let req;
+    try { req = indexedDB.open(CF_DB_NAME, 1); }
+    catch(e) { _cfIdbAvailable = false; reject(e); return; }
+    req.onupgradeneeded = ev => {
+      const db = ev.target.result;
+      if (!db.objectStoreNames.contains(CF_STORE_NAME)) db.createObjectStore(CF_STORE_NAME);
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror   = () => { _cfIdbAvailable = false; reject(req.error); };
+  });
+}
+function _cfIdbGet(id) {
+  return _cfIdbOpen().then(db => new Promise((resolve, reject) => {
+    const tx = db.transaction(CF_STORE_NAME, 'readonly');
+    const req = tx.objectStore(CF_STORE_NAME).get(id);
+    req.onsuccess = () => resolve(req.result || null);
+    req.onerror   = () => reject(req.error);
+  })).catch(() => null);
+}
+// 追加時のみ reject を呼び出し側へ伝播（cfHandleFile が toast.cfSaveFailed を出す）
+function _cfIdbPut(id, value) {
+  return _cfIdbOpen().then(db => new Promise((resolve, reject) => {
+    const tx = db.transaction(CF_STORE_NAME, 'readwrite');
+    const req = tx.objectStore(CF_STORE_NAME).put(value, id);
+    req.onsuccess = () => resolve();
+    req.onerror   = () => reject(req.error);
+    tx.onerror    = () => reject(tx.error);
+  }));
+}
+function _cfIdbDelete(id) {
+  return _cfIdbOpen().then(db => new Promise((resolve, reject) => {
+    const tx = db.transaction(CF_STORE_NAME, 'readwrite');
+    const req = tx.objectStore(CF_STORE_NAME).delete(id);
+    req.onsuccess = () => resolve();
+    req.onerror   = () => reject(req.error);
+  })).catch(() => {});
+}
+
+// メタ配列（localStorage・軽量）。バイナリは持たない。
+function cfLoadMeta() {
+  try {
+    const arr = JSON.parse(localStorage.getItem('epub_custom_fonts'));
+    if (Array.isArray(arr))
+      state.customFonts = arr.filter(f => f && typeof f.id === 'string' && typeof f.name === 'string');
+  } catch (e) { /* 破損時は空のまま */ }
+}
+function cfSaveMeta() {
+  try { localStorage.setItem('epub_custom_fonts', JSON.stringify(state.customFonts)); }
+  catch (e) { notifyStorageError(); }
+}
+
+// マジックバイト判定（拡張子偽装・壊れファイル・.ttc を追加時点で検出）
+async function cfSniffFormat(file) {
+  try {
+    const u32 = new DataView(await file.slice(0, 4).arrayBuffer()).getUint32(0); // big-endian
+    if (u32 === 0x00010000 || u32 === 0x74727565) return 'ttf';   // sfnt 1.0 / 'true'
+    if (u32 === 0x4F54544F) return 'otf';    // 'OTTO'
+    if (u32 === 0x774F4646) return 'woff';   // 'wOFF'
+    if (u32 === 0x774F4632) return 'woff2';  // 'wOF2'
+  } catch (e) { /* 読み取り失敗 → null 扱い */ }
+  return null;   // 'ttcf'(.ttc) 等の未対応形式を含む
+}
+
+// @font-face src:url() に入れる文字列を返す。http(s)=Blob URL、file://=data URI。
+async function cfGetFontSrc(id) {
+  if (location.protocol !== 'file:') {
+    if (_cfBlobUrlCache.has(id)) return _cfBlobUrlCache.get(id);
+    const rec = await _cfIdbGet(id);
+    if (!rec || !rec.buf) return null;
+    const url = URL.createObjectURL(new Blob([rec.buf], {type: rec.mime || 'font/ttf'}));
+    _cfBlobUrlCache.set(id, url);
+    return url;
+  }
+  if (_cfDataUriCache.has(id)) return _cfDataUriCache.get(id);
+  const rec = await _cfIdbGet(id);
+  if (!rec || !rec.buf) return null;
+  const blob = new Blob([rec.buf], {type: rec.mime || 'font/ttf'});
+  const dataUri = await new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result);
+    r.onerror = rej;
+    r.readAsDataURL(blob);
+  });
+  _cfDataUriCache.clear();          // 27MB級文字列の多重保持を避ける：直近1件のみ
+  _cfDataUriCache.set(id, dataUri);
+  return dataUri;
+}
+
+// ピッカープレビュー用に親ドキュメントへ FontFace 登録（fire-and-forget・失敗は無視）
+async function cfRegisterPreviewFace(id) {
+  if (_cfPreviewRegistered.has(id)) return;
+  try {
+    const src = await cfGetFontSrc(id);
+    if (!src) return;
+    const fam = 'CustomFont_' + id;
+    const face = new FontFace(fam, 'url(' + src + ')');
+    await face.load();
+    document.fonts.add(face);
+    _cfPreviewRegistered.add(id);
+  } catch (e) { /* プレビュー登録失敗は致命的でない */ }
+}
+
+async function cfHandleFile(file) {
+  if (!file) return;
+  if (!_cfIdbAvailable) { showToast(t('toast.cfSaveFailed')); return; }
+  if (!/\.(ttf|otf|woff2?)$/i.test(file.name)) { showToast(t('toast.cfInvalidType')); return; }
+  if (!(await cfSniffFormat(file)))            { showToast(t('toast.cfInvalidType')); return; }
+  if (state.customFonts.some(f => f.name === file.name && f.size === file.size))
+                                               { showToast(t('toast.cfDuplicate')); return; }
+  if (file.size > CF_MAX_SIZE)                 { showToast(t('toast.cfTooLarge')); return; }
+  if (state.customFonts.length >= CF_MAX_COUNT){ showToast(t('toast.cfLimitReached')); return; }
+  const id = 'cf_' + (crypto.randomUUID
+    ? crypto.randomUUID().replace(/-/g, '').slice(0, 12)
+    : Date.now().toString(36) + Math.random().toString(36).slice(2, 8));
+  const addedAt = new Date().toISOString();
+  try {
+    const buf = await file.arrayBuffer();
+    await _cfIdbPut(id, { buf, mime: file.type || 'font/ttf', fileName: file.name, addedAt });
+  } catch (e) {
+    console.warn('custom font save failed:', e);
+    showToast(t('toast.cfSaveFailed'));
+    return;
+  }
+  state.customFonts.push({ id, name: file.name, size: file.size, addedAt });
+  cfSaveMeta();
+  cfRegisterPreviewFace(id);        // プレビュー登録（fire-and-forget）
+  selectFont('custom:' + id);       // 即適用（closeFontPicker + changeFont → 再レンダー）
+  buildFontPickerList();
+}
+
+function confirmDeleteCustomFont(id) {
+  if (!confirm(t('cf.deleteConfirm'))) return;
+  cfDeleteFont(id);
+}
+async function cfDeleteFont(id) {
+  await _cfIdbDelete(id);
+  state.customFonts = state.customFonts.filter(f => f.id !== id);
+  cfSaveMeta();
+  const bu = _cfBlobUrlCache.get(id);
+  if (bu) { URL.revokeObjectURL(bu); _cfBlobUrlCache.delete(id); }
+  _cfDataUriCache.delete(id);
+  _cfPreviewRegistered.delete(id);
+  if (state.fontMode === 'custom:' + id) {
+    changeFont('gothic');           // 選択中フォント削除時のフォールバック
+    showToast(t('toast.cfDeleted'));
+  }
+  buildFontPickerList();
 }
 
 // LRU: excludeKey 以外で lastOpenedAt が最古のエントリを 1 件削除し、その bookKey を返す。
@@ -2738,7 +2949,24 @@ async function buildSrcdoc(xhtmlText, xhtmlAbsPath, scrollTarget, readySeq) {
   // iOS Safari の iframe 内では scroll API が動作しないため、
   // body を position:fixed + writing-mode:vertical-rl にして
   // body.style.transform = translateX(tx) でコンテンツを横移動させる。
-  const font   = FONTS[state.fontMode];
+  let font = FONTS[state.fontMode], fontFaceRule = '';
+  if (state.fontMode.indexOf('custom:') === 0) {
+    // ローカルフォント（1-A）: IDB 実体を Blob URL / file:// では data URI で @font-face 埋め込み
+    const cfId = state.fontMode.slice(7);
+    const cfSrc = await cfGetFontSrc(cfId);
+    if (cfSrc) {
+      const fam = 'CustomFont_' + cfId;
+      fontFaceRule = "@font-face{font-family:'" + fam + "';src:url(" + cfSrc + ");font-display:swap;}\n";
+      font = "'" + fam + "'";
+    } else {
+      // 実体欠損（削除済み/破損/IDB消去）→ 恒久フォールバック。changeFont は renderPage を再帰するため使わない。
+      state.fontMode = 'gothic';
+      saveSettings();
+      updateFontPickerUI();
+      font = FONTS['gothic'];
+      showToast(t('toast.cfMissing'));
+    }
+  }
   const colors = THEME_CONTENT[state.theme] || THEME_CONTENT[''];
   const paper  = colors.paper;
   const text   = colors.text;
@@ -2771,7 +2999,7 @@ async function buildSrcdoc(xhtmlText, xhtmlAbsPath, scrollTarget, readySeq) {
         'min-height:100vh!important;max-height:none!important;';
   const overrideStyle = doc.createElement('style');
   overrideStyle.id = 'epub-viewer-inject';
-  overrideStyle.textContent = fontImport + [
+  overrideStyle.textContent = fontImport + fontFaceRule + [
     'html{height:100%!important;overflow:hidden!important;writing-mode:horizontal-tb!important;',
         '-webkit-text-size-adjust:100%!important;text-size-adjust:100%!important;',
         'margin:0!important;padding:0!important;',
@@ -2833,20 +3061,30 @@ function buildScrollScript(scrollTarget, writingMode, readySeq) {
   });`;
 
   const INIT_FN = `
+  function fixTcy(){
+    // WebKit/Chrome は縦書き初回レイアウトで text-combine-upright(縦中横)を左寄せに誤配置する。
+    // visibility の反転だけではレイアウトが dirty にならず(再ペイントのみ)ジオメトリが再計算されない。
+    // letter-spacing を微小変更→復帰して実レイアウトを2回強制し、2回目(復帰値)の正しい配置で確定させる。
+    // hide→show を同一タスク内で行うため無ちらつき。
+    var _d = document.documentElement, _b = document.body;
+    if(!_b) return;
+    _d.style.visibility = 'hidden';
+    var _ls = _b.style.letterSpacing;
+    _b.style.letterSpacing = '0.01px'; _d.offsetWidth;
+    _b.style.letterSpacing = _ls; _d.offsetWidth;
+    _d.style.visibility = '';
+  }
   function init(){
     var _initApplied = false;
     function runApplyInit(){
       if(_initApplied) return;
       _initApplied = true;
       applyInit();
-      // Fix WebKit text-combine-upright initial-paint misposition in vertical writing mode.
-      // Same pattern as yomikake.html SHARED_TAIL: visibility hide + layout flush forces
-      // WebKit to re-resolve tcy span positions before the next paint.
-      var _d = document.documentElement;
-      _d.style.visibility = 'hidden';
-      _d.offsetWidth;
-      _d.style.visibility = '';
+      fixTcy();
       window.parent.postMessage({type:'EPUB_READY',seq:${readySeq}},'*');
+      // 追加是正: 初回ペイント後(double-rAF)とフォント遅延ロード後にも縦中横を再確定。
+      requestAnimationFrame(function(){ requestAnimationFrame(fixTcy); });
+      if(document.fonts && document.fonts.ready) document.fonts.ready.then(fixTcy);
     }
     function run(){
       // double-rAF: iPhoneでは十分。iPadは500msフォールバックで再測定。
@@ -4541,6 +4779,21 @@ function buildFontPickerList() {
     }
   }
 
+  // カスタムフォント（1-A）: 動的セクション＋追加行
+  html += '<div class="fp-group-header">' + esc(t('font.customGroup')) + '</div>';
+  for (const cf of state.customFonts) {
+    const key = 'custom:' + cf.id;
+    const sel = state.fontMode === key ? ' fp-selected' : '';
+    html += '<div class="fp-item' + sel + '" onclick="selectFont(\'' + key + '\')">' +
+      '<span class="fp-name">' + esc(cf.name) + '</span>' +
+      '<span class="fp-sample" style="font-family:\'CustomFont_' + esc(cf.id) + '\'">' + esc(sample) + '</span>' +
+      '<button class="fp-del-btn" data-id="' + esc(cf.id) + '" ' +
+        'onclick="event.stopPropagation();confirmDeleteCustomFont(this.dataset.id)">✕</button>' +
+      '</div>';
+  }
+  html += '<div class="fp-item fp-add-custom" onclick="event.stopPropagation();document.getElementById(\'custom-font-input\').click()">' +
+    '+ ' + esc(t('font.addCustom')) + '</div>';
+
   list.innerHTML = html;
 }
 
@@ -4549,7 +4802,16 @@ function toggleFontPicker() {
   const btn  = document.getElementById('font-picker-btn');
   const open = list.classList.toggle('open');
   btn.setAttribute('aria-expanded', open ? 'true' : 'false');
-  if (open) buildFontPickerList();
+  if (open) {
+    buildFontPickerList();
+    // カスタムフォント（1-A）: 未登録のプレビュー FontFace を遅延ロードし、完了後に再描画
+    const pending = state.customFonts.filter(cf => !_cfPreviewRegistered.has(cf.id));
+    if (pending.length) {
+      Promise.all(pending.map(cf => cfRegisterPreviewFace(cf.id))).then(() => {
+        if (list.classList.contains('open')) buildFontPickerList();
+      });
+    }
+  }
 }
 
 function closeFontPicker() {
@@ -4571,6 +4833,14 @@ function selectFont(key) {
 function updateFontPickerUI() {
   const label = document.getElementById('font-picker-label');
   if (!label) return;
+  // カスタムフォント（1-A）: FONT_GROUPS には無いので先に解決（生キー表示を防ぐ）
+  if (state.fontMode.indexOf('custom:') === 0) {
+    const cf = state.customFonts.find(f => 'custom:' + f.id === state.fontMode);
+    label.textContent = cf ? cf.name : t('font.customGroup');
+    label.style.fontFamily = cf ? "'CustomFont_" + cf.id + "'" : '';
+    if (document.getElementById('font-picker-list').classList.contains('open')) buildFontPickerList();
+    return;
+  }
   let name = state.fontMode;
   for (const group of FONT_GROUPS) {
     if (group.key === state.fontMode) {
@@ -6044,6 +6314,12 @@ function exportBookmarks() {
   showToast(t('toast.exported', {count}));
 }
 
+document.getElementById('custom-font-input').addEventListener('change', e => {
+  const f = e.target.files && e.target.files[0];
+  e.target.value = '';   // 同一ファイルの再選択でも change を発火させる
+  cfHandleFile(f);
+});
+
 document.getElementById('bookmark-input').addEventListener('change', e => {
   const file = e.target.files[0];
   e.target.value = '';
@@ -6869,6 +7145,7 @@ document.addEventListener('visibilitychange', () => {
 window.addEventListener('pagehide', () => { _rdFlush(); flushAutoSave(); });
 
 // Init
+cfLoadMeta();   // loadSettings() より前（custom: 選択中のラベル解決に state.customFonts が必要）
 initLang();
 applyI18n();
 loadSettings();
@@ -6879,6 +7156,8 @@ updateFontStrokeRowUI();
 showResumeBanner();
 updateThemeBtnUI();
 loadPreviewFonts();
+// カスタムフォント選択中ならプレビュー FontFace をウォームアップ（ラベル書体＋IDBキャッシュ温め）
+if (state.fontMode.indexOf('custom:') === 0) cfRegisterPreviewFace(state.fontMode.slice(7));
 
 document.getElementById('search-input').addEventListener('keydown', e => {
   if (e.key === 'Enter') { e.preventDefault(); startSearch(); }
