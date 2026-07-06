@@ -130,7 +130,7 @@ doDeleteBook・clear での台帳同期。実機：4 冊目でも「⚡すぐ開
 | `manifest.webmanifest` | PC/Android 用（`yomikake.html` が参照）。`share_target` 宣言を含む |
 | `manifest_ios.webmanifest` | iOS 用（`yomikake_ios.html` が参照）。share_target なし |
 | `sw.js` | 共有 POST の受領＋アプリシェルのオフラインキャッシュ |
-| `icon-192.png` / `icon-512.png` / `icon-512-maskable.png` / `apple-touch-icon.png`(180px) | インストール要件のアイコン。温白背景 `#fdf8f0` に濃茶の「読」1 文字（明朝）のフラットデザイン。生成スクリプトは一度きりの使い捨てで PNG のみコミット |
+| `icon-192.png` / `icon-512.png` / `icon-512-maskable.png` / `apple-touch-icon.png`(180px) | インストール要件のアイコン。**作者自作フォントの「読」1 文字**（温白背景 `#f8f6f2`）。マスター画像 `myfont-icon-512.png` を PIL で各サイズにリサイズ生成。maskable はグリフを 0.88 倍に縮小配置してセーフゾーン内（半対角 ≒37% < 40%）に収める |
 
 > **「2 ファイル構成」からの変更点**はこの 7 ファイル追加のみ。ビルドステップは引き続き無し。
 > `file://`・未インストール・SW 非対応環境では従来動作のまま（すべて漸進的強化）。
@@ -239,15 +239,18 @@ const SHELL = ['./yomikake.html', './yomikake_ios.html',
 | 巨大マンガの共有 | 数百 MB の File の IDB put が一拍かかるが、SW 内で完結するので UI は既存 Loading オーバーレイが吸収 |
 | `.webmanifest` の MIME | サーバーが `application/manifest+json` を返さない場合は Chrome が警告することがある。ayati.com で問題が出たら `manifest.json` に改名（`link` の href 変更のみ） |
 
-### 3.7 Phase 2 チェックリスト
+### 3.7 Phase 2 チェックリスト（✅ 実装済み 2026-07-06・未コミット）
 
-- [ ] `manifest.webmanifest` / `manifest_ios.webmanifest` 新規作成
-- [ ] アイコン 4 点生成・コミット
-- [ ] `sw.js` 新規作成（share-receive / network-first シェル / VERSION 管理）
-- [ ] `yomikake.html`: link/meta 追加・SW 登録・shared=1 受取り・PK ヘッダ検証・i18n 2 キー ×4 言語
-- [ ] `yomikake_ios.html`: link/meta 追加・SW 登録のみ
-- [ ] README: インストール手順（Android/iOS）・共有から開く手順・iOS ストレージ別枠の注意・SW 再登録の注意
-- [ ] CLAUDE.md: 新ファイル構成・SW の役割・「2 ファイル＋PWA 資産」への記述更新
+- [x] `manifest.webmanifest` / `manifest_ios.webmanifest` 新規作成
+- [x] アイコン 4 点生成（**作者自作フォントの「読」** マスター `myfont-icon-512.png` を PIL でリサイズ・maskable は 0.88 倍でセーフゾーン内）
+- [x] `sw.js` 新規作成（share-receive / network-first シェル / VERSION 管理）
+- [x] `yomikake.html`: link/meta 追加・SW 登録・shared=1 受取り（`_shareIdbTake`＋鮮度10分ガード）・PK ヘッダ検証・i18n 2 キー ×4 言語
+- [x] `yomikake_ios.html`: link/meta 追加・SW 登録＋**PK 検証と i18n も追加**（loadEpub 同期のため。共有受信は入れない）
+- [x] README: インストール手順（Android/iOS）・共有から開く手順・iOS ストレージ別枠・SW 再登録の注意・配置ファイル表
+- [x] CLAUDE.md: 新ファイル構成・SW の役割・「2 ファイル＋PWA 資産」への記述更新
+- [x] **ヘルプ画面（help.body）に「📲 アプリとして入れる」節を追加**（4言語×2ファイル・ファイル形式節の直前・Android Chrome/iOS Safari の手順を番号付きで平易に。PC版は Android 先頭・iOS版は iOS 先頭に並べ替え）
+
+**実装メモ**：`Response.redirect` はスコープ基準の絶対URL（`new URL('yomikake.html?shared=1', self.registration.scope)`）で構築。共有IDBは `epub_viewer_share`/`pending`/key`'file'`（ePubキャッシュ `epub_viewer_files` とは別DB）。PK検証は設計では yomikake.html のみだったが、loadEpub は両ファイル共通関数のため iOS 版にも入れて同期（i18n 2キーも両方）。構文チェック（HTML内JS×2・sw.js `node --check`・manifest JSON）全OK・URL構築/PKロジック/共有IDBキー一致を確認。**実機テスト（§3.7 の 7 項目）は未実施**。
 
 テスト観点（実機必須）：
 1. Android: Chrome メニューに「アプリをインストール」が出る／インストール後、
