@@ -1240,7 +1240,7 @@ const I18N = {
     'cache.group':          '📂 ePub キャッシュ',
     'cache.summary':        '{count}冊 / {size}',
     'cache.summaryEmpty':   'キャッシュ無し',
-    'cache.help':           '直近の ePub をローカルに保存し、ピッカー無しで再開できます',
+    'cache.help':           '直近の ePub（最大20冊・約300MBまで）をローカルに保存し、ピッカー無しで再開できます',
     'cache.clearBtn':       'クリア',
     'cache.confirmClear':   'ePub キャッシュを全て削除します。読書位置・しおりは保持されます。続行しますか？',
     'cache.cleared':        '🗑 キャッシュを削除しました',
@@ -1477,7 +1477,7 @@ const I18N = {
     'cache.group':          '📂 ePub cache',
     'cache.summary':        '{count} book(s) / {size}',
     'cache.summaryEmpty':   'No cached files',
-    'cache.help':           'Stores recent ePub files locally so you can resume without the picker',
+    'cache.help':           'Stores recent ePub files locally (up to 20 books / ~300 MB) so you can resume without the picker',
     'cache.clearBtn':       'Clear',
     'cache.confirmClear':   'Remove all cached ePub files? Reading positions and bookmarks are kept. Continue?',
     'cache.cleared':        '🗑 Cache cleared',
@@ -1714,7 +1714,7 @@ const I18N = {
     'cache.group':          '📂 ePub 快取',
     'cache.summary':        '{count} 本 / {size}',
     'cache.summaryEmpty':   '無快取',
-    'cache.help':           '將近期 ePub 儲存於本地，無需檔案選擇器即可重新開啟',
+    'cache.help':           '將近期 ePub（最多20本・約300MB）儲存於本地，無需檔案選擇器即可重新開啟',
     'cache.clearBtn':       '清除',
     'cache.confirmClear':   '將清除所有快取的 ePub 檔案。閱讀位置與書籤會保留。是否繼續？',
     'cache.cleared':        '🗑 已清除快取',
@@ -1951,7 +1951,7 @@ const I18N = {
     'cache.group':          '📂 ePub 缓存',
     'cache.summary':        '{count} 本 / {size}',
     'cache.summaryEmpty':   '无缓存',
-    'cache.help':           '将近期 ePub 保存在本地，无需文件选择器即可重新打开',
+    'cache.help':           '将近期 ePub（最多20本・约300MB）保存在本地，无需文件选择器即可重新打开',
     'cache.clearBtn':       '清除',
     'cache.confirmClear':   '将清除所有缓存的 ePub 文件。阅读位置与书签会保留。是否继续？',
     'cache.cleared':        '🗑 已清除缓存',
@@ -2206,9 +2206,33 @@ const STROKE_WIDTHS = { 1: '0.02em', 2: '0.035em', 3: '0.05em' };
 // ══════════════════════════════════════════
 const EPUB_CACHE_DB    = 'epub_viewer_files';
 const EPUB_CACHE_STORE = 'files';
-const EPUB_CACHE_LIMIT = 3;             // 保持する最大件数
+const EPUB_CACHE_LIMIT     = 20;        // 保持する最大件数（v2.5.0: 3→20。件数と容量の二重制限）
+const EPUB_CACHE_BUDGET_MB = 300;       // 総容量バジェット（MB）。超過したら古い順に LRU 削除
+const EPUB_CACHE_INDEX_KEY = 'epub_cache_index'; // localStorage: {bookKey:{size}} サイズ台帳（容量判定用・IDBは触らない）
+// ※ i18n 'cache.help' に「最大20冊・約300MB」を明記しているため、上記2定数を変えたら文言も更新すること
 let _cachedKeys   = new Set();          // bookKey → IDB に Blob あり
 let _idbAvailable = true;               // false なら全関数 no-op（Private Browsing 等）
+
+// ── ePub キャッシュのサイズ台帳（localStorage・容量バジェット判定用。IDB スキーマは変更しない）──
+function _cacheIdxLoad() { try { return JSON.parse(localStorage.getItem(EPUB_CACHE_INDEX_KEY)) || {}; } catch (e) { return {}; } }
+function _cacheIdxSave(m) { try { localStorage.setItem(EPUB_CACHE_INDEX_KEY, JSON.stringify(m)); } catch (e) {} }
+function _cacheIdxSet(bookKey, size) { const m = _cacheIdxLoad(); m[bookKey] = { size: (+size || 0) }; _cacheIdxSave(m); }
+function _cacheIdxRemove(bookKey) { const m = _cacheIdxLoad(); if (bookKey in m) { delete m[bookKey]; _cacheIdxSave(m); } }
+// _cachedKeys に載っているキーの合計サイズ（excludeKey を除く）。台帳に無いキーは 0 扱い
+function _cacheIdxTotal(excludeKey) { const m = _cacheIdxLoad(); let s = 0; for (const k of _cachedKeys) { if (k === excludeKey) continue; s += (+((m[k] || {}).size) || 0); } return s; }
+// 起動時に IDB 実キーと台帳を突き合わせる（台帳のみ→削除／IDBのみ→size:0で仮登録し後で backfill）
+function _cacheIdxReconcile(idbKeys) {
+  const set = new Set(idbKeys), m = _cacheIdxLoad(); let ch = false;
+  for (const k in m) if (!set.has(k)) { delete m[k]; ch = true; }
+  for (const k of idbKeys) if (!(k in m)) { m[k] = { size: 0 }; ch = true; }
+  if (ch) _cacheIdxSave(m);
+}
+// キャッシュ書込み前に「もう1件 evict すべきか」判定（純関数・単体テスト用に分離）
+function _cacheNeedsEvict(othersSize, cacheCount, isUpdate, newSize, limit, budgetBytes) {
+  const overCount  = !isUpdate && cacheCount >= limit;
+  const overBudget = othersSize + newSize > budgetBytes;
+  return overCount || overBudget;
+}
 
 function _idbOpenCache() {
   return new Promise((resolve, reject) => {
@@ -2242,6 +2266,7 @@ function _idbPut(bookKey, value) {
   }));
 }
 function _idbDelete(bookKey) {
+  _cacheIdxRemove(bookKey);   // サイズ台帳も掃除（全削除経路をここに集約）
   return _idbOpenCache().then(db => new Promise((resolve, reject) => {
     const tx = db.transaction(EPUB_CACHE_STORE, 'readwrite');
     const req = tx.objectStore(EPUB_CACHE_STORE).delete(bookKey);
@@ -2258,6 +2283,7 @@ function _idbGetAllKeys() {
   })).catch(() => []);
 }
 function _idbClear() {
+  try { localStorage.removeItem(EPUB_CACHE_INDEX_KEY); } catch (e) {}   // サイズ台帳も全消去
   return _idbOpenCache().then(db => new Promise((resolve, reject) => {
     const tx = db.transaction(EPUB_CACHE_STORE, 'readwrite');
     const req = tx.objectStore(EPUB_CACHE_STORE).clear();
@@ -2269,6 +2295,7 @@ function _idbClear() {
 // 起動時に IDB の既存キーを取り込み、persistent storage を要求
 _idbGetAllKeys().then(keys => {
   _cachedKeys = new Set(keys);
+  _cacheIdxReconcile(keys);   // サイズ台帳を IDB 実キーと突き合わせ
   // 既に welcome 画面にリストが描画済みの場合はバッジ反映のため再描画
   if (!state.epub && document.getElementById('reading-list')) buildReadingList();
   updateCacheGroupUI();
@@ -2469,12 +2496,12 @@ async function evictOldestEpubCache(excludeKey) {
 async function cacheEpubFile(file, bookKey) {
   if (!_idbAvailable || !file || !bookKey) return;
   try {
-    // 上限超過なら先に LRU 削除
-    if (!_cachedKeys.has(bookKey)) {
-      while (_cachedKeys.size >= EPUB_CACHE_LIMIT) {
-        const evicted = await evictOldestEpubCache(bookKey);
-        if (!evicted) break;
-      }
+    // 二重制限（件数 EPUB_CACHE_LIMIT・総容量 EPUB_CACHE_BUDGET_MB）超過なら古い順に LRU 削除。
+    // 今開いた本(bookKey)は exclude して最優先で残す（単体でバジェット超過でもキャッシュする）。
+    const newSize = +file.size || 0;
+    const budgetBytes = EPUB_CACHE_BUDGET_MB * 1048576;
+    while (_cacheNeedsEvict(_cacheIdxTotal(bookKey), _cachedKeys.size, _cachedKeys.has(bookKey), newSize, EPUB_CACHE_LIMIT, budgetBytes)) {
+      if (!await evictOldestEpubCache(bookKey)) break;   // これ以上 evict 不可（残るは bookKey 自身）→ そのまま保存
     }
     // iOS Safari は IDB に保存した Blob/File の実体を後で失う既知バグ（取り出した Blob を読むと
     // "The object can not be found here." が発生）がある。バイト列を ArrayBuffer として保存すれば
@@ -2491,14 +2518,16 @@ async function cacheEpubFile(file, bookKey) {
     try {
       await _idbPut(bookKey, value);
       _cachedKeys.add(bookKey);
+      _cacheIdxSet(bookKey, value.size);
     } catch (e) {
       if (e && e.name === 'QuotaExceededError') {
-        // 1 件削除してリトライ
-        const evicted = await evictOldestEpubCache(bookKey);
-        if (evicted) {
-          await _idbPut(bookKey, value);
-          _cachedKeys.add(bookKey);
+        // 実クォータ超過: evict できる限りループしてリトライ（バジェットより実クォータが小さい端末対策）
+        let saved = false;
+        while (await evictOldestEpubCache(bookKey)) {
+          try { await _idbPut(bookKey, value); _cachedKeys.add(bookKey); _cacheIdxSet(bookKey, value.size); saved = true; break; }
+          catch (e2) { if (!(e2 && e2.name === 'QuotaExceededError')) throw e2; }
         }
+        if (!saved) console.warn('[cache] quota exceeded, gave up caching');
       } else {
         throw e;
       }
@@ -5474,11 +5503,13 @@ async function loadEpubFromCache(bookKey) {
     let data = cached && (cached.buf || cached.blob);
     if (!cached || !data) {
       _cachedKeys.delete(bookKey);
+      _cacheIdxRemove(bookKey);
       hideLoading();
       showToast(t('toast.cacheLoadFailed'));
       openFilePicker();
       return;
     }
+    if (cached.size) _cacheIdxSet(bookKey, cached.size);  // 旧エントリのサイズを台帳へ backfill（起動時 size:0 の是正）
     // 旧 Blob エントリ（iOS で実体が失効している可能性あり）は読めるか検証しつつ ArrayBuffer 化する。
     // 失効していれば arrayBuffer() が throw し、下の catch でピッカーへフォールバックする。
     if (!(data instanceof ArrayBuffer)) data = await data.arrayBuffer();
