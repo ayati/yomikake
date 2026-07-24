@@ -618,6 +618,11 @@
     #toolbar.tb-overflow { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent); }
     #book-title { display:none; }
     #settings-popover { right:8px; width:calc(100vw - 16px); }
+    /* 読みかけリスト（リスト表示）: 狭い縦画面では下段を縦積みし、残り時間/サイトバッジと
+       「開く」ボタンが重なるのを防ぐ（PC・横長・グリッド表示は従来どおり横並び） */
+    #reading-list-items:not(.view-grid) .rl-meta { flex-direction:column; align-items:stretch; gap:6px; }
+    #reading-list-items:not(.view-grid) .rl-meta-left { flex-wrap:wrap; row-gap:4px; }
+    #reading-list-items:not(.view-grid) .rl-open-btn { align-self:flex-end; }
   }
 
   /* ── フルスクリーン ── */
@@ -1129,6 +1134,9 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 //  4. 発行された Client ID を下記定数に貼り付ける
 //  ※ file:// オリジンは Google OAuth 非対応のため HTTP/HTTPS サーバー必須
 // ══════════════════════════════════════════
+// アプリ版数の単一ソース（表示・更新検知用）。sw.js の VERSION と git タグに一致させる。
+// リリース時は scripts/release.sh が両 HTML と sw.js を一括で書き換えるため手動更新は不要。
+const APP_VERSION = '2.10.1';
 const GOOGLE_CLIENT_ID = '491729394813-3dm1apv1do4pmcsv1mpgdq26ji2iavdr.apps.googleusercontent.com';  // ← ここに Client ID を貼り付ける
 
 let _driveToken       = null;  // OAuth アクセストークン（メモリのみ、XSS対策でlocalStorage非使用）
@@ -1297,6 +1305,7 @@ const I18N = {
     'toast.noBookmarks':    '書き出せるしおりがありません',
     'toast.exported':       '📤 {count}冊分のしおりを書き出しました',
     'toast.imported':       '📥 {count}冊分のしおりを読み込みました',
+    'toast.updated':        '✨ yomikake を v{version} に更新しました',
     'toast.localJumped':    '📥 しおりを読み込み、第{n}章に移動しました',
     'toast.storageError':   '⚠️ しおり・設定の保存に失敗しました（ストレージ容量不足の可能性）',
     'toast.resumeHint':     '同じファイル「{title}」を開いてください',
@@ -1579,6 +1588,7 @@ const I18N = {
     'toast.noBookmarks':    'No bookmarks to export',
     'toast.exported':       '📤 Exported {count} bookmark(s)',
     'toast.imported':       '📥 Imported {count} bookmark(s)',
+    'toast.updated':        '✨ Updated yomikake to v{version}',
     'toast.localJumped':    '📥 Bookmarks imported — jumped to chapter {n}',
     'toast.storageError':   '⚠️ Failed to save (storage may be full)',
     'toast.resumeHint':     'Please open "{title}"',
@@ -1861,6 +1871,7 @@ const I18N = {
     'toast.noBookmarks':    '沒有可匯出的書籤',
     'toast.exported':       '📤 已匯出 {count} 本書的書籤',
     'toast.imported':       '📥 已匯入 {count} 本書的書籤',
+    'toast.updated':        '✨ yomikake 已更新至 v{version}',
     'toast.localJumped':    '📥 已匯入書籤，跳轉至第 {n} 章',
     'toast.storageError':   '⚠️ 儲存失敗（可能儲存空間不足）',
     'toast.resumeHint':     '請開啟「{title}」',
@@ -2143,6 +2154,7 @@ const I18N = {
     'toast.noBookmarks':    '没有可导出的书签',
     'toast.exported':       '📤 已导出 {count} 本书的书签',
     'toast.imported':       '📥 已导入 {count} 本书的书签',
+    'toast.updated':        '✨ yomikake 已更新至 v{version}',
     'toast.localJumped':    '📥 已导入书签，跳转至第 {n} 章',
     'toast.storageError':   '⚠️ 保存失败（可能存储空间不足）',
     'toast.resumeHint':     '请打开「{title}」',
@@ -8409,7 +8421,8 @@ function updateHelpContent() {
     '<button onclick="closeModal(true); showNavHint();" style="margin-top:10px;width:100%;border:1px solid var(--ui-border);border-radius:8px;padding:7px 14px;font-size:13px;font-weight:600;cursor:pointer;background:transparent;color:inherit;">' + esc(t('help.showTapGuide')) + '</button>',
     '</div>',
   ].join('') : '';
-  document.getElementById('modal-body').innerHTML = bookInfo + t('help.body');
+  const verLine = '<p style="font-size:11px;opacity:.45;margin:0 0 14px;letter-spacing:.02em;">yomikake v' + esc(APP_VERSION) + '</p>';
+  document.getElementById('modal-body').innerHTML = verLine + bookInfo + t('help.body');
 }
 function showHelp() {
   updateHelpContent();
@@ -8541,6 +8554,15 @@ if (state.driveAutoSave) driveSyncPull({ force: true });
 // iOS Safari は Web Share Target 非対応のため共有受信コードは持たない。シェルキャッシュの恩恵のみ。
 if ('serviceWorker' in navigator && location.protocol.startsWith('http'))
   navigator.serviceWorker.register('sw.js').catch(() => {});
+
+// アプリ更新の可視化: SW はサイレント自動更新（skipWaiting）。版数が変わっていたら
+// 次回ロード時に一度だけトーストで知らせる。初回インストールは無音（比較対象なし）。
+try {
+  const _prevVer = localStorage.getItem('epub_app_version');
+  if (_prevVer && _prevVer !== APP_VERSION)
+    setTimeout(() => showToast(t('toast.updated', {version: APP_VERSION})), 800);
+  if (_prevVer !== APP_VERSION) localStorage.setItem('epub_app_version', APP_VERSION);
+} catch (e) {}
 
 </script>
 </body>

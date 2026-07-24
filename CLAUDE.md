@@ -32,7 +32,7 @@ Two-file ePub 3 vertical-text viewer for reading Japanese publications. No build
 - Keyboard shortcuts (Space/arrows/Home/End): both files support Bluetooth keyboard; `yomikake_ios.html` also handles touch swipe inside the iframe
 - Toolbar mouse-wheel scroll: `yomikake.html` only
 - Google Drive bookmark sync: both files (requires HTTP server — Google Identity Services does not work on `file://`)
-- Release tags follow `vX.Y.Z` convention (`git tag vX.Y.Z && git push --tags`)
+- Release tags follow `vX.Y.Z` convention. **リリースは `scripts/release.sh <X.Y.Z>` に集約**（版数を単一ソース化）: `const APP_VERSION`（**両 HTML**）と `sw.js` の `VERSION`（`yomikake-shell-vX.Y.Z`）を一括で書き換え → 一致検証 → `release: vX.Y.Z` コミット → タグ → push → GitHub Release。`--notes-file` / `--title` / `--yes` / `--no-release` 対応。手で版数を触る必要はない。`scripts/install-hooks.sh` で入れる `pre-push` フックが「3箇所の版数＝タグ」を検査（非ブロック）。**版数表示**: ヘルプモーダル冒頭に `yomikake vX.Y.Z`（`APP_VERSION`）を常時表示。**更新通知**: SW はサイレント自動更新（`skipWaiting`）のまま、Init で `APP_VERSION` と `localStorage.epub_app_version` を比較し、変化時のみ `toast.updated` を一度表示（初回は無音・`file://` でも動作）。両ファイル共通。
 
 ## Development
 
@@ -272,6 +272,7 @@ Both files support **4 languages**: `ja` (Japanese), `en` (English), `zh-TW` (Tr
 | `epub_lang` | selected UI language (`ja` / `en` / `zh-TW` / `zh-CN`) |
 | `epub_consolidate_v1` | one-shot flag set after `consolidateBookmarks()` runs once at startup |
 | `epub_tap_guide_v1` | one-shot flag set after the tap guide has been shown once (v2.8.0) |
+| `epub_app_version` | last-seen `APP_VERSION`; on load, a change (and non-empty prior) fires the `toast.updated` "updated to vX.Y.Z" toast once (v2.10.1). First install stores silently. |
 
 Bookmark key uses OPF title + creator (v1.8.11+, was title + spineCount before). The new scheme means **the same Web 連載 novel re-downloaded with more chapters is recognised as the same book** — re-opening the new file resumes from the last-read position. Moving or renaming the file does not break saved positions either. `makeBookKey(title, creator)` and `parseBookKey(key)` are the single source of truth for key construction/parsing; both files use double underscore (`__`) as separator since title may contain single underscores. `parseBookKey()` handles both formats — new (`...__{creator}`) and legacy (`..._{spineCount}`) — by checking for `__` first.
 

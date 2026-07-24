@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+#
+# 版数ガード: vX.Y.Z タグを push する際、APP_VERSION（両 HTML）と sw.js の VERSION が
+# タグと一致するかを確認して警告する（不一致でも push はブロックしない）。
+#
+# 導入: scripts/install-hooks.sh を一度実行する。
+#
+set -uo pipefail
+ROOT="$(git rev-parse --show-toplevel)"
+
+tag_ver=""
+while read -r _l _ls remote_ref _rs; do
+  case "$remote_ref" in refs/tags/v[0-9]*) tag_ver="${remote_ref#refs/tags/v}";; esac
+done
+[ -n "$tag_ver" ] || exit 0
+
+a1="$(grep -oP "const APP_VERSION\s*=\s*'\K[^']*" "$ROOT/yomikake.html" 2>/dev/null | head -1)"
+a2="$(grep -oP "const APP_VERSION\s*=\s*'\K[^']*" "$ROOT/yomikake_ios.html" 2>/dev/null | head -1)"
+sv="$(grep -oP "yomikake-shell-v\K[^']*" "$ROOT/sw.js" 2>/dev/null | head -1)"
+
+if [ "$a1" != "$tag_ver" ] || [ "$a2" != "$tag_ver" ] || [ "$sv" != "$tag_ver" ]; then
+  echo "" >&2
+  echo "⚠️  版数がタグ v$tag_ver と一致しません:" >&2
+  echo "     yomikake.html APP_VERSION = $a1" >&2
+  echo "     yomikake_ios.html APP_VERSION = $a2" >&2
+  echo "     sw.js VERSION = $sv" >&2
+  echo "   通常は scripts/release.sh $tag_ver で3箇所を一括更新します（push はブロックしません）。" >&2
+  echo "" >&2
+fi
+exit 0
