@@ -68,6 +68,8 @@
   .btn-group span { display:flex; align-items:center; justify-content:center; padding:0 8px; font-size:13px; font-weight:500; border-left:1px solid var(--ui-border); border-right:1px solid var(--ui-border); min-width:54px; color:var(--ui-text); }
   
   .theme-options { display:grid; grid-template-columns:repeat(4,32px); gap:6px; }
+  /* OS テーマ連動：明/暗のテーマ指定は連動ON中のみ出す */
+  body:not(.theme-auto-on) .theme-auto-only { display:none; }
   .theme-btn { width:32px; height:32px; border-radius:50%; border:2px solid var(--ui-border); cursor:pointer; transition:transform .15s; display:flex; align-items:center; justify-content:center; }
   .theme-btn:hover { transform:scale(1.1); }
   .theme-btn.active { border-color:var(--accent); }
@@ -759,6 +761,37 @@
           <div class="theme-btn tb-tsuki"  onclick="changeTheme('tsuki')"  data-i18n-title="theme.tsuki" ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
         </div>
       </div>
+      <div class="set-row">
+        <span class="set-label" data-i18n="settings.themeAuto">OS のテーマに連動</span>
+        <button id="theme-auto-toggle" onclick="toggleThemeAuto()"
+                style="border:1px solid var(--ui-border);border-radius:8px;padding:6px 16px;min-width:60px;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;">OFF</button>
+      </div>
+      <div class="set-row theme-auto-only">
+        <span class="set-label" data-i18n="settings.themeLight">明るいとき</span>
+        <select class="modern-select" id="theme-light-select" onchange="changeAutoTheme('light', this.value)">
+          <option value=""       data-i18n="theme.std">標準</option>
+          <option value="sepia"  data-i18n="theme.sepia">セピア</option>
+          <option value="white"  data-i18n="theme.white">白紙</option>
+          <option value="dark"   data-i18n="theme.dark">ダーク</option>
+          <option value="sakura" data-i18n="theme.sakura">さくら</option>
+          <option value="hoshi"  data-i18n="theme.hoshi">星空</option>
+          <option value="matcha" data-i18n="theme.matcha">抹茶</option>
+          <option value="tsuki"  data-i18n="theme.tsuki">月夜</option>
+        </select>
+      </div>
+      <div class="set-row theme-auto-only">
+        <span class="set-label" data-i18n="settings.themeDark">暗いとき</span>
+        <select class="modern-select" id="theme-dark-select" onchange="changeAutoTheme('dark', this.value)">
+          <option value=""       data-i18n="theme.std">標準</option>
+          <option value="sepia"  data-i18n="theme.sepia">セピア</option>
+          <option value="white"  data-i18n="theme.white">白紙</option>
+          <option value="dark"   data-i18n="theme.dark">ダーク</option>
+          <option value="sakura" data-i18n="theme.sakura">さくら</option>
+          <option value="hoshi"  data-i18n="theme.hoshi">星空</option>
+          <option value="matcha" data-i18n="theme.matcha">抹茶</option>
+          <option value="tsuki"  data-i18n="theme.tsuki">月夜</option>
+        </select>
+      </div>
     </div>
 
     <div class="set-group fxl-hide-group">
@@ -1214,6 +1247,9 @@ const I18N = {
     'settings.language':    '言語 / Language',
     'settings.color':       'カラー',
     'settings.theme':       'テーマ',
+    'settings.themeAuto':   'OS のテーマに連動',
+    'settings.themeLight':  '明るいとき',
+    'settings.themeDark':   '暗いとき',
     'theme.std':            '標準',
     'theme.sepia':          'セピア',
     'theme.white':          '白紙',
@@ -1535,6 +1571,9 @@ const I18N = {
     'settings.language':    'Language / 言語',
     'settings.color':       'Color',
     'settings.theme':       'Theme',
+    'settings.themeAuto':   'Follow OS theme',
+    'settings.themeLight':  'When light',
+    'settings.themeDark':   'When dark',
     'theme.std':            'Standard',
     'theme.sepia':          'Sepia',
     'theme.white':          'White',
@@ -1856,6 +1895,9 @@ const I18N = {
     'settings.language':    '語言 / Language',
     'settings.color':       '顏色',
     'settings.theme':       '主題',
+    'settings.themeAuto':   '跟隨系統主題',
+    'settings.themeLight':  '淺色時',
+    'settings.themeDark':   '深色時',
     'theme.std':            '標準',
     'theme.sepia':          '棕褐',
     'theme.white':          '白紙',
@@ -2177,6 +2219,9 @@ const I18N = {
     'settings.language':    '语言 / Language',
     'settings.color':       '颜色',
     'settings.theme':       '主题',
+    'settings.themeAuto':   '跟随系统主题',
+    'settings.themeLight':  '浅色时',
+    'settings.themeDark':   '深色时',
     'theme.std':            '标准',
     'theme.sepia':          '棕褐',
     'theme.white':          '白纸',
@@ -2540,6 +2585,11 @@ const state = {
   // サイト側の総話数 / 総文字数 / サイト更新日 / 対象年齢。すべて表示専用。
   // このうち bookGenre と bookSerial だけを本棚の絞り込み用に localStorage へ保存する。
   fontMode:'publisher', fontSize:100, lineHeight:2.0, theme:'', margin:'full',
+  // theme は常に「解決後の実効テーマ」。OS 連動の有無は themeAuto で独立して持つ
+  // （theme に 'auto' 等の番兵値を入れると THEME_CONTENT 参照など全経路に分岐が波及する）
+  themeAuto:false,         // OS のカラースキームに追従するか（epub_settings に永続化）
+  themeLight:'',           // 追従ON・明るいとき に適用するテーマキー（同上）
+  themeDark:'dark',        // 追従ON・暗いとき に適用するテーマキー（同上）
   writingMode:'vertical',  // 'vertical' | 'horizontal' | 'publisher'
   fwdBtnSize:'small',      // 'small' | 'medium' | 'large'
   tapZone:'lshape',        // 'center' | 'lr' | 'tb' | 'lshape' — タップページ送りのゾーン配置（epub_settings に永続化）
@@ -5107,6 +5157,9 @@ function saveSettings() {
       fontSize:      state.fontSize,
       lineHeight:    state.lineHeight,
       theme:         state.theme,
+      themeAuto:     state.themeAuto,
+      themeLight:    state.themeLight,
+      themeDark:     state.themeDark,
       margin:        state.margin,
       writingMode:   state.writingMode,
       fwdBtnSize:    state.fwdBtnSize,
@@ -5135,6 +5188,12 @@ function loadSettings() {
     if (s.fontSize)              { state.fontSize = s.fontSize;         const el = document.getElementById('font-size-display'); if(el) el.textContent = s.fontSize + '%'; }
     if (s.lineHeight)            { state.lineHeight = s.lineHeight;     const el = document.getElementById('lineh-select'); if(el) el.value = String(s.lineHeight); }
     if (s.theme !== undefined)   { state.theme = s.theme;               applyThemeClass(s.theme); updateThemeBtnUI(); }
+    // OS テーマ連動。テーマキーの検証は `in THEME_CONTENT`（'' も正しく通る）
+    if (typeof s.themeLight === 'string' && s.themeLight in THEME_CONTENT) state.themeLight = s.themeLight;
+    if (typeof s.themeDark  === 'string' && s.themeDark  in THEME_CONTENT) state.themeDark  = s.themeDark;
+    if (typeof s.themeAuto === 'boolean') state.themeAuto = s.themeAuto;
+    document.body.classList.toggle('theme-auto-on', state.themeAuto);
+    syncAutoThemeUI();
     if (s.margin)                { state.margin = s.margin;             const el = document.getElementById('margin-select'); if(el) el.value = s.margin; applyMargin(s.margin); }
     if (s.writingMode)           { state.writingMode = s.writingMode;   const el = document.getElementById('writing-mode-select'); if(el) el.value = s.writingMode; }
     if (s.fwdBtnSize)            { state.fwdBtnSize = s.fwdBtnSize;     const el = document.getElementById('fwd-btn-size-select'); if(el) el.value = s.fwdBtnSize; applyFwdBtnSize(s.fwdBtnSize); }
@@ -5873,11 +5932,79 @@ function updateMetaThemeColor() {
   m.setAttribute('content', c.paper);
 }
 function changeTheme(v) {
+  // チップを直接押したら OS 連動は解除する（押せなくする代わりに、押したら外れる）
+  if (state.themeAuto) {
+    state.themeAuto = false;
+    document.body.classList.remove('theme-auto-on');
+    updateThemeAutoToggleUI();
+  }
   state.theme = v;
   applyThemeClass(v);
   updateThemeBtnUI();
   saveSettings();
   rerenderKeepPos();
+}
+
+// ══════════════════════════════════════════
+//  OS テーマ連動（prefers-color-scheme）
+// ══════════════════════════════════════════
+const _darkMQ = (typeof window !== 'undefined' && window.matchMedia)
+  ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+
+function resolveAutoTheme() {
+  return (_darkMQ && _darkMQ.matches) ? state.themeDark : state.themeLight;
+}
+
+// 連動ONのとき state.theme を OS 設定に合わせる。変化が無ければ何もしない
+//（起動時の無駄な再描画を避ける）。適用したかどうかを返す。
+function applyAutoTheme(rerender) {
+  if (!state.themeAuto) return false;
+  const v = resolveAutoTheme();
+  if (v === state.theme) return false;
+  state.theme = v;
+  applyThemeClass(v);
+  updateThemeBtnUI();
+  if (rerender) rerenderKeepPos();
+  return true;
+}
+
+function toggleThemeAuto() {
+  state.themeAuto = !state.themeAuto;
+  document.body.classList.toggle('theme-auto-on', state.themeAuto);
+  if (state.themeAuto) {
+    // ONにした時点の見た目を、いま該当する側の初期値として引き継ぐ
+    if (_darkMQ && _darkMQ.matches) state.themeDark = state.theme;
+    else                            state.themeLight = state.theme;
+    syncAutoThemeUI();
+    applyAutoTheme(true);
+  }
+  updateThemeAutoToggleUI();
+  saveSettings();
+}
+
+function changeAutoTheme(side, v) {
+  if (!(v in THEME_CONTENT)) return;
+  if (side === 'light') state.themeLight = v; else state.themeDark = v;
+  applyAutoTheme(true);
+  saveSettings();
+}
+
+function syncAutoThemeUI() {
+  const l = document.getElementById('theme-light-select');
+  const d = document.getElementById('theme-dark-select');
+  if (l) l.value = state.themeLight;
+  if (d) d.value = state.themeDark;
+  updateThemeAutoToggleUI();
+}
+
+function updateThemeAutoToggleUI() {
+  const btn = document.getElementById('theme-auto-toggle');
+  if (!btn) return;
+  const on = !!state.themeAuto;
+  btn.textContent = on ? 'ON' : 'OFF';
+  btn.style.background  = on ? 'var(--accent)' : '';
+  btn.style.color       = on ? '#fff' : '';
+  btn.style.borderColor = on ? 'var(--accent)' : 'var(--ui-border)';
 }
 function applyMargin(v) {
   const presets = {
@@ -9282,6 +9409,13 @@ applyI18n();
 updateCloseBookBtnVisibility();  // 左上ボタンの初期状態（未オープン=「開く」）を確定
 document.getElementById('toc-btn').classList.add('active');
 loadSettings();
+// OS テーマ連動：初回適用（まだ何も描いていないので rerender は不要）
+applyAutoTheme(false);
+if (_darkMQ) {
+  const _onSysTheme = () => { if (applyAutoTheme(true)) saveSettings(); };
+  if (_darkMQ.addEventListener) _darkMQ.addEventListener('change', _onSysTheme);
+  else if (_darkMQ.addListener) _darkMQ.addListener(_onSysTheme);  // Safari 13 以前
+}
 consolidateBookmarks();
 updateFxlLtrAutoFlipUI();
 updateAutoOpenToggleUI();
