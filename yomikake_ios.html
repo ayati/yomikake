@@ -5401,7 +5401,7 @@ function loadSettings() {
     if (s.fontMode)              { state.fontMode = s.fontMode;         updateFontPickerUI(); }
     if (s.fontSize)              { state.fontSize = s.fontSize;         const el = document.getElementById('font-size-display'); if(el) el.textContent = s.fontSize + '%'; }
     if (s.lineHeight)            { state.lineHeight = s.lineHeight;     const el = document.getElementById('lineh-select'); if(el) el.value = String(s.lineHeight); }
-    if (s.theme !== undefined)   { state.theme = s.theme;               document.body.className = s.theme ? 'theme-' + s.theme : ''; if(typeof updateThemeBtnUI === 'function') updateThemeBtnUI(); }
+    if (s.theme !== undefined)   { state.theme = s.theme;               applyThemeClass(s.theme); updateThemeBtnUI(); }
     if (s.margin)                { state.margin = s.margin;             const el = document.getElementById('margin-select'); if(el) el.value = s.margin; applyMargin(s.margin); }
     if (s.writingMode)           { state.writingMode = s.writingMode;   const el = document.getElementById('writing-mode-select'); if(el) el.value = s.writingMode; }
     if (s.fwdBtnSize)            { state.fwdBtnSize = s.fwdBtnSize;     const el = document.getElementById('fwd-btn-size-select'); if(el) el.value = s.fwdBtnSize; applyFwdBtnSize(s.fwdBtnSize); }
@@ -5460,13 +5460,6 @@ function updateThemeBtnUI() {
   let btn = document.querySelector('.tb-' + (th || 'std'));
   if (btn) btn.classList.add('active');
 }
-
-// changeTheme をラップして theme ボタン UI を同期
-const _origChangeTheme = changeTheme;
-changeTheme = function(v) {
-  _origChangeTheme(v);
-  updateThemeBtnUI();
-};
 
 function resumeBook() {
   try {
@@ -6120,14 +6113,29 @@ function changeLineHeight(v) {
   saveSettings();
   rerenderKeepPos();
 }
-function changeTheme(v) {
-  state.theme = v;
-  // mode-fxl / fullscreen など他クラスを保持し theme-* だけ差し替える。
-  // className を丸ごと代入すると FXL モードで body.mode-fxl が外れ、
-  // #fxl-container が非表示になって書籍が表示されなくなる。
+// body の theme-* クラスを差し替え、PWA のステータスバー色も追従させる。
+// mode-fxl / fullscreen など他クラスを保持し theme-* だけ差し替えるのが要点。
+// className を丸ごと代入すると FXL モードで body.mode-fxl が外れ、
+// #fxl-container が非表示になって書籍が表示されなくなる。
+// changeTheme() / loadSettings() / applyAutoTheme() の共通経路。
+function applyThemeClass(v) {
   const cls = document.body.classList;
   Array.from(cls).forEach(c => { if (c.indexOf('theme-') === 0) cls.remove(c); });
   if (v) cls.add('theme-' + v);
+  updateMetaThemeColor();
+}
+// <meta name="theme-color"> を現在のテーマの紙色に合わせる（PWA のステータスバー色）。
+// manifest_ios.webmanifest の theme_color は起動スプラッシュ用なので触らない。
+function updateMetaThemeColor() {
+  const m = document.querySelector('meta[name="theme-color"]');
+  if (!m) return;
+  const c = THEME_CONTENT[state.theme] || THEME_CONTENT[''];
+  m.setAttribute('content', c.paper);
+}
+function changeTheme(v) {
+  state.theme = v;
+  applyThemeClass(v);
+  updateThemeBtnUI();
   saveSettings();
   rerenderKeepPos();
 }
