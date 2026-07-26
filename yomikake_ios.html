@@ -241,22 +241,22 @@
                border-radius:10px; background:var(--ui-bg); color:var(--ui-text); outline:none; box-sizing:border-box; }
   #rl-search:focus { border-color:var(--accent); }
   #rl-tools-row { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
-  #rl-sort-wrap { position:relative; }
-  #rl-sort-btn, .rl-chip { font-size:12px; font-weight:600; padding:5px 10px; border-radius:8px;
+  #rl-sort-wrap, #rl-genre-wrap { position:relative; }
+  #rl-sort-btn, #rl-genre-btn, .rl-chip { font-size:12px; font-weight:600; padding:5px 10px; border-radius:8px;
     border:1px solid var(--ui-border); background:var(--ui-bg); color:var(--ui-text);
     cursor:pointer; transition:all .15s; white-space:nowrap; }
-  #rl-sort-btn:hover, .rl-chip:hover { border-color:var(--accent); color:var(--accent); }
+  #rl-sort-btn:hover, #rl-genre-btn:hover, .rl-chip:hover { border-color:var(--accent); color:var(--accent); }
   .rl-chip.active { background:var(--accent); border-color:var(--accent); color:#fff; }
   .rl-chip.active:hover { color:#fff; filter:brightness(1.1); }
-  #rl-sort-menu { display:none; position:absolute; top:calc(100% + 4px); left:0; z-index:60;
+  #rl-sort-menu, #rl-genre-menu { display:none; position:absolute; top:calc(100% + 4px); left:0; z-index:60;
     min-width:160px; background:var(--backdrop); backdrop-filter:blur(16px);
     -webkit-backdrop-filter:blur(16px); border:1px solid var(--glass-border);
     border-radius:12px; box-shadow:0 8px 24px var(--shadow); padding:6px; flex-direction:column; }
-  #rl-sort-menu.show { display:flex; }
-  #rl-sort-menu button { font-size:13px; text-align:left; padding:8px 12px; border:none;
+  #rl-sort-menu.show, #rl-genre-menu.show { display:flex; }
+  #rl-sort-menu button, #rl-genre-menu button { font-size:13px; text-align:left; padding:8px 12px; border:none;
     background:transparent; color:var(--ui-text); border-radius:8px; cursor:pointer; white-space:nowrap; }
-  #rl-sort-menu button:hover { background:var(--hover-bg); }
-  #rl-sort-menu button.checked::before { content:'✓ '; color:var(--accent); font-weight:700; }
+  #rl-sort-menu button:hover, #rl-genre-menu button:hover { background:var(--hover-bg); }
+  #rl-sort-menu button.checked::before, #rl-genre-menu button.checked::before { content:'✓ '; color:var(--accent); font-weight:700; }
   #rl-view-toggle { margin-left:auto; display:flex; border:1px solid var(--ui-border);
     border-radius:8px; overflow:hidden; }
   #rl-view-toggle button { font-size:14px; padding:4px 11px; border:none; background:transparent;
@@ -291,6 +291,8 @@
     font-size:11px; align-items:center; justify-content:center; box-shadow:0 1px 4px var(--shadow); }
   /* 読了カード */
   .rl-card.rl-finished .rl-thumb { opacity:.75; }
+  .rl-serial { font-size:10px; padding:0 5px; margin-left:5px; border-radius:8px;
+               border:1px solid var(--ui-border); opacity:.65; white-space:nowrap; }
   .rl-finished-badge { font-size:12px; font-weight:700; color:var(--accent); white-space:nowrap; flex-shrink:0; }
   /* 絞り込み0件メッセージ */
   #rl-no-match { text-align:center; padding:32px 0 8px; font-size:13px; opacity:.75;
@@ -982,6 +984,10 @@
                 <button data-sort="timeLeft"     onclick="setRlSort('timeLeft')"></button>
               </div>
             </div>
+            <div id="rl-genre-wrap">
+              <button id="rl-genre-btn" onclick="toggleRlGenreMenu(event)"></button>
+              <div id="rl-genre-menu"></div>
+            </div>
             <button id="rl-chip-ready"    class="rl-chip" onclick="toggleRlFilter('filterReady')"
                     data-i18n="readingList.filterReady">⚡ すぐ開ける</button>
             <button id="rl-chip-finished" class="rl-chip" onclick="toggleRlFilter('showFinished')"
@@ -1294,6 +1300,32 @@ const I18N = {
     'help.synopsis':        'あらすじ',
     'help.more':            'もっと見る',
     'help.less':            '閉じる',
+    'genre.fantasy':         'ファンタジー',
+    'genre.romance':         '恋愛',
+    'genre.sf':              'SF',
+    'genre.mystery':         'ミステリー・ホラー',
+    'genre.drama':           '現代ドラマ',
+    'genre.history':         '歴史・時代',
+    'genre.literature':      '文芸',
+    'genre.nonfiction':      '評論・エッセイ',
+    'genre.fanfic':          '二次創作',
+    'genre.other':           'その他',
+    'help.genre':           'ジャンル：{name}',
+    'help.tags':            'タグ',
+    'help.serialRunning':   '連載中',
+    'help.serialFinished':  '完結',
+    'help.sourceUpdated':   'サイト更新：{date}',
+    'help.audience':        '対象：{name}',
+    'help.volumeOf':        '{total}話中 {n}話を収録',
+    'help.volume':          '{n}話',
+    'help.chars':           '約{n}字',
+    'help.readTime':        '読了目安 {t}',
+    'role.trc':             '入力',
+    'role.pfr':             '校正',
+    'readingList.genreLabel':'ジャンル: {name}',
+    'readingList.genreAll': 'すべて',
+    'readingList.genreNone':'未分類',
+    'readingList.serialRunning':'連載中',
     'help.body':            '<p><strong>👆 タップでページ送り</strong></p><p>　画面の端をタップするとページが進みます（初期設定：L字）</p><p>　⚙設定「タップページ送り」で4種から選択：</p><p>　<b>L字（端＋下）</b>＝読み進み側の端と画面下端が「次」、反対側の端と上端が「前」</p><p>　<b>左右の端</b>＝左右の端のみ（上下の中央は何も起きません）</p><p>　<b>上下の端</b>＝下端が「次」、上端が「前」（書字方向によらず固定。片手持ち向き）</p><p>　<b>ボタン（上下＋章送り）</b>＝端タップを使わず、従来どおり画面上のボタンで操作</p><p>　縦書きは左端、横書きは右端が「次」に自動で切り替わります</p><p>　※「ボタン」以外を選ぶと、タップ領域と重なって誤爆する画面上のナビボタン（次へ／前へ／章送り）は自動的に隠れます</p><br><p><strong>🎛️ 中央タップ＝操作メニュー</strong></p><p>　画面の中央をタップすると、前ページ／次ページ／前の章／次の章／リストへ戻る（全画面のときは全画面解除）のメニューが開きます</p><p>　メニューは背景をタップするか ✕、任意のキーで閉じます</p><br><p><strong>🗺️ タップ領域のガイド</strong></p><p>　どこを押すと何が起きるかを画面に重ねて表示します</p><p>　初回に自動表示。以降は 👁️ ボタン・ヘルプを閉じたとき・設定を変えたときに表示されます</p><p>　どこかをタップすると閉じます</p><br><p><strong>📱 スワイプ・ボタンでのページ送り</strong></p><p>　左スワイプ：1画面分 前進スクロール</p><p>　右スワイプ：1画面分 後退スクロール</p><p>　画面下「次へ」・上「前へ」ボタン（設定が「ボタン（上下＋章送り）」のとき表示）</p><p>　※章末尾/先頭で自動的に章移動</p><br><p><strong>📖 章切り替え（リフロー型のみ）</strong></p><p>　右「›」ボタン：前の章　／　左「‹」ボタン：次の章</p><p>　（設定が「ボタン（上下＋章送り）」のとき表示。ほかの設定では中央タップのメニューから）</p><br><p><strong>🔵 Bluetoothキーボード</strong></p><p>　スペース：次へ　Shift+スペース：前へ</p><p>　← 次の章　→ 前の章（リフロー型のみ）</p><br><p><strong>🎯 ページジャンプ（サイドバー）</strong></p><p>　サイドバー（☰ 目次ボタン）最上部の「ジャンプ」パネル</p><p>　スライダー：ドラッグで任意位置にプレビュー＆ジャンプ</p><p>　📖 表紙 / -10 / +10 / 🏁 末尾 の4ボタン</p><p>　ページ番号（リフロー型は章番号）を入力して Go または Enter</p><p>　ジャンプ前の位置は自動的にジャンプ履歴（↩）に記録、タップで戻れます</p><br><p><strong>🖼️ マンガ・雑誌モード（FXL / Fixed Layout）</strong></p><p>　pre-paginated 指定の ePub を自動検出し、画像1枚/ページ を画面内フィット表示</p><p>　iPad 横画面では2ページ見開き自動表示</p><p>　組方向・フォント等は無効化、代わりに⚙設定の「見開き表示」で自動/単ページ/見開きを切替</p><p>　マンガ（RTL）は右ページから順に表示、見開き時は中央で隣接</p><p>　スマホでは☰→ジャンプパネルで表紙・末尾・任意ページへ遷移</p><br><p><strong>🔍 コマ読みズーム（FXLのみ）</strong></p><p>　ツールバー🔍ボタン または 画面をダブルタップ で ON／OFF</p><p>　⚙設定「ズームモード」で4種から選択：</p><p>　<b>ストーリーまんが</b>＝1ページを2列×3行=6領域に分け、右上→左上→右中→左中→右下→左下 の順（5タップで1ページ読了→次ページへ）</p><p>　<b>4コマまんが</b>＝右列3個→左列3個 の順（縦4コマ用）</p><p>　<b>縦合わせ・横スクロール</b>（v1.8.4）＝縦持ちスマホ×縦書き紙本スキャンに最適。画像を縦いっぱいに拡大、Nextで横ステップ→末尾で次ページ冒頭へ</p><p>　<b>横合わせ・縦スクロール</b>（v1.8.5）＝横倒しスマホ×横書き紙本スキャンに最適。画像を横いっぱいに拡大、Nextで上→下ステップ→末尾で次ページ冒頭へ</p><p>　LTR書籍（洋書）は自動で左右反転（⚙でOFF可能、6領域モード時のみ）</p><p>　ズーム中の任意ドラッグで自由パン（🌀）へ移行。右下のピル（🎯/↔/↕/🌀）をタップで復帰/次領域へ</p><p>　画面端からさらに読み進み方向へ引っ張る（ラバーバンド）で次/前ページへジャンプ</p><p>　⚙「拡大倍率」：1.5x / 2.0x / 2.5x（6領域モード専用。軸モードは画像比から自動算出）</p><p>　軸モードは全画面モードと併用で上下/左右の余白が完全消滅</p><br><p><strong>🔍 全文検索</strong></p><p>　サイドバー（目次ボタン）→「検索」タブにキーワードを入力してEnter</p><p>　タップするとその章に移動（ジャンプ履歴にも記録）</p><p>　画像形式の本（FXL）も、自炊 OCR などの透明テキストがあれば検索可能（ヒット箇所をページ上でハイライト表示）</p><br><p><strong>🔊 読み上げ（音声のみ）</strong></p><p>　ツールバーの 🔊 ボタンで、いま開いている本文を端末の音声で読み上げます（リフロー型のみ）</p><p>　画面下部のプレイヤーで 前の文／一時停止・再開／次の文／停止、速度（0.5〜2.0倍）を操作できます</p><p>　章の終わりまで読むと自動で次の章へ進みます。ルビ（ふりがな）がある箇所はふりがなを読みます</p><p>　音声の種類は⚙設定「🔊 読み上げ」で選べます（端末に入っている音声から本の言語で絞り込み）</p><p>　再生中は画面が消灯しないようにします（Wake Lock 対応端末）。<b>ただし画面ロック・タブ切替では停止します</b>（ブラウザの制約）。明るさを下げてのご利用をおすすめします</p><p>　この端末に本の言語の音声が無い場合は再生できません。iOS は 設定→アクセシビリティ→読み上げコンテンツ で高品質な音声を追加できます</p><br><p><strong>🎨 表示設定（歯車アイコン）</strong></p><p>　フォント：22種（游明朝・ゴシック・Google Fonts など）＋ ローカルフォント追加（.ttf/.otf/.woff/.woff2、最大5件・端末内に保存されオフラインでも利用可）※リフロー型のみ</p><p>　太字表示：本文全体を太字化（実体Bold書体があればそれを使用）※リフロー型のみ</p><p>　縁取りの強さ：太字表示ON時に文字を縁取りしてさらに強調（なし/弱/中/強。ルビは除外）※リフロー型のみ</p><p>　テーマ：8色（標準・セピア・白紙・ダーク・さくら・星空・抹茶・月夜）</p><p>　文字サイズ・行間・余白・書字方向 ※リフロー型のみ</p><p>　見開き表示（FXL時のみ）：自動 / 単ページ / 見開き</p><br><p><strong>🔖 しおり・ジャンプ履歴</strong></p><p>　読み位置は自動記録。サイドバーの目次タブでジャンプ履歴と元の位置に戻れます</p><p>　📥 読み込み / 📤 書き出し（⚙設定「しおりデータ」）　☁↓ Drive読込　☁↑ Drive保存</p><p>　⚙設定「しおり自動保存」ON：読書位置を自動でDriveに保存し、起動時・タブ復帰時に他端末の続きを自動取得します（より進んだ位置を採用。読書中はトーストで通知→タップで移動）</p><p style="font-size:12px;opacity:.6;">　※ Drive機能はHTTP/HTTPSサーバー経由の起動とGoogle Client IDの設定が必要です</p><br><p><strong>📚 読みかけリスト</strong></p><p>　本を開いていないとき、ウェルカム画面に読みかけの本を一覧表示します</p><p>　各カードに表紙・タイトル・著者名・進捗バー・最終閲覧日を表示</p><p>&nbsp;並べ替えボタンで「残り時間が短い順」ほかに切替可。各カードに残り読書時間の目安 ⏱ を表示（Web小説など長編で「あと2時間で読めそうな本」を探せます）</p><p>　カード右下「このファイルを開く」でファイルを選ぶと前回の続きから自動再開</p><p>　最終章の末尾まで読み進めると画面下部に読了バナーが表示されます</p><p>　「読みかけリストへ」：本を閉じてリストへ戻る。読了済みとしてリストから自動除外</p><p>　「閉じない」：バナーを閉じてそのまま読み続けられます</p><p>　左上の「リストへ」ボタンでいつでも本を閉じてリストへ戻れます（読み位置を自動保存）</p><p>　リスト右上「編集」ボタンで編集モードに切り替え、各カードの × で削除できます</p><p>　⚙設定「起動時に前回の本を開く」がONなら、次回そのまま前回の本が開きます（オフライン用にキャッシュ済みの本のみ。読了した本は開きません）</p><br><p><strong>📊 読書データ</strong></p><p>　ツールバー📊ボタン（またはウェルカム画面のボタン）で読書統計を表示</p><p>　読了率・読了冊数・読みかけ冊数／よく読む著者／最近読了（タップで再オープン）</p><p>　累計読書時間・本ごとの読書時間・読書スピード・読了までの目安（リフロー型）</p><p>　連続読書（日／週／月）・読書カレンダー（草グラフ）・週次／月次の読書ペース</p><p style="font-size:12px;opacity:.6;">　※ 読書時間はこの端末での実読のみ計測。Drive自動保存ONで端末間の合算・同期に対応</p><br><p><strong>📲 アプリとして入れる（ホーム画面に追加）</strong></p><p>　ホーム画面に追加すると、アドレスバーの無い単独ウィンドウで起動し、オフラインでも開けます（https:// で開いた時のみ）</p><p>　<b>iPhone・iPad（Safari）の場合：</b></p><p>　① 画面下（機種により上）の 共有ボタン（□に↑）をタップ</p><p>　② メニューを下にたどり「ホーム画面に追加」をタップ</p><p>　③ 右上の「追加」をタップ</p><p>　※ iOS は「共有から開く」に未対応です。ホーム画面版は Safari とデータの保存場所が別になるため、しおりは「☁↓ Drive読込」で引き継いでください（表紙キャッシュ・追加フォントは開き直しが必要）</p><p>　<b>Android（Chrome）の場合：</b></p><p>　① 画面右上の ⋮（メニュー）を開く</p><p>　②「アプリをインストール」または「ホーム画面に追加」をタップ</p><p>　③ 確認が出たら「インストール」をタップ</p><p>　④ 入れておくと、ファイルアプリやファイラーで ePub を選んで「共有」→ 一覧から yomikake を選ぶだけで、その本を直接開けます（フォルダから探す手間がありません。※Android では通常版 yomikake.html をご利用ください）</p><br><p><strong>ファイル形式</strong></p><p>　.epub / .kepub（Kobo）対応。リフロー型・固定レイアウト型（マンガ・雑誌）どちらも自動判別</p>',
     'loading.fetching':     '📂 ファイルを取得しています…',
     'loading.opening':      '「{filename}」を開いています…',
@@ -1588,6 +1620,32 @@ const I18N = {
     'help.synopsis':        'Synopsis',
     'help.more':            'Show more',
     'help.less':            'Show less',
+    'genre.fantasy':         'Fantasy',
+    'genre.romance':         'Romance',
+    'genre.sf':              'Sci-Fi',
+    'genre.mystery':         'Mystery & Horror',
+    'genre.drama':           'Contemporary',
+    'genre.history':         'Historical',
+    'genre.literature':      'Literary',
+    'genre.nonfiction':      'Essays & Criticism',
+    'genre.fanfic':          'Fan Fiction',
+    'genre.other':           'Other',
+    'help.genre':           'Genre: {name}',
+    'help.tags':            'Tags',
+    'help.serialRunning':   'Ongoing',
+    'help.serialFinished':  'Completed',
+    'help.sourceUpdated':   'Site updated: {date}',
+    'help.audience':        'Audience: {name}',
+    'help.volumeOf':        '{n} of {total} episodes included',
+    'help.volume':          '{n} episodes',
+    'help.chars':           'approx. {n} chars',
+    'help.readTime':        'Est. reading time {t}',
+    'role.trc':             'Transcription',
+    'role.pfr':             'Proofreading',
+    'readingList.genreLabel':'Genre: {name}',
+    'readingList.genreAll': 'All',
+    'readingList.genreNone':'Unclassified',
+    'readingList.serialRunning':'Ongoing',
     'help.body':            '<p><strong>👆 Tap to turn pages</strong></p><p>&nbsp;Tap near the screen edges to turn the page (default: L-shape)</p><p>&nbsp;Pick one of 4 patterns in ⚙ settings, "Tap to turn page":</p><p>&nbsp;<b>L-shape (edge + bottom)</b> = the forward-side edge and the bottom edge go next; the opposite edge and the top edge go back</p><p>&nbsp;<b>Left / right edges</b> = side edges only (top and bottom centers do nothing)</p><p>&nbsp;<b>Top / bottom edges</b> = bottom goes next, top goes back (fixed regardless of writing direction; good for one-handed reading)</p><p>&nbsp;<b>Buttons (scroll + chapter)</b> = no edge tapping; use the on-screen buttons as before</p><p>&nbsp;In vertical writing the left edge is "next"; in horizontal writing the right edge is "next"</p><p>&nbsp;※ With any pattern other than "Buttons", the on-screen nav buttons (next / back / chapter) are hidden, because they overlap the tap zones and would fire by mistake</p><br><p><strong>🎛️ Tap the center for the menu</strong></p><p>&nbsp;Tapping the center of the screen opens a menu: previous page / next page / previous chapter / next chapter / back to list (plus exit fullscreen while in fullscreen)</p><p>&nbsp;Close it by tapping the backdrop, the ✕, or any key</p><br><p><strong>🗺️ Tap zone guide</strong></p><p>&nbsp;Shows what happens where, overlaid on the page</p><p>&nbsp;Appears once automatically the first time; after that use the 👁️ button, close this help, or change the setting</p><p>&nbsp;Tap anywhere to close it</p><br><p><strong>📱 Swipe and buttons</strong></p><p>&nbsp;Swipe left: scroll forward one page</p><p>&nbsp;Swipe right: scroll back one page</p><p>&nbsp;"Next" button (bottom) / "Prev" button (top) — shown when the setting is "Buttons (scroll + chapter)"</p><p>&nbsp;※ Automatically advances chapter at boundaries</p><br><p><strong>📖 Chapter navigation (reflow only)</strong></p><p>&nbsp;"›" button (right): previous chapter&nbsp;/&nbsp;"‹" button (left): next chapter</p><p>&nbsp;(Shown when the setting is "Buttons (scroll + chapter)"; otherwise use the center-tap menu)</p><br><p><strong>🔵 Bluetooth keyboard</strong></p><p>&nbsp;Space: forward　Shift+Space: back</p><p>&nbsp;← next chapter　→ previous chapter (reflow only)</p><br><p><strong>🎯 Page Jump (sidebar)</strong></p><p>&nbsp;Jump panel at the top of the sidebar (☰ Contents button)</p><p>&nbsp;Slider: drag to preview, release to jump</p><p>&nbsp;📖 Cover / -10 / +10 / 🏁 End buttons</p><p>&nbsp;Type a page number (or chapter # in reflow mode) and tap Go or press Enter</p><p>&nbsp;Previous position is saved to jump history (↩); tap to return</p><br><p><strong>🖼️ Manga / Magazine mode (FXL / Fixed Layout)</strong></p><p>&nbsp;Auto-detects pre-paginated ePubs; displays one image per page, fit to screen</p><p>&nbsp;iPad landscape shows two-page spreads automatically</p><p>&nbsp;Writing mode & font settings are disabled; use "Spread layout" in ⚙ settings (Auto / Single / Two-page)</p><p>&nbsp;Manga (RTL) displays the right page first; spread pairs are adjacent at the center</p><p>&nbsp;On iPhone, use the sidebar jump panel to navigate to cover / end / any page</p><br><p><strong>🔍 Panel zoom (FXL only)</strong></p><p>&nbsp;Toggle with the 🔍 toolbar button or double-tap the page.</p><p>&nbsp;Choose one of 4 modes in ⚙ "Zoom mode":</p><p>&nbsp;<b>Story manga</b> — 2×3 = 6 regions per page. Next walks TR→TL→MR→ML→BR→BL (5 taps then next page).</p><p>&nbsp;<b>4-panel manga</b> — Right column ×3 → left column ×3 (for 4-panel strips).</p><p>&nbsp;<b>Fit height, scroll H</b> (v1.8.4) — Best for vertical-text scans on portrait phones. Image fills viewport height; Next steps horizontally → top of next page at end.</p><p>&nbsp;<b>Fit width, scroll V</b> (v1.8.5) — Best for horizontal-text scans on landscape phones. Image fills viewport width; Next steps top → bottom → top of next page at end.</p><p>&nbsp;LTR books auto-mirror (toggle off via "Flip for LTR books"; 6-region modes only).</p><p>&nbsp;Drag to enter free pan (🌀). Tap the pill (🎯/↔/↕/🌀) to snap back / step to next region.</p><p>&nbsp;Keep dragging past the edge ("rubber band") to jump to next/prev page.</p><p>&nbsp;⚙ "Zoom level": 1.5x / 2.0x / 2.5x (6-region only; axis modes auto-compute).</p><p>&nbsp;Pair axis modes with fullscreen to remove all page margins.</p><br><p><strong>🔍 Full-text search</strong></p><p>&nbsp;Open sidebar (Contents button) → "Search" tab, type a keyword and press Enter</p><p>&nbsp;Tap a result to jump to that chapter (also recorded in jump history)</p><p>&nbsp;Image-based books (FXL) are also searchable when they contain OCR text (e.g. scanned books); hits are highlighted on the page</p><br><p><strong>🔊 Read aloud (audio only)</strong></p><p>&nbsp;The 🔊 toolbar button reads the current text using your device voice (reflowable books only)</p><p>&nbsp;The player at the bottom controls previous sentence / pause-resume / next sentence / stop and speed (0.5–2.0x)</p><p>&nbsp;It advances to the next chapter automatically at the chapter end. Ruby (furigana) is read where present</p><p>&nbsp;Choose the voice in ⚙ settings "🔊 Read aloud" (filtered by the book language from voices installed on your device)</p><p>&nbsp;The screen is kept awake while playing (Wake Lock devices). <b>However playback stops when the screen locks or you switch tabs</b> (browser limitation). Lowering the brightness is recommended</p><p>&nbsp;Playback is unavailable if your device has no voice for the book language. On iOS you can add high-quality voices in Settings → Accessibility → Spoken Content</p><br><p><strong>🎨 Display settings (⚙ icon)</strong></p><p>&nbsp;Font: 22 options (Mincho, Gothic, Google Fonts, etc.) + add your own local fonts (.ttf/.otf/.woff/.woff2, up to 5, stored on this device and usable offline) — reflow only</p><p>&nbsp;Bold text: makes the whole body bold (uses a real Bold face when available) — reflow only</p><p>&nbsp;Outline weight: adds an outline to further strengthen text when Bold is ON (None / Light / Medium / Strong; ruby excluded) — reflow only</p><p>&nbsp;Theme: 8 colors (Standard, Sepia, White, Dark, Sakura, Starry Night, Matcha, Moonlit)</p><p>&nbsp;Font size, line height, margin, and writing mode — reflow only</p><p>&nbsp;Spread layout (FXL only): Auto / Single page / Two-page</p><br><p><strong>🔖 Bookmarks &amp; jump history</strong></p><p>&nbsp;Reading position is saved automatically. Sidebar TOC tab shows jump history.</p><p>&nbsp;📥 Import / 📤 Export (⚙ Settings "Bookmark data")　☁↓ Drive load　☁↑ Drive save</p><p>&nbsp;⚙ "Auto-save bookmarks" ON: position is saved to Drive automatically and the latest position from other devices is pulled on startup / tab focus (more-advanced position wins; while reading you get a toast — tap to move)</p><p style="font-size:12px;opacity:.6;">&nbsp;※ Drive features require HTTP/HTTPS server and Google Client ID configuration</p><br><p><strong>📚 Reading list</strong></p><p>&nbsp;When no book is open, the welcome screen shows a list of books in progress</p><p>&nbsp;Each card shows the cover, title, author, progress bar, and last read date</p><p>&nbsp;Use the Sort button to order by "Shortest time left" and more; each card shows an estimated ⏱ time-to-finish (handy for finding a book you can finish in ~2 hours)</p><p>&nbsp;Tap "Open this file" on a card to pick the file and resume where you left off</p><p>&nbsp;When you reach the end of the last chapter, a "Finished" banner appears</p><p>&nbsp;"Back to reading list": close the book and return to the list (marked as completed)</p><p>&nbsp;"Stay": dismiss the banner and keep reading</p><p>&nbsp;The top-left "Book list" button closes the book and returns to the list anytime (position is saved)</p><p>&nbsp;Tap "Edit" (top right of list) to enter edit mode; tap × on a card to remove it from the list</p><p>&nbsp;With "Auto-open last book" ON (⚙ settings), the app reopens your last book on launch (only books cached for offline use; finished books are skipped)</p><br><p><strong>📊 Reading Data</strong></p><p>&nbsp;Open reading stats from the 📊 toolbar button (or the welcome screen button)</p><p>&nbsp;Completion rate, finished / in-progress counts, top authors, recently finished (tap to reopen)</p><p>&nbsp;Total reading time, per-book time, reading speed, estimated time to finish (reflow only)</p><p>&nbsp;Reading streaks (day / week / month), reading calendar (heatmap), weekly / monthly pace</p><p style="font-size:12px;opacity:.6;">&nbsp;※ Time is measured for actual reading on this device only; with Drive auto-save it is combined across devices</p><br><p><strong>📲 Install as an app (Add to Home Screen)</strong></p><p>&nbsp;Installing launches yomikake in its own window (no address bar) and lets it open offline (https:// only).</p><p>&nbsp;<b>On iPhone / iPad (Safari):</b></p><p>&nbsp;1. Tap the Share button (a square with an up arrow) at the bottom (or top)</p><p>&nbsp;2. Scroll down and tap "Add to Home Screen"</p><p>&nbsp;3. Tap "Add" (top right)</p><p>&nbsp;※ iOS does not support "open from Share". The Home Screen version stores data separately from Safari, so migrate bookmarks with "☁↓ Drive load" (cover cache and added fonts need a re-open).</p><p>&nbsp;<b>On Android (Chrome):</b></p><p>&nbsp;1. Open the ⋮ menu (top right)</p><p>&nbsp;2. Tap "Install app" (or "Add to Home screen")</p><p>&nbsp;3. Tap "Install" to confirm</p><p>&nbsp;4. Once installed, pick an ePub in your Files app / file manager, tap "Share", and choose yomikake to open it directly (on Android, please use the standard yomikake.html)</p><br><p><strong>File formats</strong></p><p>&nbsp;.epub / .kepub (Kobo) supported. Both reflowable and fixed-layout (manga / magazine) books are auto-detected</p>',
     'loading.fetching':     '📂 Fetching file…',
     'loading.opening':      'Opening "{filename}"…',
@@ -1882,6 +1940,32 @@ const I18N = {
     'help.synopsis':        '簡介',
     'help.more':            '顯示更多',
     'help.less':            '收合',
+    'genre.fantasy':         '奇幻',
+    'genre.romance':         '戀愛',
+    'genre.sf':              '科幻',
+    'genre.mystery':         '推理・恐怖',
+    'genre.drama':           '現代劇',
+    'genre.history':         '歷史・時代',
+    'genre.literature':      '文藝',
+    'genre.nonfiction':      '評論・隨筆',
+    'genre.fanfic':          '二次創作',
+    'genre.other':           '其他',
+    'help.genre':           '類型：{name}',
+    'help.tags':            '標籤',
+    'help.serialRunning':   '連載中',
+    'help.serialFinished':  '完結',
+    'help.sourceUpdated':   '網站更新：{date}',
+    'help.audience':        '分級：{name}',
+    'help.volumeOf':        '共{total}話，收錄{n}話',
+    'help.volume':          '{n}話',
+    'help.chars':           '約{n}字',
+    'help.readTime':        '預估閱讀 {t}',
+    'role.trc':             '輸入',
+    'role.pfr':             '校對',
+    'readingList.genreLabel':'類型: {name}',
+    'readingList.genreAll': '全部',
+    'readingList.genreNone':'未分類',
+    'readingList.serialRunning':'連載中',
     'help.body':            '<p><strong>👆 點擊翻頁</strong></p><p>　點選畫面邊緣即可翻頁（預設：L形）</p><p>　可於⚙設定「點擊翻頁」選擇4種：</p><p>　<b>L形（邊緣＋下方）</b>＝閱讀前進側的邊緣與畫面下緣為「下一頁」，另一側與上緣為「上一頁」</p><p>　<b>左右兩側</b>＝僅左右邊緣（上下中央不會有反應）</p><p>　<b>上下兩側</b>＝下緣為「下一頁」，上緣為「上一頁」（不隨書寫方向改變，適合單手持握）</p><p>　<b>按鈕（上下＋換章）</b>＝不使用邊緣點擊，維持以往的畫面按鈕操作</p><p>　直排書為左側、橫排書為右側是「下一頁」，會自動切換</p><p>　※選擇「按鈕」以外的模式時，與點擊區域重疊而容易誤觸的畫面導覽按鈕（下一頁／上一頁／換章）會自動隱藏</p><br><p><strong>🎛️ 點選中央開啟操作選單</strong></p><p>　點選畫面中央會開啟選單：上一頁／下一頁／上一章／下一章／返回清單（全螢幕時另有結束全螢幕）</p><p>　點選背景、✕ 或任意按鍵即可關閉</p><br><p><strong>🗺️ 點擊區域說明</strong></p><p>　以疊加方式顯示各區域按下後會發生什麼</p><p>　初次會自動顯示；之後可用 👁️ 按鈕、關閉本說明時或變更設定時顯示</p><p>　點選任意處即可關閉</p><br><p><strong>📱 滑動與按鈕翻頁</strong></p><p>　向左滑動：前進一頁</p><p>　向右滑動：後退一頁</p><p>　畫面下方「下一頁」・上方「上一頁」按鈕（設定為「按鈕（上下＋換章）」時顯示）</p><p>　※章節末尾/開頭時自動切換章節</p><br><p><strong>📖 章節切換（僅限流式排版）</strong></p><p>　右側「›」按鈕：上一章　／　左側「‹」按鈕：下一章</p><p>　（設定為「按鈕（上下＋換章）」時顯示；其他設定請用點選中央的選單）</p><br><p><strong>🔵 藍牙鍵盤</strong></p><p>　空白鍵：前進　Shift+空白：後退</p><p>　← 下一章　→ 上一章（僅限流式排版）</p><br><p><strong>🎯 頁面跳轉（側邊欄）</strong></p><p>　側邊欄（☰ 目錄按鈕）最上方的「跳轉」面板</p><p>　滑桿：拖曳預覽並跳至任意位置</p><p>　📖 封面 / -10 / +10 / 🏁 末頁 四個按鈕</p><p>　輸入頁碼（流式排版為章節號）後按 Go 或 Enter</p><p>　跳轉前位置自動記錄於跳轉歷史（↩），點選即可返回</p><br><p><strong>🖼️ 漫畫・雜誌模式（FXL / Fixed Layout）</strong></p><p>　自動偵測 pre-paginated ePub，每頁單張圖片等比縮放顯示</p><p>　iPad 橫向畫面自動顯示跨頁（兩頁並排）</p><p>　書寫方向・字型等設定停用，改以⚙設定「跨頁顯示」切換自動/單頁/跨頁</p><p>　漫畫（RTL）依右頁起始顯示，跨頁時於畫面中央相鄰</p><p>　iPhone 可透過☰→跳轉面板瀏覽封面・末頁・任意頁</p><br><p><strong>🔍 分格閱讀縮放（僅 FXL）</strong></p><p>　工具列🔍按鈕 或 雙擊頁面 開啟／關閉</p><p>　⚙「縮放模式」可選 4 種：</p><p>　<b>故事型漫畫</b>＝單頁劃分為 2欄×3列=6個區域，Next 按右上→左上→右中→左中→右下→左下 順序（5次到達下一頁）</p><p>　<b>四格漫畫</b>＝右欄3個→左欄3個 順序（縱向四格用）</p><p>　<b>配合高度・橫向捲動</b>（v1.8.4）＝直立手機 × 直書紙本掃描最佳。圖像縱向填滿，Next 橫向捲動，到末端跳至下一頁開頭</p><p>　<b>配合寬度・縱向捲動</b>（v1.8.5）＝橫向手機 × 橫書紙本掃描最佳。圖像橫向填滿，Next 上→下捲動，到末端跳至下一頁開頭</p><p>　LTR 書籍自動左右反轉（可於⚙關閉，僅 6 區域模式）</p><p>　拖曳進入🌀自由模式，右下膠囊（🎯/↔/↕/🌀）點擊回到預設/下個區域</p><p>　邊緣再拉（橡皮筋）跳至下一／前一頁</p><p>　⚙「縮放倍率」：1.5x / 2.0x / 2.5x（僅 6 區域模式，軸模式自動計算）</p><p>　軸模式搭配全螢幕可消除上下／左右邊距</p><br><p><strong>🔍 全文搜尋</strong></p><p>　側邊欄（目錄按鈕）→「搜尋」索引標籤，輸入關鍵字後按 Enter</p><p>　點擊結果即可跳轉至該章（同時記錄於跳轉歷史）</p><p>　圖片格式書籍（FXL）若含 OCR 透明文字亦可搜尋（命中處會在頁面上高亮顯示）</p><br><p><strong>🔊 朗讀（僅語音）</strong></p><p>　工具列的 🔊 按鈕會用裝置語音朗讀目前的內文（僅限流式排版）</p><p>　畫面下方的播放列可操作 上一句／暫停·繼續／下一句／停止，以及速度（0.5〜2.0倍）</p><p>　讀到章節結尾會自動前往下一章。有標注假名（ふりがな）處會朗讀假名</p><p>　可於⚙設定「🔊 朗讀」選擇語音（依書籍語言從裝置已安裝的語音中篩選）</p><p>　播放時會保持螢幕不熄滅（支援 Wake Lock 的裝置）。<b>但螢幕鎖定或切換分頁時會停止</b>（瀏覽器限制）。建議調低亮度使用</p><p>　若裝置沒有該書語言的語音則無法播放。iOS 可於 設定→輔助使用→朗讀內容 新增高品質語音</p><br><p><strong>🎨 顯示設定（⚙圖示）</strong></p><p>　字型：22 種（明朝體・黑體・Google Fonts 等）＋ 可新增本機字型（.ttf/.otf/.woff/.woff2，最多 5 個・儲存於本裝置並可離線使用）※僅限流式排版</p><p>　粗體顯示：將整篇內文加粗（若有實際 Bold 字重則使用）※僅限流式排版</p><p>　描邊強度：粗體開啟時為文字加上描邊以進一步強調（無/弱/中/強；不含注音）※僅限流式排版</p><p>　主題：8 色（標準・棕褐・白紙・暗色・櫻花・星空・抹茶・月夜）</p><p>　字型大小・行距・邊距・書寫方向 ※僅限流式排版</p><p>　跨頁顯示（僅 FXL）：自動 / 單頁 / 跨頁</p><br><p><strong>🔖 書籤・跳轉歷史</strong></p><p>　閱讀位置自動記錄。側邊欄目錄索引標籤可查看跳轉歷史</p><p>　📥 匯入 / 📤 匯出（⚙設定「書籤資料」）　☁↓ Drive 載入　☁↑ Drive 儲存</p><p>　⚙設定「自動儲存書籤」開啟：自動將閱讀位置儲存至 Drive，並於啟動・切回分頁時自動取得其他裝置的最新位置（採用較前進的位置；閱讀中以提示通知→點擊跳轉）</p><p style="font-size:12px;opacity:.6;">　※ Drive 功能需透過 HTTP/HTTPS 伺服器啟動並設定 Google Client ID</p><br><p><strong>📚 閱讀中清單</strong></p><p>　未開啟書籍時，歡迎畫面顯示正在閱讀的書籍清單</p><p>　書卡顯示封面、書名、作者、進度列及最後閱讀日期</p><p>&nbsp;可用排序按鈕切換「剩餘時間短至長」等順序；每張卡片顯示預估剩餘閱讀時間 ⏱（方便尋找約2小時可讀完的書）</p><p>　點選書卡右下角「開啟此檔案」，選擇檔案後從上次位置繼續閱讀</p><p>　讀到最後一章末尾時，畫面下方會出現讀完提示橫幅</p><p>　「回到閱讀清單」：關閉書籍並返回清單（標記為已讀完並自動移除）</p><p>　「繼續閱讀」：關閉橫幅，繼續閱讀</p><p>　左上角的「返回清單」按鈕可隨時關閉書籍並返回清單（自動儲存閱讀位置）</p><p>　點選清單右上角「編輯」進入編輯模式，點選書卡 × 可從清單移除</p><p>　若⚙設定「啟動時開啟上次的書」為開啟，下次啟動時會直接開啟上次的書（僅限已離線快取的書籍，已讀完的不會開啟）</p><br><p><strong>📊 閱讀數據</strong></p><p>　工具列📊按鈕（或歡迎畫面按鈕）顯示閱讀統計</p><p>　讀完率・讀完本數・閱讀中本數／常讀作者／最近讀完（點擊重新開啟）</p><p>　累計閱讀時間・每本閱讀時間・閱讀速度・預計讀完時間（流式排版）</p><p>　連續閱讀（日／週／月）・閱讀日曆（草圖）・每週／每月閱讀步調</p><p style="font-size:12px;opacity:.6;">　※ 閱讀時間僅計算本裝置的實際閱讀；開啟 Drive 自動儲存後可跨裝置合計同步</p><br><p><strong>📲 安裝為應用程式（加入主畫面）</strong></p><p>　安裝後會以獨立視窗（無網址列）啟動，並可離線開啟（僅限 https://）</p><p>　<b>iPhone・iPad（Safari）：</b></p><p>　① 點選畫面下方（部分機型在上方）的 分享按鈕（方框加箭頭）</p><p>　② 往下捲動並點選「加入主畫面」</p><p>　③ 點選右上角「加入」</p><p>　※ iOS 不支援「從分享開啟」。主畫面版本與 Safari 的資料儲存位置分開，書籤請以「☁↓ 從 Drive 載入」轉移（封面快取・新增字型需重新開啟）</p><p>　<b>Android（Chrome）：</b></p><p>　① 開啟右上角 ⋮（選單）</p><p>　② 點選「安裝應用程式」或「加入主畫面」</p><p>　③ 出現確認時點選「安裝」</p><p>　④ 安裝後，於檔案 App 或檔案管理器選取 ePub →「分享」→ 選擇 yomikake 即可直接開啟（Android 請使用一般版 yomikake.html）</p><br><p><strong>支援格式</strong></p><p>　.epub / .kepub（Kobo）。流式排版與固定版式（漫畫・雜誌）均自動偵測</p>',
     'loading.fetching':     '📂 正在取得檔案…',
     'loading.opening':      '正在開啟「{filename}」…',
@@ -2176,6 +2260,32 @@ const I18N = {
     'help.synopsis':        '简介',
     'help.more':            '显示更多',
     'help.less':            '收起',
+    'genre.fantasy':         '奇幻',
+    'genre.romance':         '恋爱',
+    'genre.sf':              '科幻',
+    'genre.mystery':         '推理・恐怖',
+    'genre.drama':           '现代剧',
+    'genre.history':         '历史・时代',
+    'genre.literature':      '文艺',
+    'genre.nonfiction':      '评论・随笔',
+    'genre.fanfic':          '二次创作',
+    'genre.other':           '其他',
+    'help.genre':           '类型：{name}',
+    'help.tags':            '标签',
+    'help.serialRunning':   '连载中',
+    'help.serialFinished':  '完结',
+    'help.sourceUpdated':   '网站更新：{date}',
+    'help.audience':        '分级：{name}',
+    'help.volumeOf':        '共{total}话，收录{n}话',
+    'help.volume':          '{n}话',
+    'help.chars':           '约{n}字',
+    'help.readTime':        '预估阅读 {t}',
+    'role.trc':             '输入',
+    'role.pfr':             '校对',
+    'readingList.genreLabel':'类型: {name}',
+    'readingList.genreAll': '全部',
+    'readingList.genreNone':'未分类',
+    'readingList.serialRunning':'连载中',
     'help.body':            '<p><strong>👆 点击翻页</strong></p><p>　点击画面边缘即可翻页（默认：L形）</p><p>　可在⚙设置「点击翻页」中选择4种：</p><p>　<b>L形（边缘＋下方）</b>＝阅读前进侧的边缘与画面下缘为「下一页」，另一侧与上缘为「上一页」</p><p>　<b>左右两侧</b>＝仅左右边缘（上下中央不会有反应）</p><p>　<b>上下两侧</b>＝下缘为「下一页」，上缘为「上一页」（不随书写方向改变，适合单手持握）</p><p>　<b>按钮（上下＋换章）</b>＝不使用边缘点击，保持以往的画面按钮操作</p><p>　竖排书为左侧、横排书为右侧是「下一页」，会自动切换</p><p>　※选择「按钮」以外的模式时，与点击区域重叠而容易误触的画面导航按钮（下一页／上一页／换章）会自动隐藏</p><br><p><strong>🎛️ 点击中央打开操作菜单</strong></p><p>　点击画面中央会打开菜单：上一页／下一页／上一章／下一章／返回列表（全屏时另有结束全屏）</p><p>　点击背景、✕ 或任意按键即可关闭</p><br><p><strong>🗺️ 点击区域说明</strong></p><p>　以叠加方式显示各区域按下后会发生什么</p><p>　首次会自动显示；之后可用 👁️ 按钮、关闭本说明时或更改设置时显示</p><p>　点击任意处即可关闭</p><br><p><strong>📱 滑动与按钮翻页</strong></p><p>　向左滑动：前进一页</p><p>　向右滑动：后退一页</p><p>　画面下方「下一页」・上方「上一页」按钮（设置为「按钮（上下＋换章）」时显示）</p><p>　※章节末尾/开头时自动切换章节</p><br><p><strong>📖 章节切换（仅限流式排版）</strong></p><p>　右侧「›」按钮：上一章　／　左侧「‹」按钮：下一章</p><p>　（设置为「按钮（上下＋换章）」时显示；其他设置请用点击中央的菜单）</p><br><p><strong>🔵 蓝牙键盘</strong></p><p>　空格键：前进　Shift+空格：后退</p><p>　← 下一章　→ 上一章（仅限流式排版）</p><br><p><strong>🎯 页面跳转（侧边栏）</strong></p><p>　侧边栏（☰ 目录按钮）最上方的「跳转」面板</p><p>　滑块：拖动预览并跳至任意位置</p><p>　📖 封面 / -10 / +10 / 🏁 末页 四个按钮</p><p>　输入页码（流式排版为章节号）后按 Go 或 Enter</p><p>　跳转前位置自动记录于跳转历史（↩），点击即可返回</p><br><p><strong>🖼️ 漫画・杂志模式（FXL / Fixed Layout）</strong></p><p>　自动检测 pre-paginated ePub，每页单张图片等比缩放显示</p><p>　iPad 横向画面自动显示跨页（两页并排）</p><p>　书写方向・字体等设置停用，改以⚙设置「跨页显示」切换自动/单页/跨页</p><p>　漫画（RTL）依右页起始显示，跨页时于画面中央相邻</p><p>　iPhone 可通过☰→跳转面板浏览封面・末页・任意页</p><br><p><strong>🔍 分格阅读缩放（仅 FXL）</strong></p><p>　工具栏🔍按钮 或 双击页面 开启/关闭</p><p>　⚙「缩放模式」可选 4 种：</p><p>　<b>故事型漫画</b>＝单页划分为 2列×3行=6个区域，Next 按右上→左上→右中→左中→右下→左下 顺序（5次到达下一页）</p><p>　<b>四格漫画</b>＝右列3个→左列3个 顺序（纵向四格用）</p><p>　<b>适合高度·横向滚动</b>（v1.8.4）＝竖持手机 × 竖排纸本扫描最佳。图像纵向填满，Next 横向滚动，到末端跳至下一页开头</p><p>　<b>适合宽度·纵向滚动</b>（v1.8.5）＝横放手机 × 横排纸本扫描最佳。图像横向填满，Next 上→下滚动，到末端跳至下一页开头</p><p>　LTR 书籍自动左右反转（可于⚙关闭，仅 6 区域模式）</p><p>　拖动进入🌀自由模式，右下胶囊（🎯/↔/↕/🌀）点击回到预设/下个区域</p><p>　边缘再拉（橡皮筋）跳至下一／前一页</p><p>　⚙「缩放倍率」：1.5x / 2.0x / 2.5x（仅 6 区域模式，轴模式自动计算）</p><p>　轴模式搭配全屏可消除上下／左右边距</p><br><p><strong>🔍 全文搜索</strong></p><p>　侧边栏（目录按钮）→「搜索」选项卡，输入关键词后按 Enter</p><p>　点击结果即可跳转至该章（同时记录于跳转历史）</p><p>　图片格式书籍（FXL）若含 OCR 透明文本亦可搜索（命中处会在页面上高亮显示）</p><br><p><strong>🔊 朗读（仅语音）</strong></p><p>　工具栏的 🔊 按钮会用设备语音朗读当前正文（仅限流式排版）</p><p>　画面下方的播放栏可操作 上一句／暂停·继续／下一句／停止，以及速度（0.5〜2.0倍）</p><p>　读到章节结尾会自动前往下一章。有标注假名（ふりがな）处会朗读假名</p><p>　可在⚙设置「🔊 朗读」选择语音（按书籍语言从设备已安装的语音中筛选）</p><p>　播放时会保持屏幕不熄灭（支持 Wake Lock 的设备）。<b>但屏幕锁定或切换标签页时会停止</b>（浏览器限制）。建议调低亮度使用</p><p>　若设备没有该书语言的语音则无法播放。iOS 可在 设置→辅助功能→朗读内容 添加高质量语音</p><br><p><strong>🎨 显示设置（⚙图标）</strong></p><p>　字体：22 种（明朝体・黑体・Google Fonts 等）＋ 可添加本地字体（.ttf/.otf/.woff/.woff2，最多 5 个・保存于本设备并可离线使用）※仅限流式排版</p><p>　粗体显示：将整篇正文加粗（若有实际 Bold 字重则使用）※仅限流式排版</p><p>　描边强度：粗体开启时为文字添加描边以进一步强调（无/弱/中/强；不含拼音）※仅限流式排版</p><p>　主题：8 色（标准・棕褐・白纸・深色・樱花・星空・抹茶・月夜）</p><p>　字体大小・行距・边距・书写方向 ※仅限流式排版</p><p>　跨页显示（仅 FXL）：自动 / 单页 / 跨页</p><br><p><strong>🔖 书签・跳转历史</strong></p><p>　阅读位置自动记录。侧边栏目录选项卡可查看跳转历史</p><p>　📥 导入 / 📤 导出（⚙设置「书签数据」）　☁↓ Drive 加载　☁↑ Drive 保存</p><p>　⚙设置「自动保存书签」开启：自动将阅读位置保存至 Drive，并在启动・切回标签页时自动获取其他设备的最新位置（采用更前进的位置；阅读中以提示通知→点击跳转）</p><p style="font-size:12px;opacity:.6;">　※ Drive 功能需通过 HTTP/HTTPS 服务器启动并配置 Google Client ID</p><br><p><strong>📚 阅读中列表</strong></p><p>　未打开书籍时，欢迎页面显示正在阅读的书籍列表</p><p>　书卡显示封面、书名、作者、进度条及最后阅读日期</p><p>&nbsp;可用排序按钮切换「剩余时间短至长」等顺序；每张卡片显示预估剩余阅读时间 ⏱（方便寻找约2小时可读完的书）</p><p>　点击书卡右下角「打开此文件」，选择文件后从上次位置继续阅读</p><p>　读到最后一章末尾时，画面下方会出现读完提示横幅</p><p>　「回到阅读列表」：关闭书籍并返回列表（标记为已读完并自动移除）</p><p>　「继续阅读」：关闭横幅，继续阅读</p><p>　左上角的「返回列表」按钮可随时关闭书籍并返回列表（自动保存阅读位置）</p><p>　点击列表右上角「编辑」进入编辑模式，点击书卡 × 可从列表中删除</p><p>　若⚙设置「启动时打开上次的书」为开启，下次启动时会直接打开上次的书（仅限已离线缓存的书籍，已读完的不会打开）</p><br><p><strong>📊 阅读数据</strong></p><p>　工具栏📊按钮（或欢迎页面按钮）显示阅读统计</p><p>　读完率・读完本数・阅读中本数／常读作者／最近读完（点击重新打开）</p><p>　累计阅读时间・每本阅读时间・阅读速度・预计读完时间（流式排版）</p><p>　连续阅读（日／周／月）・阅读日历（草图）・每周／每月阅读节奏</p><p style="font-size:12px;opacity:.6;">　※ 阅读时间仅计算本设备的实际阅读；开启 Drive 自动保存后可跨设备合计同步</p><br><p><strong>📲 安装为应用（添加到主屏幕）</strong></p><p>　安装后会以独立窗口（无地址栏）启动，并可离线打开（仅限 https://）</p><p>　<b>iPhone・iPad（Safari）：</b></p><p>　① 点击画面下方（部分机型在上方）的 分享按钮（方框加箭头）</p><p>　② 向下滚动并点击「添加到主屏幕」</p><p>　③ 点击右上角「添加」</p><p>　※ iOS 不支持「从分享打开」。主屏幕版本与 Safari 的数据存储位置分开，书签请用「☁↓ 从 Drive 加载」迁移（封面缓存・新增字体需重新打开）</p><p>　<b>Android（Chrome）：</b></p><p>　① 打开右上角 ⋮（菜单）</p><p>　② 点击「安装应用」或「添加到主屏幕」</p><p>　③ 出现确认时点击「安装」</p><p>　④ 安装后，在文件 App 或文件管理器选择 ePub →「分享」→ 选择 yomikake 即可直接打开（Android 请使用普通版 yomikake.html）</p><br><p><strong>支持格式</strong></p><p>　.epub / .kepub（Kobo）。流式排版与固定版式（漫画・杂志）均自动检测</p>',
     'loading.fetching':     '📂 正在获取文件…',
     'loading.opening':      '正在打开「{filename}」…',
@@ -2401,6 +2511,11 @@ const state = {
   bookTitle:'', bookCreator:'', bookCreators:[], bookCreatorsRoled:[], bookCoverDataUri:'',
   bookPublisher:'', bookSourceUrl:'', bookSourceIsbn:'', bookSourceSite:'',  // 書誌: 発行元 / 底本URL / 底本ISBN / サイト表示名（セッションのみ）
   bookContributorsRoled:[], bookDescription:'', bookPubDate:'', bookSeries:'', bookRights:'',  // 書誌v2: 訳者等 / あらすじ / 刊行日 / シリーズ / 権利表示（表示専用。しおりキーには使わない）
+  bookSubtitle:'', bookGenre:'', bookGenreRaw:'', bookSerial:'', bookTags:[],
+  bookEpisodeCount:0, bookCharCount:0, bookSourceUpdated:'', bookAudience:'',
+  // 書誌v3（配信元メタデータ）: 副題 / 共通ジャンル / ジャンル原文 / 連載状態 / タグ /
+  // サイト側の総話数 / 総文字数 / サイト更新日 / 対象年齢。すべて表示専用。
+  // このうち bookGenre と bookSerial だけを本棚の絞り込み用に localStorage へ保存する。
   fontMode:'publisher', fontSize:100, lineHeight:2.0, theme:'', margin:'full',
   writingMode:'vertical',  // 'vertical' | 'horizontal' | 'publisher'
   fwdBtnSize:'small',      // 'small' | 'medium' | 'large'
@@ -3111,6 +3226,17 @@ async function loadEpub(file) {
       try { state.bookSourceUrl = await resolveSourceFromSpine(); } catch(e) {}
     }
     state.bookSourceSite = state.bookSourceUrl ? siteNameFromUrl(state.bookSourceUrl) : '';
+    // 配信元メタデータ（novel_downloader v2.4.0 以降）。無い本では全部空のまま
+    state.bookSubtitle      = _subtitleFromOpf(opfDoc);
+    state.bookGenre         = _ndMeta(opfDoc, 'genre');
+    state.bookGenreRaw      = _ndMeta(opfDoc, 'genreRaw');
+    state.bookSerial        = _ndMeta(opfDoc, 'serialStatus');
+    state.bookSourceUpdated = _ndMeta(opfDoc, 'updated');
+    state.bookEpisodeCount  = _ndMetaInt(opfDoc, 'episodeCount');
+    state.bookCharCount     = _ndMetaInt(opfDoc, 'charCount');
+    state.bookAudience      = _audienceFromOpf(opfDoc);
+    // dc:subject はジャンル原文＋タグ。原文と一致するものはタグ表示から除く
+    state.bookTags = _subjectsFromOpf(opfDoc).filter(v => v !== state.bookGenreRaw);
     buildTtsVoiceSelect();
     document.getElementById('book-title').textContent = titleText;
     state.bookKey = makeBookKey(titleText, state.bookCreator);
@@ -6198,7 +6324,7 @@ function formatRelativeDate(isoStr) {
 // _RL_SORTS は _rlLoadPrefs が変数宣言部（let _rlPrefs = _rlLoadPrefs()）から
 // 呼ばれるため、TDZ を避けて変数宣言部で const 定義している。
 function _rlLoadPrefs() {
-  const def = { view: 'list', sort: 'recent', filterReady: false, showFinished: false };
+  const def = { view: 'list', sort: 'recent', filterReady: false, showFinished: false, genre: '' };
   try {
     const p = JSON.parse(localStorage.getItem('epub_rl_prefs'));
     if (!p) return def;
@@ -6242,6 +6368,8 @@ function _rlCollect() {
         cover: val.cover || '',
         source: val.source || '',
         site: val.site || '',
+        genre: val.genre || '',
+        serial: val.serial || '',
       };
       it.timeLeftMs = _rdEstTimeLeft(it, _stats[key], _glob);  // v2.4.0: 残り時間（ms）or null
       items.push(it);
@@ -6278,10 +6406,13 @@ function _rlFilterSort(items) {
   const total = arr.length;
   if (_rlPrefs.filterReady)
     arr = arr.filter(it => _cachedKeys.has(it.key));
+  // ジャンル絞り込み。'' = すべて / '_none' = 未分類（まだ開いていない本を含む）
+  if (_rlPrefs.genre === '_none')      arr = arr.filter(it => !it.genre);
+  else if (_rlPrefs.genre)             arr = arr.filter(it => it.genre === _rlPrefs.genre);
   const terms = _rlNorm(_rlQuery).split(/[\s　]+/).filter(Boolean);
   if (terms.length)
     arr = arr.filter(it => {
-      const hay = _rlNorm(it.title + ' ' + it.creator);
+      const hay = _rlNorm(it.title + ' ' + it.creator + ' ' + genreLabel(it.genre));
       return terms.every(tm => hay.includes(tm));
     });
   const pct = it => (it.spineIdx + it.ratio) / it.spineCount;
@@ -6374,6 +6505,10 @@ function _rlRender(shown, total) {
       : BOOK_ICON;
     const creatorHtml = item.creator
       ? `<div class="rl-creator">${esc(item.creator)}</div>` : '';
+    // 連載中だけバッジを出す。完結は読了バッジと紛らわしく、本棚の大半が
+    // 完結作品なので情報量が薄い
+    const serialHtml = (item.serial && item.serial.indexOf('完結') < 0)
+      ? `<span class="rl-serial">${esc(t('readingList.serialRunning'))}</span>` : '';
     const pctHtml = item.finished
       ? `<span class="rl-finished-badge">${t('readingList.finishedBadge')}</span>`
       : `<span class="rl-pct">${pct}%</span>`;
@@ -6387,7 +6522,7 @@ function _rlRender(shown, total) {
     ${creatorHtml}
     <div class="rl-progress-row">
       <div class="rl-bar"><div class="rl-fill" style="width:${pct}%"></div></div>
-      <span class="rl-chapter">${chapterStr}</span>
+      <span class="rl-chapter">${chapterStr}</span>${serialHtml}
       ${pctHtml}
     </div>
     <div class="rl-meta">
@@ -6412,6 +6547,7 @@ function _rlSyncToolsUI() {
     b.textContent = t('readingList.sort.' + b.dataset.sort);
     b.classList.toggle('checked', b.dataset.sort === _rlPrefs.sort);
   });
+  _rlSyncGenreUI();
   document.getElementById('rl-chip-ready').classList.toggle('active', _rlPrefs.filterReady);
   document.getElementById('rl-chip-finished').classList.toggle('active', _rlPrefs.showFinished);
   document.getElementById('rl-view-list').classList.toggle('active', _rlPrefs.view === 'list');
@@ -6420,6 +6556,40 @@ function _rlSyncToolsUI() {
   if (editBtn) editBtn.textContent = _editMode ? t('readingList.editDone') : t('readingList.edit');
   const doneBtn = document.getElementById('reading-list-done-btn');
   if (doneBtn) doneBtn.textContent = t('readingList.editDone');
+}
+
+// ── ジャンル選択の再構築 ──
+// 蔵書に実在するジャンルだけを冊数付きで出す。10種を常に並べると0冊の項目が
+// 並んで使いにくい。ジャンルは本を開いたときにしか分からないので、開いていない
+// 本は「未分類」に集まる。
+function _rlSyncGenreUI() {
+  const btn = document.getElementById('rl-genre-btn');
+  const menu = document.getElementById('rl-genre-menu');
+  if (!btn || !menu) return;
+  const counts = new Map();
+  let none = 0;
+  _rlCollect().forEach(it => {
+    if (!it.genre) { none++; return; }
+    counts.set(it.genre, (counts.get(it.genre) || 0) + 1);
+  });
+  const opts = [{ id: '', label: t('readingList.genreAll'), n: 0 }];
+  [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || ND_GENRES.indexOf(a[0]) - ND_GENRES.indexOf(b[0]))
+    .forEach(([id, n]) => opts.push({ id, label: genreLabel(id), n }));
+  if (none) opts.push({ id: '_none', label: t('readingList.genreNone'), n: none });
+  // 選択中のジャンルが蔵書から消えていたら「すべて」に戻す
+  if (_rlPrefs.genre && !opts.some(o => o.id === _rlPrefs.genre)) {
+    _rlPrefs.genre = '';
+    _rlSavePrefs();
+  }
+  const cur = opts.find(o => o.id === _rlPrefs.genre) || opts[0];
+  btn.textContent = t('readingList.genreLabel', { name: cur.label }) + ' ▾';
+  menu.innerHTML = opts.map(o =>
+    '<button data-genre="' + esc(o.id) + '" onclick="setRlGenre(this.dataset.genre)"'
+    + (o.id === _rlPrefs.genre ? ' class="checked"' : '') + '>'
+    + esc(o.label) + (o.n ? ' (' + o.n + ')' : '') + '</button>').join('');
+  // 蔵書にジャンル付きの本が1冊も無ければUIごと隠す（v2.4.0 以前の本だけの環境）
+  document.getElementById('rl-genre-wrap').style.display = counts.size ? '' : 'none';
 }
 
 // ── 操作ハンドラ群 ──
@@ -6439,6 +6609,16 @@ function toggleRlFilter(name) {
   buildReadingList();
 }
 
+function toggleRlGenreMenu(ev) {
+  ev.stopPropagation();
+  document.getElementById('rl-genre-menu').classList.toggle('show');
+}
+function setRlGenre(g) {
+  _rlPrefs.genre = g;
+  _rlSavePrefs();
+  document.getElementById('rl-genre-menu').classList.remove('show');
+  buildReadingList();
+}
 function toggleRlSortMenu(ev) {
   ev.stopPropagation();
   document.getElementById('rl-sort-menu').classList.toggle('show');
@@ -6454,6 +6634,7 @@ function clearRlFilters() {
   const inp = document.getElementById('rl-search');
   if (inp) inp.value = '';
   _rlPrefs.filterReady = false;
+  _rlPrefs.genre = '';
   // 検索・チップ解除後もまだ0件（=全冊読了）なら読了表示を自動でON
   if (!_rlFilterSort(_rlCollect()).shown.length) _rlPrefs.showFinished = true;
   _rlSavePrefs();
@@ -6669,6 +6850,9 @@ function closeBook() {
   state.bookTitle = ''; state.bookCreator = ''; state.bookCreators = []; state.bookCreatorsRoled = []; state.bookCoverDataUri = '';
   state.bookPublisher = ''; state.bookSourceUrl = ''; state.bookSourceIsbn = ''; state.bookSourceSite = '';
   state.bookContributorsRoled = []; state.bookDescription = ''; state.bookPubDate = ''; state.bookSeries = ''; state.bookRights = '';
+  state.bookSubtitle = ''; state.bookGenre = ''; state.bookGenreRaw = ''; state.bookSerial = '';
+  state.bookTags = []; state.bookEpisodeCount = 0; state.bookCharCount = 0;
+  state.bookSourceUpdated = ''; state.bookAudience = '';
   state.bookKey = ''; state.publisherAxis = null;
   state.renderMode = 'reflow'; state.fxlPpd = 'ltr';
   state.fxlPairs = null; state.currentPairIdx = 0;
@@ -7255,6 +7439,56 @@ async function extractCoverThumb(opfDoc) {
 }
 
 // ══════════════════════════════════════════
+//  配信元メタデータ（novel_downloader v2.4.0 以降の nd:* / 標準語彙）
+// ══════════════════════════════════════════
+// 共通ジャンル軸。表示名は t('genre.' + id) で引く。未知の ID が来たら
+// 生の値をそのまま見せる（ビューアを更新しなくても壊れないように）。
+const ND_GENRES = ['fantasy','romance','sf','mystery','drama',
+                   'history','literature','nonfiction','fanfic','other'];
+function genreLabel(id) {
+  if (!id) return '';
+  return ND_GENRES.indexOf(id) >= 0 ? t('genre.' + id) : id;
+}
+// nd:* は prefix 宣言の有無に関わらず property の文字列一致で拾う
+// （nd: を1件も出さない本では prefix 宣言ごと省略されるため）
+function _ndMeta(opfDoc, name) {
+  const el = opfDoc.querySelector('metadata meta[property="nd:' + name + '"]');
+  return el ? el.textContent.trim() : '';
+}
+function _ndMetaInt(opfDoc, name) {
+  const n = parseInt(String(_ndMeta(opfDoc, name)).replace(/[^0-9]/g, ''), 10);
+  return isFinite(n) && n > 0 ? n : 0;
+}
+// 副題（キャッチコピー）: title-type="subtitle" で refines された dc:title
+function _subtitleFromOpf(opfDoc) {
+  const metas = [...opfDoc.querySelectorAll('metadata meta[refines]')];
+  for (const m of metas) {
+    if ((m.getAttribute('property') || '') !== 'title-type') continue;
+    if (m.textContent.trim() !== 'subtitle') continue;
+    const id = (m.getAttribute('refines') || '').replace(/^#/, '');
+    if (!id) continue;
+    const titles = [...opfDoc.querySelectorAll('metadata > *|title, metadata > title')];
+    const hit = titles.find(el => el.getAttribute('id') === id);
+    if (hit) return hit.textContent.trim();
+  }
+  return '';
+}
+function _subjectsFromOpf(opfDoc) {
+  return [...opfDoc.querySelectorAll('metadata > *|subject, metadata > subject')]
+    .map(el => el.textContent.trim()).filter(Boolean);
+}
+function _audienceFromOpf(opfDoc) {
+  const el = opfDoc.querySelector('metadata meta[property="dcterms:audience"]');
+  return el ? el.textContent.trim() : '';
+}
+// 収録話数。spine には表紙・目次・奥付も含まれるので length は話数ではない
+// （実測: 2話の本で spine 6件）。本文ファイル名で数える。表紙画像の有無で
+// 差が変わるため固定のオフセットは引かない。数えられなければ 0。
+function _countEpisodesInSpine() {
+  return (state.spine || []).filter(it => /(^|\/)ep\d+\.xhtml$/i.test(it.href || '')).length;
+}
+
+// ══════════════════════════════════════════
 //  書誌情報（底本サイト・役割付き著者）
 // ══════════════════════════════════════════
 // host サフィックス → サイト表示名（novel_downloader の _detect_site と対応）
@@ -7440,6 +7674,9 @@ function saveBookMeta() {
       spineCount: state.spine.length,
       ...(state.bookSourceUrl ? {source: state.bookSourceUrl} : {}),
       ...(state.bookSourceSite ? {site: state.bookSourceSite} : {}),
+      // 本棚のジャンル絞り込み用。タグ・あらすじ・文字数は容量を食うので保存しない
+      ...(state.bookGenre  ? {genre:  state.bookGenre}  : {}),
+      ...(state.bookSerial ? {serial: state.bookSerial} : {}),
       ...(state.bookCoverDataUri ? {cover: state.bookCoverDataUri} : {}),
     };
     localStorage.setItem(state.bookKey, JSON.stringify(meta));
@@ -8002,6 +8239,10 @@ function _rdMergePos(key, remoteRaw) {
     else if (lf || rf) merged.finishedAt = lf || rf;
     if (!(Array.isArray(remote.creators) && remote.creators.length) && Array.isArray(local.creators) && local.creators.length)
       merged.creators = local.creators;
+    // ジャンル・連載状態は本を開いた端末にしか無い。旧版から送られてきた
+    // しおりで上書きされると本棚の分類が消えるので、どちらかにあれば残す
+    if (!remote.genre  && local.genre)  merged.genre  = local.genre;
+    if (!remote.serial && local.serial) merged.serial = local.serial;
   }
   localStorage.setItem(key, JSON.stringify(merged));
 }
@@ -8347,6 +8588,8 @@ function _rdMergePosBest(key, remoteRaw) {
   if (!remote.cover && local.cover) merged.cover = local.cover; // 表紙はどちらかにあれば残す
   if (!(Array.isArray(remote.creators) && remote.creators.length) && Array.isArray(local.creators) && local.creators.length)
     merged.creators = local.creators;
+  if (!remote.genre  && local.genre)  merged.genre  = local.genre;   // 同上
+  if (!remote.serial && local.serial) merged.serial = local.serial;
   const lsc = +local.spineCount || 0, rsc = +remote.spineCount || 0;
   if (lsc || rsc) merged.spineCount = Math.max(lsc, rsc);
   localStorage.setItem(key, JSON.stringify(merged));
@@ -8512,10 +8755,11 @@ function _authorSearchLink(name) {
        + '" style="text-decoration:none;">🔍</a>';
 }
 // 制作系ロール（読者向けでないので著者行には混ぜず、下部に小さく出す）
-const ROLE_PRODUCTION = ['bkp', 'prt', 'pbl', 'dst', 'mfr'];
+const ROLE_PRODUCTION = ['bkp', 'prt', 'pbl', 'dst', 'mfr', 'trc', 'pfr'];
 const ROLE_KEY = {aut:'role.aut', ill:'role.ill', trl:'role.trl', edt:'role.edt',
                   art:'role.art', sup:'role.sup', pht:'role.pht',
                   bkp:'role.bkp', prt:'role.prt', pbl:'role.pbl',
+                  trc:'role.trc', pfr:'role.pfr',
                   dst:'role.dst', mfr:'role.mfr'};
 // 書誌ブロック: 役割付き著者行（dc:creator ＋ 読者向け役割の dc:contributor）
 function _helpCreatorsHtml() {
@@ -8593,6 +8837,68 @@ function _helpRightsHtml() {
   if (s.length > 120) s = s.slice(0, 119) + '…';
   return '<p style="font-size:11px;opacity:.5;margin-top:4px;">' + esc(s) + '</p>';
 }
+// ── 副題（キャッチコピー）: 題名の下に小さく ──
+function _helpSubtitleHtml() {
+  return state.bookSubtitle
+    ? '<p style="font-size:12px;opacity:.7;margin:-2px 0 4px;line-height:1.5;">'
+      + esc(state.bookSubtitle) + '</p>'
+    : '';
+}
+// ── 連載状態バッジ（出版社行の右に付ける）──
+function _helpStatusBadge() {
+  const s = state.bookSerial;
+  if (!s) return '';
+  const done = s.indexOf('完結') >= 0;
+  const label = done ? t('help.serialFinished') : t('help.serialRunning');
+  return '<span style="margin-left:8px;font-size:11px;padding:1px 7px;border-radius:9px;'
+       + 'border:1px solid var(--ui-border);opacity:.8;white-space:nowrap;">'
+       + esc(label) + '</span>';
+}
+function _helpGenreHtml() {
+  const label = genreLabel(state.bookGenre);
+  const raw   = state.bookGenreRaw;
+  if (!label && !raw) return '';
+  const text = (label && raw && raw !== label) ? label + '（' + raw + '）' : (label || raw);
+  return '<p>' + esc(t('help.genre', {name: text})) + '</p>';
+}
+// ── タグ（dc:subject）をチップで ──
+function _helpTagsHtml() {
+  const tags = state.bookTags || [];
+  if (!tags.length) return '';
+  const chips = tags.slice(0, 12).map(v =>
+    '<span style="display:inline-block;font-size:11px;padding:1px 7px;margin:0 4px 4px 0;'
+    + 'border-radius:9px;border:1px solid var(--ui-border);opacity:.75;">#' + esc(v) + '</span>');
+  return '<p style="margin-top:4px;line-height:1.9;">' + chips.join('') + '</p>';
+}
+function _helpAudienceHtml() {
+  return state.bookAudience
+    ? '<p>' + esc(t('help.audience', {name: state.bookAudience})) + '</p>' : '';
+}
+function _helpSourceUpdatedHtml() {
+  const v = _formatPubDate(state.bookSourceUpdated);
+  return v ? '<p>' + esc(t('help.sourceUpdated', {date: v})) + '</p>' : '';
+}
+// ── 分量の行（収録話数 ／ 文字数 ／ 読了目安）──
+// spine は表紙・目次・奥付を含むので length は話数ではない。本文だけを数え、
+// 数えられない本（他ツール製）は従来どおりチャプター数を出す。
+function _helpVolumeHtml() {
+  const parts = [];
+  const eps   = _countEpisodesInSpine();
+  const total = state.bookEpisodeCount;
+  const partial = !!(eps && total && total > eps);   // サイトに続きがある
+  if (partial)      parts.push(t('help.volumeOf', {n: eps, total: total}));
+  else if (eps)     parts.push(t('help.volume', {n: eps}));
+  else              parts.push(t('help.chapters', {n: state.spine.length}));
+  // 文字数はサイト側の作品全体の値。未収録の話がある本で出すと、この本を
+  // 読み終える時間だと誤解されるため、全話そろっているときだけ出す。
+  const chars = state.bookCharCount;
+  if (chars && !partial) {
+    parts.push(t('help.chars', {n: chars.toLocaleString()}));
+    // 読書速度 500字/分 を目安にする
+    parts.push(t('help.readTime', {t: _rdFmtDuration(chars / 500 * 60000)}));
+  }
+  return '<p>' + esc(parts.join(' ／ ')) + '</p>';
+}
 // 書誌ブロック: 底本行（http(s)=リンク / ISBN=表示＋書誌検索）
 function _helpSourceHtml() {
   if (state.bookSourceUrl) {
@@ -8616,13 +8922,20 @@ function updateHelpContent() {
     '<div style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:6px;padding:12px 16px;margin-bottom:16px;">',
     '<p style="font-size:11px;opacity:.55;margin-bottom:6px;">' + esc(t('help.currentBook')) + '</p>',
     '<p style="font-size:14px;font-weight:bold;line-height:1.6;opacity:1;margin-bottom:4px;">' + esc(state.bookTitle) + '</p>',
+    _helpSubtitleHtml(),
     _helpCreatorsHtml(),
-    state.bookPublisher ? '<p>' + esc(t('help.publisher', {name: state.bookPublisher})) + '</p>' : '',
+    (state.bookPublisher || state.bookSerial)
+      ? '<p>' + (state.bookPublisher ? esc(t('help.publisher', {name: state.bookPublisher})) : '')
+        + _helpStatusBadge() + '</p>' : '',
     _helpPubDateHtml(),
+    _helpSourceUpdatedHtml(),
     _helpSeriesHtml(),
+    _helpGenreHtml(),
+    _helpAudienceHtml(),
     _helpSourceHtml(),
     _helpDescriptionHtml(),
-    '<p>' + esc(t('help.chapters', {n: state.spine.length})) + '</p>',
+    _helpTagsHtml(),
+    _helpVolumeHtml(),
     state.toc.length ? '<p>' + esc(t('help.tocItems', {n: state.toc.length})) + '</p>' : '',
     _helpProductionHtml(),
     _helpRightsHtml(),
@@ -8741,6 +9054,9 @@ document.addEventListener('click', e => {
   const menu = document.getElementById('rl-sort-menu');
   if (menu && menu.classList.contains('show') && !e.target.closest('#rl-sort-wrap'))
     menu.classList.remove('show');
+  const gmenu = document.getElementById('rl-genre-menu');
+  if (gmenu && gmenu.classList.contains('show') && !e.target.closest('#rl-genre-wrap'))
+    gmenu.classList.remove('show');
 });
 document.getElementById('search-input').disabled = true;
 document.getElementById('search-btn').disabled = true;
