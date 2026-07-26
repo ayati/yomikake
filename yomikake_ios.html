@@ -373,6 +373,12 @@
 
   /* 読み上げ（TTS）*/
   #tts-btn.tts-active { color:var(--accent); }
+  /* ツールバー項目の表示切替（設定の「ツールバーに表示」）。
+     !important は body.mode-fxl #tts-btn や .fxl-only の既存ルールと競合したときに
+     「隠す側」を必ず勝たせるため。外れれば既存ルールが従来どおり効く */
+  .tb-off { display:none !important; }
+  .tb-item-toggle { border:1px solid var(--ui-border); border-radius:8px; padding:6px 16px; min-width:60px; font-size:13px; font-weight:600; cursor:pointer; background:var(--ui-bg); color:var(--ui-text); font-family:inherit; transition:all .15s; }
+  .tb-item-toggle.on { background:var(--accent); color:#fff; border-color:var(--accent); }
   body.mode-fxl #tts-btn { display:none; }
   #tts-bar { position:absolute; left:50%; transform:translateX(-50%);
     bottom:max(14px, env(safe-area-inset-bottom, 14px));
@@ -705,7 +711,7 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
   </button>
 
-  <button class="icon-btn" onclick="showNavHint()" data-i18n-title="btn.flash">
+  <button class="icon-btn" id="flash-btn" onclick="showNavHint()" data-i18n-title="btn.flash">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
   </button>
 
@@ -713,7 +719,7 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
   </button>
 
-  <button class="icon-btn" onclick="showHelp()" data-i18n-title="btn.help">
+  <button class="icon-btn" id="help-btn" onclick="showHelp()" data-i18n-title="btn.help">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
   </button>
 
@@ -919,6 +925,39 @@
         <button id="fxl-ltr-flip-toggle" onclick="toggleFxlLtrAutoFlip()"
                 style="border:1px solid var(--ui-border);border-radius:8px;padding:6px 16px;min-width:60px;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;">ON</button>
       </div>
+    </div>
+
+    <div class="set-group" id="toolbar-settings-group">
+      <h4 data-i18n="settings.toolbarGroup">ツールバーに表示</h4>
+      <div class="set-row" id="tbitem-flash">
+        <span class="set-label" data-i18n="settings.tbFlash">👁 操作を見せる</span>
+        <button class="tb-item-toggle" data-tbkey="flash" onclick="toggleToolbarItem(this.dataset.tbkey)">ON</button>
+      </div>
+      <div class="set-row" id="tbitem-tts">
+        <span class="set-label" data-i18n="settings.tbTts">🔊 読み上げ</span>
+        <button class="tb-item-toggle" data-tbkey="tts" onclick="toggleToolbarItem(this.dataset.tbkey)">ON</button>
+      </div>
+      <div class="set-row" id="tbitem-readingData">
+        <span class="set-label" data-i18n="settings.tbReadingData">📊 読書データ</span>
+        <button class="tb-item-toggle" data-tbkey="readingData" onclick="toggleToolbarItem(this.dataset.tbkey)">ON</button>
+      </div>
+      <div class="set-row" id="tbitem-fullscreen">
+        <span class="set-label" data-i18n="settings.tbFullscreen">⛶ 全画面</span>
+        <button class="tb-item-toggle" data-tbkey="fullscreen" onclick="toggleToolbarItem(this.dataset.tbkey)">ON</button>
+      </div>
+      <div class="set-row" id="tbitem-help">
+        <span class="set-label" data-i18n="settings.tbHelp">❓ ヘルプ</span>
+        <button class="tb-item-toggle" data-tbkey="help" onclick="toggleToolbarItem(this.dataset.tbkey)">ON</button>
+      </div>
+      <div class="set-row" id="tbitem-drive">
+        <span class="set-label" data-i18n="settings.tbDrive">☁ Drive しおり同期</span>
+        <button class="tb-item-toggle" data-tbkey="drive" onclick="toggleToolbarItem(this.dataset.tbkey)">ON</button>
+      </div>
+      <div class="set-row" id="tbitem-fxlZoom">
+        <span class="set-label" data-i18n="settings.tbFxlZoom">🔍 コマ読みズーム</span>
+        <button class="tb-item-toggle" data-tbkey="fxlZoom" onclick="toggleToolbarItem(this.dataset.tbkey)">ON</button>
+      </div>
+      <span style="font-size:11px;opacity:.6;line-height:1.5;padding:0 8px;display:block;" data-i18n="settings.toolbarHelp">開く・目次・設定は常に表示されます</span>
     </div>
 
     <div class="set-group" id="tts-settings-group">
@@ -1433,6 +1472,15 @@ const I18N = {
     'btn.fullscreen':            'フルスクリーン',
     'btn.fullscreen.exit':       '読書モード終了',
     'settings.driveGroup':       'Google Drive',
+    'settings.toolbarGroup':            'ツールバーに表示',
+    'settings.tbFlash':                 '👁 操作を見せる',
+    'settings.tbTts':                   '🔊 読み上げ',
+    'settings.tbReadingData':           '📊 読書データ',
+    'settings.tbFullscreen':            '⛶ 全画面',
+    'settings.tbHelp':                  '❓ ヘルプ',
+    'settings.tbDrive':                 '☁ Drive しおり同期',
+    'settings.tbFxlZoom':               '🔍 コマ読みズーム',
+    'settings.toolbarHelp':             '開く・目次・設定は常に表示されます',
     'settings.driveAutoSave':    'しおり自動保存',
     'settings.spreadMode':       '見開き表示',
     'spread.auto':               '自動',
@@ -1756,6 +1804,15 @@ const I18N = {
     'btn.fullscreen':            'Fullscreen',
     'btn.fullscreen.exit':       'Exit reader',
     'settings.driveGroup':       'Google Drive',
+    'settings.toolbarGroup':            'Show in toolbar',
+    'settings.tbFlash':                 '👁 Show controls',
+    'settings.tbTts':                   '🔊 Read aloud',
+    'settings.tbReadingData':           '📊 Reading data',
+    'settings.tbFullscreen':            '⛶ Fullscreen',
+    'settings.tbHelp':                  '❓ Help',
+    'settings.tbDrive':                 '☁ Drive sync',
+    'settings.tbFxlZoom':               '🔍 Panel zoom',
+    'settings.toolbarHelp':             'Open / TOC / Settings are always shown',
     'settings.driveAutoSave':    'Auto-save bookmarks',
     'settings.spreadMode':       'Spread layout',
     'spread.auto':               'Auto',
@@ -2079,6 +2136,15 @@ const I18N = {
     'btn.fullscreen':            '全螢幕',
     'btn.fullscreen.exit':       '結束閱讀模式',
     'settings.driveGroup':       'Google Drive',
+    'settings.toolbarGroup':            '工具列顯示',
+    'settings.tbFlash':                 '👁 顯示控制項',
+    'settings.tbTts':                   '🔊 朗讀',
+    'settings.tbReadingData':           '📊 閱讀數據',
+    'settings.tbFullscreen':            '⛶ 全螢幕',
+    'settings.tbHelp':                  '❓ 說明',
+    'settings.tbDrive':                 '☁ Drive 書籤同步',
+    'settings.tbFxlZoom':               '🔍 分格縮放',
+    'settings.toolbarHelp':             '開啟・目錄・設定一律顯示',
     'settings.driveAutoSave':    '自動儲存書籤',
     'settings.spreadMode':       '跨頁顯示',
     'spread.auto':               '自動',
@@ -2402,6 +2468,15 @@ const I18N = {
     'btn.fullscreen':            '全屏',
     'btn.fullscreen.exit':       '退出阅读模式',
     'settings.driveGroup':       'Google Drive',
+    'settings.toolbarGroup':            '工具栏显示',
+    'settings.tbFlash':                 '👁 显示控件',
+    'settings.tbTts':                   '🔊 朗读',
+    'settings.tbReadingData':           '📊 阅读数据',
+    'settings.tbFullscreen':            '⛶ 全屏',
+    'settings.tbHelp':                  '❓ 帮助',
+    'settings.tbDrive':                 '☁ Drive 书签同步',
+    'settings.tbFxlZoom':               '🔍 分格缩放',
+    'settings.toolbarHelp':             '打开・目录・设置始终显示',
     'settings.driveAutoSave':    '自动保存书签',
     'settings.spreadMode':       '跨页显示',
     'spread.auto':               '自动',
@@ -2601,6 +2676,7 @@ const state = {
   fwdBtnSize:'small',      // 'small' | 'medium' | 'large'
   tapZone:'lshape',        // 'center' | 'lr' | 'tb' | 'lshape' — タップページ送りのゾーン配置（epub_settings に永続化）
   autoOpenLast:true,       // 起動時に前回の本を IDB キャッシュから自動オープン（epub_settings に永続化）
+  toolbarHidden:[],        // ツールバーで隠す項目のキー配列（epub_settings に永続化）
   ttsRate:1.0,             // 読み上げ速度 0.5–2.0（epub_settings に永続化）
   ttsVoice:'',             // 読み上げ音声 voiceURI（'' = 自動。epub_settings に永続化）
   bookLang:'ja',           // OPF dc:language 先頭2文字（セッションのみ・非永続）
@@ -5465,6 +5541,7 @@ function saveSettings() {
       ttsRate:       state.ttsRate,
       ttsVoice:      state.ttsVoice,
       driveAutoSave: state.driveAutoSave,
+      toolbarHidden: state.toolbarHidden,
       fontBold:      state.fontBold,
       fontStrokeLevel: state.fontStrokeLevel,
       spreadMode:    state.spreadMode,
@@ -5502,6 +5579,10 @@ function loadSettings() {
     if (typeof s.ttsRate === 'number' && s.ttsRate >= 0.5 && s.ttsRate <= 2) state.ttsRate = s.ttsRate;
     if (typeof s.ttsVoice === 'string') state.ttsVoice = s.ttsVoice;
     if (s.driveAutoSave !== undefined) { state.driveAutoSave = !!s.driveAutoSave; updateAutoSaveToggleUI(); }
+    if (Array.isArray(s.toolbarHidden)) {
+      const _tbValid = TOOLBAR_ITEMS.map(i => i.key);
+      state.toolbarHidden = s.toolbarHidden.filter(k => _tbValid.indexOf(k) >= 0);
+    }
     if (typeof s.fontBold === 'boolean') { state.fontBold = s.fontBold; updateFontBoldToggleUI(); }
     if (typeof s.fontStrokeLevel === 'number' && [0,1,2,3].indexOf(s.fontStrokeLevel) >= 0) {
       state.fontStrokeLevel = s.fontStrokeLevel;
@@ -6984,6 +7065,54 @@ function updateToolbarFade() {
   if (!tb) return;
   const more = tb.scrollWidth - tb.clientWidth - tb.scrollLeft > 4;
   tb.classList.toggle('tb-overflow', more);
+}
+
+// ══════════════════════════════════════════
+//  ツールバー項目の表示切替
+// ══════════════════════════════════════════
+// 隠せないもの：#open-btn（開く⇄リストへ）・#toc-btn・#book-title・#settings-btn
+// — 動線が消えると復帰不能になるため。
+const TOOLBAR_ITEMS = [
+  { key:'flash',       ids:['flash-btn'] },
+  { key:'tts',         ids:['tts-btn'] },
+  { key:'readingData', ids:['reading-data-btn'] },
+  { key:'fullscreen',  ids:['fs-btn'] },
+  { key:'help',        ids:['help-btn'] },
+  { key:'drive',       ids:['drive-download-btn','drive-upload-btn'] },  // 2ボタンで1キー
+  { key:'fxlZoom',     ids:['btn-fxl-zoom'] },
+];
+
+function applyToolbarPrefs() {
+  const hid = state.toolbarHidden || [];
+  TOOLBAR_ITEMS.forEach(it => {
+    const off = hid.indexOf(it.key) >= 0;
+    it.ids.forEach(id => { const el = document.getElementById(id); if (el) el.classList.toggle('tb-off', off); });
+  });
+  updateToolbarFade();  // ボタン数が変わると右端フェードの要否が変わるので必須
+}
+
+function toggleToolbarItem(key) {
+  if (!TOOLBAR_ITEMS.some(it => it.key === key)) return;
+  const hid = state.toolbarHidden;
+  const i = hid.indexOf(key);
+  if (i >= 0) hid.splice(i, 1); else hid.push(key);
+  applyToolbarPrefs();
+  updateToolbarPrefsUI();
+  saveSettings();
+}
+
+function updateToolbarPrefsUI() {
+  const hid = state.toolbarHidden || [];
+  TOOLBAR_ITEMS.forEach(it => {
+    const btn = document.querySelector('.tb-item-toggle[data-tbkey="' + it.key + '"]');
+    if (!btn) return;
+    const on = hid.indexOf(it.key) < 0;
+    btn.textContent = on ? 'ON' : 'OFF';
+    btn.classList.toggle('on', on);
+  });
+  // 読み上げ非対応環境ではボタン自体が出ないので、設定行も出さない
+  const ttsRow = document.getElementById('tbitem-tts');
+  if (ttsRow) ttsRow.style.display = _ttsSupported ? '' : 'none';
 }
 
 // 現在開いている本の読書位置と保留中の Drive 自動保存を確定する。
@@ -9203,6 +9332,8 @@ if (_darkMQ) {
 consolidateBookmarks();
 updateFxlLtrAutoFlipUI();
 updateAutoOpenToggleUI();
+applyToolbarPrefs();
+updateToolbarPrefsUI();
 ttsInit();
 updateTapZoneBodyClass();
 updateFontBoldToggleUI();
@@ -9238,6 +9369,8 @@ if (location.protocol !== 'http:' && location.protocol !== 'https:') {
   document.getElementById('drive-download-btn').style.display = 'none';
   document.getElementById('drive-upload-btn').style.display = 'none';
   document.getElementById('drive-auto-group').style.display = 'none';
+  const _tbDriveRow = document.getElementById('tbitem-drive');
+  if (_tbDriveRow) _tbDriveRow.style.display = 'none';  // 効果が無い設定行は出さない
   state.driveAutoSave = false;  // file:// 環境では強制 OFF
 }
 
