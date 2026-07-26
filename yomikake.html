@@ -67,11 +67,17 @@
   .btn-group button:hover { background:var(--hover-bg); }
   .btn-group span { display:flex; align-items:center; justify-content:center; padding:0 8px; font-size:13px; font-weight:500; border-left:1px solid var(--ui-border); border-right:1px solid var(--ui-border); min-width:54px; color:var(--ui-text); }
   
-  .theme-options { display:grid; grid-template-columns:repeat(4,32px); gap:6px; }
+  /* テーマ選択：色丸だけだとタッチ端末で title が読めずテーマ名が分からないため、
+     丸の下に名前を出す。列は 1fr にして 340px の popover でも全幅スマホでも 4 列に収める */
+  .set-row-stack { flex-direction:column; align-items:stretch; gap:10px; }
+  .theme-options { display:grid; grid-template-columns:repeat(4,1fr); gap:10px 6px; }
+  .theme-cell { display:flex; flex-direction:column; align-items:center; gap:4px; cursor:pointer; }
+  .theme-name { font-size:10px; line-height:1.2; text-align:center; color:var(--ui-text); opacity:.7; white-space:nowrap; transition:opacity .15s; }
+  .theme-cell:hover .theme-btn { transform:scale(1.1); }
+  .theme-btn.active ~ .theme-name { opacity:1; font-weight:700; color:var(--accent); }
   /* OS テーマ連動：明/暗のテーマ指定は連動ON中のみ出す */
   body:not(.theme-auto-on) .theme-auto-only { display:none; }
   .theme-btn { width:32px; height:32px; border-radius:50%; border:2px solid var(--ui-border); cursor:pointer; transition:transform .15s; display:flex; align-items:center; justify-content:center; }
-  .theme-btn:hover { transform:scale(1.1); }
   .theme-btn.active { border-color:var(--accent); }
   .theme-btn svg { width:14px; height:14px; stroke:var(--accent); stroke-width:3; opacity:0; }
   .theme-btn.active svg { opacity:1; }
@@ -748,17 +754,41 @@
   <div class="pop-body">
     <div class="set-group">
       <h4 data-i18n="settings.color">カラー</h4>
-      <div class="set-row">
+      <div class="set-row set-row-stack">
         <span class="set-label" data-i18n="settings.theme">テーマ</span>
         <div class="theme-options">
-          <div class="theme-btn tb-std"    onclick="changeTheme('')"       data-i18n-title="theme.std"   ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
-          <div class="theme-btn tb-sepia"  onclick="changeTheme('sepia')"  data-i18n-title="theme.sepia" ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
-          <div class="theme-btn tb-white"  onclick="changeTheme('white')"  data-i18n-title="theme.white" ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
-          <div class="theme-btn tb-dark"   onclick="changeTheme('dark')"   data-i18n-title="theme.dark"  ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
-          <div class="theme-btn tb-sakura" onclick="changeTheme('sakura')" data-i18n-title="theme.sakura"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
-          <div class="theme-btn tb-hoshi"  onclick="changeTheme('hoshi')"  data-i18n-title="theme.hoshi" ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
-          <div class="theme-btn tb-matcha" onclick="changeTheme('matcha')" data-i18n-title="theme.matcha"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
-          <div class="theme-btn tb-tsuki"  onclick="changeTheme('tsuki')"  data-i18n-title="theme.tsuki" ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
+          <div class="theme-cell" onclick="changeTheme('')" data-i18n-title="theme.std">
+            <div class="theme-btn tb-std"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
+            <span class="theme-name" data-i18n="theme.std">標準</span>
+          </div>
+          <div class="theme-cell" onclick="changeTheme('sepia')" data-i18n-title="theme.sepia">
+            <div class="theme-btn tb-sepia"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
+            <span class="theme-name" data-i18n="theme.sepia">セピア</span>
+          </div>
+          <div class="theme-cell" onclick="changeTheme('white')" data-i18n-title="theme.white">
+            <div class="theme-btn tb-white"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
+            <span class="theme-name" data-i18n="theme.white">白紙</span>
+          </div>
+          <div class="theme-cell" onclick="changeTheme('dark')" data-i18n-title="theme.dark">
+            <div class="theme-btn tb-dark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
+            <span class="theme-name" data-i18n="theme.dark">ダーク</span>
+          </div>
+          <div class="theme-cell" onclick="changeTheme('sakura')" data-i18n-title="theme.sakura">
+            <div class="theme-btn tb-sakura"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
+            <span class="theme-name" data-i18n="theme.sakura">さくら</span>
+          </div>
+          <div class="theme-cell" onclick="changeTheme('hoshi')" data-i18n-title="theme.hoshi">
+            <div class="theme-btn tb-hoshi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
+            <span class="theme-name" data-i18n="theme.hoshi">星空</span>
+          </div>
+          <div class="theme-cell" onclick="changeTheme('matcha')" data-i18n-title="theme.matcha">
+            <div class="theme-btn tb-matcha"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
+            <span class="theme-name" data-i18n="theme.matcha">抹茶</span>
+          </div>
+          <div class="theme-cell" onclick="changeTheme('tsuki')" data-i18n-title="theme.tsuki">
+            <div class="theme-btn tb-tsuki"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
+            <span class="theme-name" data-i18n="theme.tsuki">月夜</span>
+          </div>
         </div>
       </div>
       <div class="set-row">
