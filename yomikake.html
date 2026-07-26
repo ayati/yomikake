@@ -50,6 +50,9 @@
   .popover-overlay.show { display:block; }
   #settings-popover { position:absolute; top:64px; right:16px; width:340px; background:var(--backdrop); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); border:1px solid var(--glass-border); border-radius:16px; box-shadow:0 12px 32px var(--shadow), 0 2px 8px var(--shadow); z-index:500; opacity:0; visibility:hidden; transform:translateY(-8px); transition:all .2s cubic-bezier(0.16,1,0.3,1); display:flex; flex-direction:column; overflow:hidden; max-height:calc(100dvh - 72px - env(safe-area-inset-bottom, 0px)); }
   #settings-popover.show { opacity:1; visibility:visible; transform:translateY(0); }
+  /* ボトムシートの手がかり（スマホのみ表示）。ドラッグ開閉は実装しない
+     — iOS の慣性スクロールと干渉するため、見た目の手がかりに留める */
+  .pop-grabber { width:36px; height:4px; border-radius:2px; background:var(--ui-border); margin:8px auto 0; display:none; flex-shrink:0; }
   .pop-header { padding:16px 20px; font-weight:600; font-size:15px; border-bottom:1px solid var(--ui-border); color:var(--ui-text); display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.02); flex-shrink:0; }
   .pop-body { padding:0 12px 12px; flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; }
   
@@ -674,7 +677,19 @@
     /* 右端フェード：ツールバーに未表示のボタンが右にある間だけ tb-overflow が付く（JS制御） */
     #toolbar.tb-overflow { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent); }
     #book-title { display:none; }
-    #settings-popover { right:8px; width:calc(100vw - 16px); }
+    /* スマホでは下から出るボトムシートにする。上64pxから降ろす従来配置だと
+       縦に長い設定パネルの下側に片手の親指が届かない。
+       max-height を 82dvh に留めて背景の本文を必ず覗かせ、
+       「背景タップで閉じられる」ことを視覚的に示す */
+    #settings-popover {
+      top:auto; bottom:0; left:0; right:0; width:100%;
+      max-height:min(82dvh, calc(100dvh - 56px));
+      border-radius:18px 18px 0 0;
+      transform:translateY(16px);
+    }
+    #settings-popover.show { transform:translateY(0); }
+    .pop-grabber { display:block; }
+    .pop-body { padding-bottom:calc(12px + env(safe-area-inset-bottom, 0px)); }
     /* 読みかけリスト（リスト表示）: 狭い縦画面では下段を縦積みし、残り時間/サイトバッジと
        「開く」ボタンが重なるのを防ぐ（PC・横長・グリッド表示は従来どおり横並び） */
     #reading-list-items:not(.view-grid) .rl-meta { flex-direction:column; align-items:stretch; gap:6px; }
@@ -753,6 +768,7 @@
 
 <div class="popover-overlay" id="settings-overlay" onclick="toggleSettings()"></div>
 <div id="settings-popover">
+  <div class="pop-grabber"></div>
   <div class="pop-header">
     <span data-i18n="settings.title">表示設定</span>
     <button class="icon-btn" onclick="toggleSettings()" style="padding:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
