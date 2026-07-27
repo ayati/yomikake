@@ -72,6 +72,15 @@ state.customFonts = [{ id: 'nope', name: 'ダミー' }];
 applyBookPrefs('epub_pos_検証__X');
 T('実体があれば採用する', state.fontMode === 'custom:nope', state.fontMode);
 state.customFonts = []; state.fontMode = 'publisher';
+
+// プロトタイプ由来のキー（FONTS['constructor'] は関数を返す）を弾くこと。
+// 通すと CSS へ関数のソース文字列が流れ込む
+['constructor', 'toString', '__proto__'].forEach(function (bad) {
+  _bpSave({ v: 1, books: { 'epub_pos_検証__X': { fontMode: bad, t: Date.now() } } });
+  state.fontMode = 'publisher';
+  applyBookPrefs('epub_pos_検証__X');
+  T('フォント名 "' + bad + '" は採用しない', state.fontMode === 'publisher', state.fontMode);
+});
 localStorage.removeItem('epub_book_prefs');
 
 // しおり JSON / Drive 同期に載らないこと

@@ -1,3 +1,7 @@
 # ローカル検証用サンプル（個人のしおりデータ・スクリーンショット等）
 temp_sample/
 tests/.fixtures/
+
+# テストハーネスが作る一時コピー（通常は trap で消えるが、強制終了時に残る）
+.__domtest_*.html
+.__pixtest_*.html

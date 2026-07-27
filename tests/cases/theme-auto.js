@@ -57,6 +57,23 @@ T('epub_settings に themeAuto/Light/Dark',
   saved.themeAuto === false && typeof saved.themeLight === 'string' && typeof saved.themeDark === 'string',
   JSON.stringify({a: saved.themeAuto, l: saved.themeLight, d: saved.themeDark}));
 
+// マップ存在チェックがプロトタイプチェーンを拾わないこと（hasOwnKey）
+T('hasOwnKey は own property のみ通す',
+  hasOwnKey(THEME_CONTENT, '') && hasOwnKey(THEME_CONTENT, 'dark') &&
+  !hasOwnKey(THEME_CONTENT, 'constructor') && !hasOwnKey(THEME_CONTENT, 'toString') &&
+  !hasOwnKey(THEME_CONTENT, '__proto__'));
+T('hasOwnKey は文字列以外を弾く', !hasOwnKey(THEME_CONTENT, 0) && !hasOwnKey(THEME_CONTENT, null));
+localStorage.setItem('epub_settings', JSON.stringify(
+  Object.assign({}, JSON.parse(localStorage.getItem('epub_settings') || '{}'),
+                { themeLight: 'constructor', themeDark: 'toString' })));
+state.themeLight = ''; state.themeDark = 'dark';
+loadSettings();
+T('プロトタイプ由来のテーマキーは採用しない',
+  state.themeLight === '' && state.themeDark === 'dark',
+  state.themeLight + '/' + state.themeDark);
+changeAutoTheme('light', 'constructor');
+T('changeAutoTheme もプロトタイプ由来を弾く', state.themeLight === '');
+
 // 不正値は弾く
 localStorage.setItem('epub_settings', JSON.stringify(
   Object.assign({}, saved, {themeAuto: true, themeLight: 'NOPE', themeDark: 'hoshi'})));

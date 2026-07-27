@@ -86,6 +86,7 @@ Most features exist in both files. As a rule:
 - **全画面 HUD** — `#fs-hud` は `body.fullscreen` の間だけ右下に出る。**`pointer-events:none` は必須** — `tapZone` が `'lshape'`/`'tb'` のとき下端はページ送り帯であり、HUD がタップを吸うと「ここだけ反応しない」死角ができてタップ操作ガイドが嘘をつく。位置が右下なのは下端中央を `#btn-scroll-fwd` が占めるため。進捗は進捗バーと**同じ式**を使い `updatePageInfo()` から更新する。時計の `setInterval` は全画面の間だけ arm し、`toggleFullscreen` と `fullscreenchange` の**両方**から `syncFsHud()` を呼ぶ（Layer2 の外部解除に追従）。**バッテリー残量は入れない**（`getBattery()` は Chromium 限定で iOS Safari に無い）。
 - **設定グループの折りたたみ** — `SET_GROUP_DEFAULT_OPEN` が対象 9 グループと既定の開閉を持つ。**Init では `loadSettings()` の後にも `applySetGroupsOpen()` を呼ぶこと** — `loadSettings()` は保存値が無いと早期 return するため、初回訪問時に既定の開閉が DOM に届かない。既定で開く 3 つは markup にも `open` を書いてちらつきを防ぐ。
 - **`resetDisplaySettings()` はオブジェクトをコピーする** — `state[k] = v` で参照を代入すると `DISPLAY_DEFAULTS.setGroupsOpen` 自体が汚れ、2 回目以降のリセットが壊れる。
+- **`syncAllSettingsUI()` は「state → UI 反映」だけを行う。副作用のある適用（`applyOrientationLock()` 等）を混ぜないこと** — この関数は `resetDisplaySettings()` と `applyBookPrefs()`（＝**本を開くたび**）の両方から呼ばれる。ロックの掛け直しをここに置くと、`lock()` の一時的な失敗で `_onOrientationLockFail()` が走り、**ユーザーの設定が無断で `'off'` に戻る**（v2.16.0 のレビューで是正）。
 
 **表示設定 第3弾（v2.15.0）** (`LETTER_SPACING_EM`, `previewLineHeight`, `changeLineHeight`, `previewLetterSpacing`, `changeLetterSpacing`, `setTtsRate`, `_orientationLockSupported`, `changeOrientationLock`, `applyOrientationLock`, `_onOrientationLockFail`, `updateOrientationLockUI`, `state.letterSpacing`/`orientationLock` — 設計書 `design_display_settings_v3.md`)。
 
@@ -104,6 +105,7 @@ Most features exist in both files. As a rule:
 - **適用は `loadEpub()` の `state.bookKey` 確定後・最初の `renderPage()` より前**（`renderMode` は既に確定済み）。ここでないと開いてから設定が切り替わってチラつく。
 - **リセット（`resetDisplaySettings`）は `_bpClearAll()` で全消しする** — 残っていると本を開き直した瞬間に復活し「リセットしたのに戻らない」という最悪の体験になる。確認文にも明記してある。
 - ローカルフォント（`custom:`）は `state.customFonts` に実体が無ければ**採用しない**（端末ごとに有無が違う。既定へ落とすより現状維持のほうが混乱が少ない）。
+- **マップのキー存在判定は `hasOwnKey(obj, k)` を使う**（`k in obj` / `obj[k] !== undefined` は禁止）— プロトタイプチェーンを拾うため `'constructor'` や `'toString'` が検証を通ってしまう。検証対象は localStorage 由来の値で、たとえば `FONTS['constructor']` は関数を返し、そのまま `font-family` へ文字列化されて流れ込む。`THEME_CONTENT` / `I18N` / `FONTS` の判定はすべてこれに統一済み（v2.16.0）。
 - 完全削除（`_rlPurgeLocalData`）では該当エントリも消す。論理削除（`markAsFinished`）では消さない。
 
 When fixing a bug or adding a feature that is not in the "only" lists above, apply the change to **both files**.

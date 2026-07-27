@@ -63,6 +63,19 @@ try {
     state.fullscreen = false; applyOrientationLock();
     T('全画面を抜けると unlock', calls.join(',') === 'unlock', calls.join(','));
 
+    // syncAllSettingsUI は「state → UI 反映」の責務に限る。
+    // ここで lock() を掛け直すと、本を開くたび（applyBookPrefs 経由）に呼ばれ、
+    // 一時的な失敗でユーザーの設定が無断で off に戻る経路ができる。
+    calls = [];
+    state.fullscreen = true; state.orientationLock = 'portrait';
+    syncAllSettingsUI();
+    T('syncAllSettingsUI は lock を掛け直さない', calls.indexOf('lock:portrait') < 0, calls.join(',') || '(呼び出しなし)');
+    // リセットでは明示的に解除する
+    calls = [];
+    window.confirm = function () { return true; };
+    resetDisplaySettings();
+    T('リセットでは unlock する', calls.indexOf('unlock') >= 0, calls.join(',') || '(呼び出しなし)');
+
     // 失敗したら設定ごと off に戻してトーストを出す
     var toasted = null, origToast = showToast;
     window.showToast = function (m) { toasted = m; };

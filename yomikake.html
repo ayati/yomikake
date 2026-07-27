@@ -1475,10 +1475,6 @@ const I18N = {
     'settings.fontSize':    '文字サイズ',
     'settings.lineHeight':  '行間',
     'settings.letterSpacing': '字間',
-    'lh.narrow':            '狭い',
-    'lh.normal':            '標準',
-    'lh.wide':              '広い',
-    'lh.veryWide':          'かなり広い',
     'settings.fontBold':    '太字表示',
     'settings.fontStroke':  '縁取りの強さ',
     'stroke.none':          'なし',
@@ -1827,10 +1823,6 @@ const I18N = {
     'settings.fontSize':    'Font size',
     'settings.lineHeight':  'Line height',
     'settings.letterSpacing': 'Letter spacing',
-    'lh.narrow':            'Narrow',
-    'lh.normal':            'Normal',
-    'lh.wide':              'Wide',
-    'lh.veryWide':          'Extra wide',
     'settings.fontBold':    'Bold text',
     'settings.fontStroke':  'Outline weight',
     'stroke.none':          'None',
@@ -2179,10 +2171,6 @@ const I18N = {
     'settings.fontSize':    '字型大小',
     'settings.lineHeight':  '行距',
     'settings.letterSpacing': '字距',
-    'lh.narrow':            '緊縮',
-    'lh.normal':            '標準',
-    'lh.wide':              '寬鬆',
-    'lh.veryWide':          '非常寬鬆',
     'settings.fontBold':    '粗體顯示',
     'settings.fontStroke':  '描邊強度',
     'stroke.none':          '無',
@@ -2531,10 +2519,6 @@ const I18N = {
     'settings.fontSize':    '字体大小',
     'settings.lineHeight':  '行距',
     'settings.letterSpacing': '字距',
-    'lh.narrow':            '紧缩',
-    'lh.normal':            '标准',
-    'lh.wide':              '宽松',
-    'lh.veryWide':          '非常宽松',
     'settings.fontBold':    '粗体显示',
     'settings.fontStroke':  '描边强度',
     'stroke.none':          '无',
@@ -2842,9 +2826,16 @@ function t(key, vars) {
   return str;
 }
 
+// マップに「そのキーが自前で存在するか」。`k in obj` や `obj[k] !== undefined` は
+// プロトタイプチェーンを拾い、'constructor' / 'toString' などが検証を通ってしまう。
+// 検証対象は localStorage から来る値なので、素通りさせず own property だけを見る。
+function hasOwnKey(obj, k) {
+  return typeof k === 'string' && Object.prototype.hasOwnProperty.call(obj, k);
+}
+
 function initLang() {
   const stored = localStorage.getItem('epub_lang');
-  if (stored && stored in I18N) { _lang = stored; return; }
+  if (stored && hasOwnKey(I18N, stored)) { _lang = stored; return; }
   const nav = navigator.language || 'ja';
   if      (nav.startsWith('zh-TW') || nav.startsWith('zh-Hant')) _lang = 'zh-TW';
   else if (nav.startsWith('zh'))                                   _lang = 'zh-CN';
@@ -2853,7 +2844,7 @@ function initLang() {
 }
 
 function setLang(lang) {
-  if (!(lang in I18N)) return;
+  if (!hasOwnKey(I18N, lang)) return;
   _lang = lang;
   try { localStorage.setItem('epub_lang', lang); } catch(e) {}
   applyI18n();
@@ -5557,9 +5548,9 @@ function loadSettings() {
       previewLetterSpacing(state.letterSpacing);
     }
     if (s.theme !== undefined)   { state.theme = s.theme;               applyThemeClass(s.theme); updateThemeBtnUI(); }
-    // OS テーマ連動。テーマキーの検証は `in THEME_CONTENT`（'' も正しく通る）
-    if (typeof s.themeLight === 'string' && s.themeLight in THEME_CONTENT) state.themeLight = s.themeLight;
-    if (typeof s.themeDark  === 'string' && s.themeDark  in THEME_CONTENT) state.themeDark  = s.themeDark;
+    // OS テーマ連動。テーマキーの検証は hasOwnKey（'' も正しく通る）
+    if (hasOwnKey(THEME_CONTENT, s.themeLight)) state.themeLight = s.themeLight;
+    if (hasOwnKey(THEME_CONTENT, s.themeDark))  state.themeDark  = s.themeDark;
     if (typeof s.themeAuto === 'boolean') state.themeAuto = s.themeAuto;
     document.body.classList.toggle('theme-auto-on', state.themeAuto);
     syncAutoThemeUI();
@@ -6417,7 +6408,7 @@ function toggleThemeAuto() {
 }
 
 function changeAutoTheme(side, v) {
-  if (!(v in THEME_CONTENT)) return;
+  if (!hasOwnKey(THEME_CONTENT, v)) return;
   if (side === 'light') state.themeLight = v; else state.themeDark = v;
   applyAutoTheme(true);
   saveSettings();
@@ -7842,7 +7833,7 @@ function applyBookPrefs(bookKey) {
 function _bpFontUsable(key) {
   if (key.indexOf('custom:') === 0)
     return state.customFonts.some(f => f.id === key.slice(7));
-  return FONTS[key] !== undefined;
+  return hasOwnKey(FONTS, key);
 }
 
 function toggleBookPrefs() {
@@ -7987,7 +7978,6 @@ function syncAllSettingsUI() {
   syncFsHud();
   applySetGroupsOpen();
   updateOrientationLockUI();
-  applyOrientationLock();
 }
 
 function resetDisplaySettings() {
@@ -8000,6 +7990,7 @@ function resetDisplaySettings() {
   state.fxlZoom.level = state.fxlZoomLevel;
   _bpClearAll();   // 残すと本を開き直した瞬間に復活し「リセットが効かない」ように見える
   syncAllSettingsUI();
+  applyOrientationLock();   // 解除は明示的にここで行う（syncAllSettingsUI は UI 反映に限る）
   saveSettings();
   rerenderKeepPos();
   // FXL は renderPage を通らないので見開き設定の反映を別途行う
