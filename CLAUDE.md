@@ -48,7 +48,18 @@ python3 -m http.server 8080
 # then visit http://localhost:8080/yomikake.html
 ```
 
-There are no automated tests. Manual testing requires a `.epub` or `.kepub` file.
+### テスト
+
+```sh
+tests/lib/run.sh            # 全ケースを両ファイルに流す（落ちたら exit 1）
+tests/lib/run.sh theme      # 名前で絞り込み
+```
+
+依存は python3・node・Chrome 系 1 本のみ（自動探索・無ければ SKIP）。詳細は `tests/README.md`。
+
+**主目的は `yomikake.html` と `yomikake_ios.html` の同期崩れの検知** — 同じ assertion を両ファイルに流すので、片方だけ直した事故がその場で出る。この repo 最大の弱点をコードで見張るためにある。E2E は `tests/lib/make-fixtures.py` が生成する合成 ePub（リフロー4章／FXL4ページ）を使うので `temp_sample/`（個人の蔵書）に依存しない。
+
+**担保できないこと（実機確認が必須）**: headless の `--dump-dom` では `requestAnimationFrame` が発火せず `loadEpub()` が完了しないため、E2E は **rAF を `setTimeout` に差し替えている**。iPad の `double-rAF + 500ms フォールバック`・`EPUB_READY` の seq 競合・`_isRendering` の窓といった**タイミング由来のバグは検出できないどころか隠れる**。ほかに 500px 未満の実寸レイアウト、iOS Safari 固有挙動（transform スクロール・`dvh` と URL バー・セーフエリア）、実音声 TTS、Drive 連携、タッチ操作も対象外。手動テストには `.epub` / `.kepub` が要る。
 
 ### Keeping both files in sync
 
