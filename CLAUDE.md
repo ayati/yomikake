@@ -95,6 +95,17 @@ Most features exist in both files. As a rule:
 - **読み上げ速度** — 絶対値セッター `setTtsRate(v)` が本体で、`changeTtsRate(delta)`（バーの ＋/－）はラッパ。**`updateTtsUI()` がバーと設定セレクトの両方を同期する**（片方だけだと 2 つの UI が食い違う）。option の `value` は `toFixed(2)` と一致する文字列（`'1.00'`）で書くこと。`ttsRate` は**リセット対象外**（読み上げ設定は触らない方針）。
 - **画面の向きロック** — `screen.orientation.lock()` は環境差が大きい（Android Chrome は全画面/インストール済み PWA が要る、iOS Safari には `lock()` が無い、デスクトップは効果なし）。**(1) `lock` が生えている環境でだけ設定行を出す (2) 全画面に紐付けて掛け外しする (3) 失敗したら設定ごと `'off'` に戻してトースト**、の 3 点で組んである。`lock()` が Promise を返さない実装・同期例外を投げる実装のどちらでも落ちないようにしてある。
 
+**本ごとの表示設定（v2.16.0・B-7）** (`BOOK_PREFS_KEY`, `_bpLoad`, `_bpSave`, `_bpPrune`, `_bpGet`, `_bpSet`, `_bpDelete`, `_bpClearAll`, `applyBookPrefs`, `_bpFontUsable`, `toggleBookPrefs`, `updateBookPrefsToggleUI`, `state.bookPrefsEnabled` — 設計書 `design_per_book_settings.md`)。
+
+- **覚えるのは 5 つだけ**: `writingMode` / `fontMode` / `fontSize` / `spreadMode` / `fxlRegionOrder`。線引きの基準は「同じ本で前と同じであってほしいか」ではなく **「本が変われば変わるべきか」** — テーマ・明るさ・余白・行間・字間・タップ設定は読者の目や環境で決まるので対象外。
+- **`epub_pos_*` の値には入れない。別キー `epub_book_prefs` にする** — しおりは Drive 同期・JSON 書き出し・墓標マージの対象で、そこに端末固有の表示設定を混ぜると「表示設定は端末ローカルに閉じる」方針（B-8 不採用）と矛盾する。**別キーであること自体が同期に載せない構造的な保証**。
+- **`change*()` はグローバルと本ごとの両方に書く** — 本ごとにだけ書くとグローバルが初期値で固定され、新しい本を開くたびに設定し直す羽目になる。両方書けば「最後に使った設定」が新しい本の既定になる。
+- **`_bpSet` は触った項目だけ記録する** — 全項目のスナップショットにすると、一度開いただけの本が古い設定を丸ごと抱え込み、グローバルを変えても反映されない「なぜかこの本だけ古い」状態になる。
+- **適用は `loadEpub()` の `state.bookKey` 確定後・最初の `renderPage()` より前**（`renderMode` は既に確定済み）。ここでないと開いてから設定が切り替わってチラつく。
+- **リセット（`resetDisplaySettings`）は `_bpClearAll()` で全消しする** — 残っていると本を開き直した瞬間に復活し「リセットしたのに戻らない」という最悪の体験になる。確認文にも明記してある。
+- ローカルフォント（`custom:`）は `state.customFonts` に実体が無ければ**採用しない**（端末ごとに有無が違う。既定へ落とすより現状維持のほうが混乱が少ない）。
+- 完全削除（`_rlPurgeLocalData`）では該当エントリも消す。論理削除（`markAsFinished`）では消さない。
+
 When fixing a bug or adding a feature that is not in the "only" lists above, apply the change to **both files**.
 
 ## Architecture
@@ -306,9 +317,10 @@ Both files support **4 languages**: `ja` (Japanese), `en` (English), `zh-TW` (Tr
 |-----|---------|
 | `epub_pos_{title}__{creator}` | `{spineIdx, ratio, lastOpenedAt, creator, spineCount, cover?, source?, site?}` — reading position + book metadata written by `saveBookMeta()` on open and `savePos()` on scroll/chapter change. Separator is **double underscore** (v1.8.11+). `source`/`site` (v2.10.0・追加のみ・旧ビルド無視) = 底本 URL とサイト表示名（読みかけリストのサイトバッジ用。quota 超過時は cover→source/site の順に落として読書位置を優先）。 |
 | `epub_last_book` | `{title, bookKey}` — for the resume banner |
-| `epub_settings` | `{fontMode, fontSize, lineHeight, letterSpacing, theme, themeAuto, themeLight, themeDark, margin, writingMode, fwdBtnSize, tapZone, autoOpenLast, ttsRate, ttsVoice, driveAutoSave, fontBold, fontStrokeLevel, spreadMode, fxlZoomLevel, fxlRegionOrder, fxlLtrAutoFlip, toolbarHidden, brightness, warmth, fsHud, setGroupsOpen, orientationLock}` — **端末ローカルに閉じる**（しおり JSON にも Drive 同期にも含めない。端末ごとに画面サイズ・DPI・フォント資産・OS が違うため） |
+| `epub_settings` | `{fontMode, fontSize, lineHeight, letterSpacing, theme, themeAuto, themeLight, themeDark, margin, writingMode, fwdBtnSize, tapZone, autoOpenLast, ttsRate, ttsVoice, driveAutoSave, fontBold, fontStrokeLevel, spreadMode, fxlZoomLevel, fxlRegionOrder, fxlLtrAutoFlip, toolbarHidden, brightness, warmth, fsHud, setGroupsOpen, orientationLock, bookPrefsEnabled}` — **端末ローカルに閉じる**（しおり JSON にも Drive 同期にも含めない。端末ごとに画面サイズ・DPI・フォント資産・OS が違うため） |
 | `epub_lang` | selected UI language (`ja` / `en` / `zh-TW` / `zh-CN`) |
 | `epub_consolidate_v1` | one-shot flag set after `consolidateBookmarks()` runs once at startup |
+| `epub_book_prefs` | `{v:1, books:{[bookKey]:{writingMode?, fontMode?, fontSize?, spreadMode?, fxlRegionOrder?, t}}}` — **本ごとの表示設定**（v2.16.0）。キーは `state.bookKey`（`makeBookKey()`）。**しおりとは別キー**にすることで Drive 同期・JSON 書き出しに載らないことを構造的に保証する。300冊 / 730日で剪定 |
 | `epub_tap_guide_v1` | one-shot flag set after the tap guide has been shown once (v2.8.0) |
 | `epub_app_version` | last-seen `APP_VERSION`; on load, a change (and non-empty prior) fires the `toast.updated` "updated to vX.Y.Z" toast once (v2.10.1). First install stores silently. |
 
