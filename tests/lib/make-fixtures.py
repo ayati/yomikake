@@ -54,12 +54,15 @@ def build_reflow(path):
     z.writestr('META-INF/container.xml', CONTAINER)
     items, refs, navpoints = [], [], []
     for i in range(4):
-        body = ''.join('<p>第%d章の本文です。縦書きの折り返しを起こすために、'
-                       'ある程度の分量を並べておきます。行番号 %d。</p>' % (i + 1, n)
+        # ルビと縦中横を含める（字間・行間・縦中横フィックスの検証に要る）
+        body = ''.join('<p><ruby>本文<rt>ほんぶん</rt></ruby>です。縦書きの折り返しを'
+                       '起こすために、ある程度の分量を並べておきます。'
+                       '<span class="tcy">%02d</span>行目。</p>' % (n,)
                        for n in range(40))
         z.writestr('OEBPS/ch%d.xhtml' % i,
                    '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE html>\n'
-                   '<html xmlns="http://www.w3.org/1999/xhtml"><head><title>第%d章</title></head>'
+                   '<html xmlns="http://www.w3.org/1999/xhtml"><head><title>第%d章</title>'
+                   '<style>.tcy{text-combine-upright:all;-webkit-text-combine:horizontal;}</style></head>'
                    '<body><h1 id="top">第%d章</h1>%s</body></html>' % (i + 1, i + 1, body))
         items.append('<item id="c%d" href="ch%d.xhtml" media-type="application/xhtml+xml"/>' % (i, i))
         refs.append('<itemref idref="c%d"/>' % i)

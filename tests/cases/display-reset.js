@@ -15,6 +15,7 @@ state.themeAuto = true; state.themeLight = 'sakura'; state.themeDark = 'matcha';
 document.body.classList.add('theme-auto-on');
 changeFontSize(4);
 changeLineHeight('2.8');
+changeLetterSpacing(4);
 changeMargin('none');
 changeWritingMode('horizontal');
 changeFwdBtnSize('large');
@@ -53,7 +54,10 @@ T('body の theme-* が外れる',
   document.body.className);
 T('theme-auto-on も外れる', !document.body.classList.contains('theme-auto-on'));
 T('文字サイズ表示', document.getElementById('font-size-display').textContent === '100%');
-T('行間セレクト', document.getElementById('lineh-select').value === '2.0', document.getElementById('lineh-select').value);
+T('行間スライダー', parseFloat(document.getElementById('lineh-range').value) === 2.0,
+  document.getElementById('lineh-range').value);
+T('字間スライダー', parseInt(document.getElementById('letter-spacing-range').value, 10) === 0,
+  document.getElementById('letter-spacing-range').value);
 T('余白セレクト', document.getElementById('margin-select').value === 'full');
 T('組方向セレクト', document.getElementById('writing-mode-select').value === 'vertical');
 T('次へボタンセレクト', document.getElementById('fwd-btn-size-select').value === 'small');

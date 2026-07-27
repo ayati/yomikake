@@ -934,12 +934,19 @@
       </div>
       <div class="set-row">
         <span class="set-label" data-i18n="settings.lineHeight">行間</span>
-        <select class="modern-select" id="lineh-select" onchange="changeLineHeight(this.value)">
-          <option value="1.6" data-i18n="lh.narrow">狭い</option>
-          <option value="2.0" selected data-i18n="lh.normal">標準</option>
-          <option value="2.4" data-i18n="lh.wide">広い</option>
-          <option value="2.8" data-i18n="lh.veryWide">かなり広い</option>
-        </select>
+        <div class="range-wrap">
+          <input type="range" class="set-range" id="lineh-range" min="1.4" max="3.0" step="0.1" value="2.0"
+                 oninput="previewLineHeight(this.value)" onchange="changeLineHeight(this.value)">
+          <span class="range-val" id="lineh-val">2.0</span>
+        </div>
+      </div>
+      <div class="set-row">
+        <span class="set-label" data-i18n="settings.letterSpacing">字間</span>
+        <div class="range-wrap">
+          <input type="range" class="set-range" id="letter-spacing-range" min="0" max="5" step="1" value="0"
+                 oninput="previewLetterSpacing(this.value)" onchange="changeLetterSpacing(this.value)">
+          <span class="range-val" id="letter-spacing-val">0</span>
+        </div>
       </div>
       <div class="set-row">
         <span class="set-label" data-i18n="settings.fontBold">太字表示</span>
@@ -1453,6 +1460,7 @@ const I18N = {
     'font.sans':            '汎用サンセリフ',
     'settings.fontSize':    '文字サイズ',
     'settings.lineHeight':  '行間',
+    'settings.letterSpacing': '字間',
     'lh.narrow':            '狭い',
     'lh.normal':            '標準',
     'lh.wide':              '広い',
@@ -1797,6 +1805,7 @@ const I18N = {
     'font.sans':            'Generic sans-serif',
     'settings.fontSize':    'Font size',
     'settings.lineHeight':  'Line height',
+    'settings.letterSpacing': 'Letter spacing',
     'lh.narrow':            'Narrow',
     'lh.normal':            'Normal',
     'lh.wide':              'Wide',
@@ -2141,6 +2150,7 @@ const I18N = {
     'font.sans':            '通用非襯線',
     'settings.fontSize':    '字型大小',
     'settings.lineHeight':  '行距',
+    'settings.letterSpacing': '字距',
     'lh.narrow':            '緊縮',
     'lh.normal':            '標準',
     'lh.wide':              '寬鬆',
@@ -2485,6 +2495,7 @@ const I18N = {
     'font.sans':            '通用非衬线',
     'settings.fontSize':    '字体大小',
     'settings.lineHeight':  '行距',
+    'settings.letterSpacing': '字距',
     'lh.narrow':            '紧缩',
     'lh.normal':            '标准',
     'lh.wide':              '宽松',
@@ -2849,6 +2860,7 @@ const state = {
   // サイト側の総話数 / 総文字数 / サイト更新日 / 対象年齢。すべて表示専用。
   // このうち bookGenre と bookSerial だけを本棚の絞り込み用に localStorage へ保存する。
   fontMode:'publisher', fontSize:100, lineHeight:2.0, theme:'', margin:'full',
+  letterSpacing:0,         // 字間 0–5（LETTER_SPACING_EM の添字。epub_settings に永続化）
   // theme は常に「解決後の実効テーマ」。OS 連動の有無は themeAuto で独立して持つ
   // （theme に 'auto' 等の番兵値を入れると THEME_CONTENT 参照など全経路に分岐が波及する）
   themeAuto:false,         // OS のカラースキームに追従するか（epub_settings に永続化）
@@ -2915,6 +2927,9 @@ let _fxlAxisCache = { displayedW:0, displayedH:0, level:1, n:1, tx_init:0 };
 let _fxlAxisLandAtEnd = false;
 
 // テーマ別 ePub 本文エリアの色（iframe 内に直接注入）
+// 字間の段階 → em。日本語の縦組みでは 0.12em でもかなり緩い
+const LETTER_SPACING_EM = [0, 0.02, 0.04, 0.06, 0.09, 0.12];
+
 const THEME_CONTENT = {
   '':       { paper: '#fdf8f0', text: '#1a1008' },  // 標準：温かみのある白
   sepia:    { paper: '#dfc89a', text: '#2e1a06' },  // セピア：クリーム色系（やや暗め）
@@ -3607,6 +3622,10 @@ async function buildSrcdoc(xhtmlText, xhtmlAbsPath, scrollTarget, readySeq) {
     ? 'html,body,p,h1,h2,h3,h4,h5,h6,div,span{-webkit-text-stroke:' + STROKE_WIDTHS[state.fontStrokeLevel] + ' currentColor!important;}' +
       'rt,rp{-webkit-text-stroke-width:0!important;}'
     : '';
+  // 字間（段階 → em）。0 のときは宣言ごと出さない
+  //（letter-spacing は最終文字の後ろにも空きを入れるため、既定では一切触らない）
+  const lsEm = LETTER_SPACING_EM[state.letterSpacing] || 0;
+  const lsRule = lsEm ? 'letter-spacing:' + lsEm + 'em!important;' : '';
   const overrideStyle = doc.createElement('style');
   overrideStyle.id = 'epub-viewer-inject';
   const wm = state.writingMode;
@@ -3637,7 +3656,9 @@ async function buildSrcdoc(xhtmlText, xhtmlAbsPath, scrollTarget, readySeq) {
   overrideStyle.textContent = fontImport + fontFaceRule + [
     'html,body{background:' + paper + '!important;color:' + text + '!important;}',
     'html{font-size:' + state.fontSize + '%!important;line-height:' + state.lineHeight + '!important;' + wmHtml + '}',
-    'body{' + wmBody + 'line-height:' + state.lineHeight + '!important;}',
+    'body{' + wmBody + 'line-height:' + state.lineHeight + '!important;' + lsRule + '}',
+    // 字間はルビに継承させない。継承するとルビ文字まで間延びして親字とのバランスが崩れる
+    lsRule ? 'rt,rp{letter-spacing:normal!important;}' : '',
     wm === 'vertical' ? (
       // PC: スクロールバートラック(6px)を常時確保しhover時のみサムを表示 / タッチ: 完全非表示
       '@media (hover:hover){' +
@@ -3706,9 +3727,15 @@ function buildScrollScript(scrollTarget, writingMode, readySeq) {
     '    var _d = document.documentElement, _b = document.body;',
     '    if(!_b) return;',
     '    _d.style.visibility = "hidden";',
-    '    var _ls = _b.style.letterSpacing;',
-    '    _b.style.letterSpacing = "0.01px"; _d.offsetWidth;',
-    '    _b.style.letterSpacing = _ls; _d.offsetWidth;',
+    '    // 字間注入（body に letter-spacing:!important）が有効なとき、非 important の',
+    '    // inline style では摂動が効かず縦中横の左ずれが再発する。important で摂動し、',
+    '    // 元の値と優先度を厳密に復元する。',
+    '    var _lsv = _b.style.getPropertyValue("letter-spacing");',
+    '    var _lsp = _b.style.getPropertyPriority("letter-spacing");',
+    '    _b.style.setProperty("letter-spacing", "0.01px", "important"); _d.offsetWidth;',
+    '    if(_lsv) _b.style.setProperty("letter-spacing", _lsv, _lsp);',
+    '    else _b.style.removeProperty("letter-spacing");',
+    '    _d.offsetWidth;',
     '    _d.style.visibility = "";',
     '  }',
     '  function init(){',
@@ -5426,6 +5453,7 @@ function saveSettings() {
       fontMode:      state.fontMode,
       fontSize:      state.fontSize,
       lineHeight:    state.lineHeight,
+      letterSpacing: state.letterSpacing,
       theme:         state.theme,
       themeAuto:     state.themeAuto,
       themeLight:    state.themeLight,
@@ -5461,7 +5489,16 @@ function loadSettings() {
     if (!s) return;
     if (s.fontMode)              { state.fontMode = s.fontMode;         updateFontPickerUI(); }
     if (s.fontSize)              { state.fontSize = s.fontSize;         const el = document.getElementById('font-size-display'); if(el) el.textContent = s.fontSize + '%'; }
-    if (s.lineHeight)            { state.lineHeight = s.lineHeight;     const el = document.getElementById('lineh-select'); if(el) el.value = Number(s.lineHeight).toFixed(1); }  // 2.0 は String() だと '2' になり option と一致しない
+    if (typeof s.lineHeight === 'number' && s.lineHeight >= 1.4 && s.lineHeight <= 3.0) {
+      state.lineHeight = Math.round(s.lineHeight * 10) / 10;
+      const el = document.getElementById('lineh-range'); if (el) el.value = String(state.lineHeight);
+      previewLineHeight(state.lineHeight);
+    }
+    if (typeof s.letterSpacing === 'number' && s.letterSpacing >= 0 && s.letterSpacing < LETTER_SPACING_EM.length) {
+      state.letterSpacing = Math.round(s.letterSpacing);
+      const el = document.getElementById('letter-spacing-range'); if (el) el.value = String(state.letterSpacing);
+      previewLetterSpacing(state.letterSpacing);
+    }
     if (s.theme !== undefined)   { state.theme = s.theme;               applyThemeClass(s.theme); updateThemeBtnUI(); }
     // OS テーマ連動。テーマキーの検証は `in THEME_CONTENT`（'' も正しく通る）
     if (typeof s.themeLight === 'string' && s.themeLight in THEME_CONTENT) state.themeLight = s.themeLight;
@@ -6218,8 +6255,31 @@ function changeFontSize(d) {
   saveSettings();
   rerenderKeepPos();
 }
+// 行間・字間のスライダー。
+// oninput では数値ラベルだけ更新し、再描画は onchange（ドラッグ終了）で行う。
+// rerenderKeepPos() は章全体を描き直すので、明るさ（CSS 変数だけで完結）と違い
+// ドラッグ中に毎ステップ走らせると重い。
+function previewLineHeight(v) {
+  const el = document.getElementById('lineh-val');
+  if (el) el.textContent = (Math.round(parseFloat(v) * 10) / 10).toFixed(1);
+}
 function changeLineHeight(v) {
-  state.lineHeight = parseFloat(v);
+  const n = Math.round(parseFloat(v) * 10) / 10;
+  if (!(n >= 1.4 && n <= 3.0)) return;
+  state.lineHeight = n;
+  previewLineHeight(n);
+  saveSettings();
+  rerenderKeepPos();
+}
+function previewLetterSpacing(v) {
+  const el = document.getElementById('letter-spacing-val');
+  if (el) el.textContent = String(parseInt(v, 10) || 0);
+}
+function changeLetterSpacing(v) {
+  const n = parseInt(v, 10);
+  if (!(n >= 0 && n < LETTER_SPACING_EM.length)) return;
+  state.letterSpacing = n;
+  previewLetterSpacing(n);
   saveSettings();
   rerenderKeepPos();
 }
@@ -7660,7 +7720,7 @@ function _wireSetGroupToggles() {
 }
 
 const DISPLAY_DEFAULTS = {
-  fontMode:'publisher', fontSize:100, lineHeight:2.0,
+  fontMode:'publisher', fontSize:100, lineHeight:2.0, letterSpacing:0,
   theme:'', themeAuto:false, themeLight:'', themeDark:'dark',
   margin:'full', writingMode:'vertical', fwdBtnSize:'small', tapZone:'lshape',
   fontBold:false, fontStrokeLevel:0,
@@ -7681,7 +7741,8 @@ function syncAllSettingsUI() {
   updateFontPickerUI();
   const fs = document.getElementById('font-size-display');
   if (fs) fs.textContent = state.fontSize + '%';
-  setVal('lineh-select', Number(state.lineHeight).toFixed(1));  // '2' ではなく '2.0'
+  setVal('lineh-range', String(state.lineHeight));            previewLineHeight(state.lineHeight);
+  setVal('letter-spacing-range', String(state.letterSpacing)); previewLetterSpacing(state.letterSpacing);
   updateFontBoldToggleUI();
   updateFontStrokeRowUI();
   setVal('margin-select', state.margin);         applyMargin(state.margin);
