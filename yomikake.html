@@ -106,7 +106,9 @@
     transition:background .15s linear;
   }
   /* 暗くしたまま忘れる事故を防ぐ目印（Drive 自動保存 ON の .auto-save-on と同じ手法） */
-  #settings-btn.filter-on { box-shadow:0 0 0 1.5px var(--accent); border-radius:8px; }
+  /* border-radius は指定しない — .icon-btn の 6px を上書きすると
+     目印が付いている間だけ歯車ボタンの角丸が他のアイコンと変わってしまう */
+  #settings-btn.filter-on { box-shadow:0 0 0 1.5px var(--accent); }
   .range-wrap { display:flex; align-items:center; gap:10px; flex:1; max-width:190px; }
   .set-range { flex:1; margin:0; -webkit-appearance:none; appearance:none; background:transparent; height:22px; cursor:pointer; }
   .set-range::-webkit-slider-runnable-track { height:4px; background:var(--ui-border); border-radius:2px; }
@@ -7508,10 +7510,17 @@ function applyScreenFilter() {
   updateFilterIndicator();
 }
 
-// 暗くしたまま忘れる事故を防ぐ目印を ⚙ ボタンに出す
+// 「暗いままで戻し方が分からない」ときの案内として ⚙ に目印を出す。
+// ただし軽い調整では出さない — 画面が暗いことは見れば分かるので、
+// 既定でないだけで印を出すと（テーマや文字サイズにも同じ理屈が必要になり）過剰になる。
+// Drive 自動保存の枠とは意味が違う（あちらは画面に痕跡が残らない裏の処理の可視化）。
+const FILTER_HINT_BRIGHTNESS = 60;  // これ以下で目印を出す
+const FILTER_HINT_WARMTH     = 3;   // これ以上で目印を出す
 function updateFilterIndicator() {
   const btn = document.getElementById('settings-btn');
-  if (btn) btn.classList.toggle('filter-on', state.brightness < 100 || state.warmth > 0);
+  if (!btn) return;
+  btn.classList.toggle('filter-on',
+    state.brightness <= FILTER_HINT_BRIGHTNESS || state.warmth >= FILTER_HINT_WARMTH);
 }
 
 

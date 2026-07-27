@@ -50,14 +50,32 @@ var rs = document.documentElement.style;
 T('既定は dim=0', parseFloat(rs.getPropertyValue('--dim-a')) === 0, rs.getPropertyValue('--dim-a'));
 T('既定は warm=0', parseFloat(rs.getPropertyValue('--warm-a')) === 0);
 T('既定は ⚙ に目印が付かない', !document.getElementById('settings-btn').classList.contains('filter-on'));
+T('目印は角丸を変えない（.icon-btn の 6px を上書きしない）',
+  getComputedStyle(document.getElementById('settings-btn')).borderTopLeftRadius === '6px',
+  getComputedStyle(document.getElementById('settings-btn')).borderTopLeftRadius);
 
 // 明るさを下げる
 changeBrightness(30);
 T('最暗でも真っ黒にしない', parseFloat(rs.getPropertyValue('--dim-a')) > 0.4 &&
   parseFloat(rs.getPropertyValue('--dim-a')) <= 0.55, rs.getPropertyValue('--dim-a'));
 T('数値表示', document.getElementById('brightness-val').textContent === '30%');
-T('⚙ に目印が付く', document.getElementById('settings-btn').classList.contains('filter-on'));
+T('強く暗くすると ⚙ に目印が付く', document.getElementById('settings-btn').classList.contains('filter-on'));
+T('目印が付いても角丸は変わらない',
+  getComputedStyle(document.getElementById('settings-btn')).borderTopLeftRadius === '6px',
+  getComputedStyle(document.getElementById('settings-btn')).borderTopLeftRadius);
 T('永続化', JSON.parse(localStorage.getItem('epub_settings')).brightness === 30);
+
+// 目印のしきい値：軽い調整では出さない（画面が暗いことは見れば分かるため）
+function hint() { return document.getElementById('settings-btn').classList.contains('filter-on'); }
+changeBrightness(100);
+changeBrightness(65); T('明るさ65%では目印なし', !hint());
+changeBrightness(FILTER_HINT_BRIGHTNESS); T('明るさ60%（しきい値）で目印あり', hint());
+changeBrightness(95);  T('明るさ95%では目印なし', !hint());
+changeWarmth(2);       T('暖色2では目印なし', !hint());
+changeWarmth(FILTER_HINT_WARMTH); T('暖色3（しきい値）で目印あり', hint());
+changeWarmth(0);
+T('しきい値の定数', FILTER_HINT_BRIGHTNESS === 60 && FILTER_HINT_WARMTH === 3,
+  FILTER_HINT_BRIGHTNESS + '/' + FILTER_HINT_WARMTH);
 
 // 暖色
 changeWarmth(5);
@@ -73,7 +91,7 @@ changeBrightness(10); changeBrightness(500); changeWarmth(-1); changeWarmth(99);
 T('範囲外は無視', state.brightness === 100 && state.warmth === 0,
   state.brightness + '/' + state.warmth);
 
-// 保存・復元
+// 保存・復元（55% はしきい値以下なので目印あり）
 localStorage.setItem('epub_settings', JSON.stringify({ brightness: 55, warmth: 3 }));
 state.brightness = 100; state.warmth = 0;
 loadSettings();
