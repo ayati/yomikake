@@ -973,6 +973,14 @@
           <option value="large" data-i18n="fwdSize.large">大</option>
         </select>
       </div>
+      <div class="set-row" id="orientation-lock-row">
+        <span class="set-label" data-i18n="settings.orientationLock">画面の向き（全画面時）</span>
+        <select class="modern-select" id="orientation-lock-select" onchange="changeOrientationLock(this.value)">
+          <option value="off" data-i18n="orient.off">固定しない</option>
+          <option value="portrait" data-i18n="orient.portrait">縦で固定</option>
+          <option value="landscape" data-i18n="orient.landscape">横で固定</option>
+        </select>
+      </div>
       <div class="set-row">
         <span class="set-label" data-i18n="settings.fsHud">全画面の隅表示</span>
         <select class="modern-select" id="fs-hud-select" onchange="changeFsHud(this.value)">
@@ -1597,6 +1605,11 @@ const I18N = {
     'btn.fullscreen.exit':       '読書モード終了',
     'settings.driveGroup':       'Google Drive',
     'settings.fsHud':              '全画面の隅表示',
+    'settings.orientationLock':    '画面の向き（全画面時）',
+    'orient.off':                  '固定しない',
+    'orient.portrait':             '縦で固定',
+    'orient.landscape':            '横で固定',
+    'toast.orientationFailed':     '画面の向きを固定できませんでした。ホーム画面に追加した状態でお試しください',
     'fsHud.both':                  '時刻＋進捗',
     'fsHud.clock':                 '時刻のみ',
     'fsHud.off':                   '表示しない',
@@ -1941,6 +1954,11 @@ const I18N = {
     'btn.fullscreen.exit':       'Exit reader',
     'settings.driveGroup':       'Google Drive',
     'settings.fsHud':              'Fullscreen corner',
+    'settings.orientationLock':    'Orientation (fullscreen)',
+    'orient.off':                  'Do not lock',
+    'orient.portrait':             'Lock portrait',
+    'orient.landscape':            'Lock landscape',
+    'toast.orientationFailed':     'Could not lock the orientation. Try after adding this to your home screen.',
     'fsHud.both':                  'Clock + progress',
     'fsHud.clock':                 'Clock only',
     'fsHud.off':                   'Hidden',
@@ -2285,6 +2303,11 @@ const I18N = {
     'btn.fullscreen.exit':       '結束閱讀模式',
     'settings.driveGroup':       'Google Drive',
     'settings.fsHud':              '全螢幕角落顯示',
+    'settings.orientationLock':    '畫面方向（全螢幕時）',
+    'orient.off':                  '不固定',
+    'orient.portrait':             '固定直向',
+    'orient.landscape':            '固定橫向',
+    'toast.orientationFailed':     '無法固定畫面方向。請加入主畫面後再試。',
     'fsHud.both':                  '時刻＋進度',
     'fsHud.clock':                 '僅時刻',
     'fsHud.off':                   '不顯示',
@@ -2629,6 +2652,11 @@ const I18N = {
     'btn.fullscreen.exit':       '退出阅读模式',
     'settings.driveGroup':       'Google Drive',
     'settings.fsHud':              '全屏角落显示',
+    'settings.orientationLock':    '画面方向（全屏时）',
+    'orient.off':                  '不固定',
+    'orient.portrait':             '固定竖向',
+    'orient.landscape':            '固定横向',
+    'toast.orientationFailed':     '无法固定画面方向。请添加到主屏幕后再试。',
     'fsHud.both':                  '时刻＋进度',
     'fsHud.clock':                 '仅时刻',
     'fsHud.off':                   '不显示',
@@ -2851,6 +2879,7 @@ const state = {
   brightness:100,          // 画面の明るさ 30–100（%）。100 = フィルタ無し（epub_settings に永続化）
   warmth:0,                // 暖色フィルタ 0–5。0 = 無し（epub_settings に永続化）
   fsHud:'both',            // 全画面時の隅表示 'off'|'clock'|'both'（epub_settings に永続化）
+  orientationLock:'off',   // 画面の向き 'off'|'portrait'|'landscape'（全画面時のみ・epub_settings に永続化）
   setGroupsOpen:{},        // 設定グループの開閉 {groupId:bool}（epub_settings に永続化・Init で既定値を流し込む）
   ttsRate:1.0,             // 読み上げ速度 0.5–2.0（epub_settings に永続化）
   ttsVoice:'',             // 読み上げ音声 voiceURI（'' = 自動。epub_settings に永続化）
@@ -5738,6 +5767,7 @@ function saveSettings() {
       brightness:    state.brightness,
       warmth:        state.warmth,
       fsHud:         state.fsHud,
+      orientationLock: state.orientationLock,
       setGroupsOpen: state.setGroupsOpen,
       fontBold:      state.fontBold,
       fontStrokeLevel: state.fontStrokeLevel,
@@ -5809,6 +5839,8 @@ function loadSettings() {
       });
     }
     applySetGroupsOpen();
+    if (['off','portrait','landscape'].indexOf(s.orientationLock) >= 0) state.orientationLock = s.orientationLock;
+    updateOrientationLockUI();
     if (typeof s.fontBold === 'boolean') { state.fontBold = s.fontBold; updateFontBoldToggleUI(); }
     if (typeof s.fontStrokeLevel === 'number' && [0,1,2,3].indexOf(s.fontStrokeLevel) >= 0) {
       state.fontStrokeLevel = s.fontStrokeLevel;
@@ -7470,6 +7502,56 @@ function updateToolbarPrefsUI() {
 // 対象は「表示」に関わるものだけ。しおり・ePubキャッシュ・言語・読み上げ設定
 // （ttsRate/ttsVoice）・Drive自動保存・起動時自動オープン・読みかけリスト設定は触らない。
 
+
+// ══════════════════════════════════════════
+//  画面の向きロック（B-13）
+// ══════════════════════════════════════════
+// screen.orientation.lock() は環境差が大きい:
+//   - Android Chrome は「全画面 or インストール済み PWA」でないと reject する
+//   - iOS Safari には lock() 自体が無い
+//   - デスクトップは呼べても効果が無い
+// そこで (1) lock が生えている環境でだけ設定行を出し、(2) 全画面（読書モード）に
+// 紐付けて掛け外しし、(3) 失敗したら設定ごと 'off' に戻して理由を伝える、で組む。
+// 黙って効かない設定が残るのがいちばん悪い。
+const _orientationLockSupported =
+  typeof screen !== 'undefined' && screen.orientation &&
+  typeof screen.orientation.lock === 'function';
+
+function changeOrientationLock(v) {
+  if (['off', 'portrait', 'landscape'].indexOf(v) < 0) return;
+  state.orientationLock = v;
+  saveSettings();
+  applyOrientationLock();
+}
+
+// 全画面の出入り・設定変更のすべてから呼ぶ同期点
+function applyOrientationLock() {
+  if (!_orientationLockSupported) return;
+  if (!state.fullscreen || state.orientationLock === 'off') {
+    try { screen.orientation.unlock(); } catch (e) {}
+    return;
+  }
+  let p;
+  try { p = screen.orientation.lock(state.orientationLock); } catch (e) { _onOrientationLockFail(); return; }
+  // Promise を返さない実装が過去にあったため thenable か確認してから catch する
+  if (p && typeof p.catch === 'function') p.catch(_onOrientationLockFail);
+}
+
+function _onOrientationLockFail() {
+  state.orientationLock = 'off';
+  const el = document.getElementById('orientation-lock-select');
+  if (el) el.value = 'off';
+  saveSettings();
+  showToast(t('toast.orientationFailed'));
+}
+
+function updateOrientationLockUI() {
+  const row = document.getElementById('orientation-lock-row');
+  if (row) row.style.display = _orientationLockSupported ? '' : 'none';
+  const el = document.getElementById('orientation-lock-select');
+  if (el) el.value = state.orientationLock;
+}
+
 // ══════════════════════════════════════════
 //  設定グループの折りたたみ（B-5）
 // ══════════════════════════════════════════
@@ -7511,6 +7593,7 @@ const DISPLAY_DEFAULTS = {
   toolbarHidden:[],
   brightness:100, warmth:0, fsHud:'both',
   setGroupsOpen: SET_GROUP_DEFAULT_OPEN,
+  orientationLock:'off',
 };
 
 // state の表示系プロパティを UI へ一括反映する。loadSettings() は
@@ -7545,6 +7628,8 @@ function syncAllSettingsUI() {
   setVal('fs-hud-select', state.fsHud);
   syncFsHud();
   applySetGroupsOpen();
+  updateOrientationLockUI();
+  applyOrientationLock();
 }
 
 function resetDisplaySettings() {
@@ -9723,6 +9808,7 @@ function toggleFullscreen() {
     _clearFsExitBtn();
   }
   syncFsHud();
+  applyOrientationLock();
 }
 
 function showFsExitBtn() {
@@ -9746,6 +9832,7 @@ document.addEventListener('fullscreenchange', () => {
     document.body.classList.remove('fullscreen');
     _clearFsExitBtn();
     syncFsHud();
+    applyOrientationLock();
   }
 });
 
@@ -9789,6 +9876,7 @@ applyToolbarPrefs();
 updateToolbarPrefsUI();
 applyScreenFilter();
 syncFsHud();
+updateOrientationLockUI();
 ttsInit();
 updateTapZoneBodyClass();
 updateFontBoldToggleUI();
