@@ -87,6 +87,14 @@ Most features exist in both files. As a rule:
 - **設定グループの折りたたみ** — `SET_GROUP_DEFAULT_OPEN` が対象 9 グループと既定の開閉を持つ。**Init では `loadSettings()` の後にも `applySetGroupsOpen()` を呼ぶこと** — `loadSettings()` は保存値が無いと早期 return するため、初回訪問時に既定の開閉が DOM に届かない。既定で開く 3 つは markup にも `open` を書いてちらつきを防ぐ。
 - **`resetDisplaySettings()` はオブジェクトをコピーする** — `state[k] = v` で参照を代入すると `DISPLAY_DEFAULTS.setGroupsOpen` 自体が汚れ、2 回目以降のリセットが壊れる。
 
+**表示設定 第3弾（v2.15.0）** (`LETTER_SPACING_EM`, `previewLineHeight`, `changeLineHeight`, `previewLetterSpacing`, `changeLetterSpacing`, `setTtsRate`, `_orientationLockSupported`, `changeOrientationLock`, `applyOrientationLock`, `_onOrientationLockFail`, `updateOrientationLockUI`, `state.letterSpacing`/`orientationLock` — 設計書 `design_display_settings_v3.md`)。
+
+- **行間はスライダー（1.4–3.0・0.1 刻み）** — 旧 4 値（1.6/2.0/2.4/2.8）はすべて新レンジの刻みに乗るので移行不要。**`oninput` では数値ラベルだけ更新し、再描画は `onchange`（ドラッグ終了）で行う** — `rerenderKeepPos()` は章全体を描き直すので、明るさ（CSS 変数だけで完結）と違いドラッグ中に毎ステップ走らせると重い。
+- **字間は `body` 側 1 箇所にのみ注入し、0 のときは宣言ごと出さない**（`letter-spacing` は最終文字の後ろにも空きを入れるため、既定では一切触らない）。**`rt,rp` は `letter-spacing:normal` で打ち消す** — 継承するとルビ文字まで間延びして親字とのバランスが崩れる。
+- **⚠ 縦中横フィックス（`fixTcy`）との干渉** — `fixTcy` は body の `letter-spacing` を微小変更してレイアウトを dirty にする実装。字間注入は `!important` の author スタイルなので、**非 important の inline style では摂動が効かず縦中横の左ずれが再発する**。`setProperty(..., 'important')` で摂動し、`getPropertyValue`/`getPropertyPriority` で元の値と優先度を厳密に復元すること。`letter-spacing` を触る改修をする際は必ずここを確認する。
+- **読み上げ速度** — 絶対値セッター `setTtsRate(v)` が本体で、`changeTtsRate(delta)`（バーの ＋/－）はラッパ。**`updateTtsUI()` がバーと設定セレクトの両方を同期する**（片方だけだと 2 つの UI が食い違う）。option の `value` は `toFixed(2)` と一致する文字列（`'1.00'`）で書くこと。`ttsRate` は**リセット対象外**（読み上げ設定は触らない方針）。
+- **画面の向きロック** — `screen.orientation.lock()` は環境差が大きい（Android Chrome は全画面/インストール済み PWA が要る、iOS Safari には `lock()` が無い、デスクトップは効果なし）。**(1) `lock` が生えている環境でだけ設定行を出す (2) 全画面に紐付けて掛け外しする (3) 失敗したら設定ごと `'off'` に戻してトースト**、の 3 点で組んである。`lock()` が Promise を返さない実装・同期例外を投げる実装のどちらでも落ちないようにしてある。
+
 When fixing a bug or adding a feature that is not in the "only" lists above, apply the change to **both files**.
 
 ## Architecture
@@ -298,7 +306,7 @@ Both files support **4 languages**: `ja` (Japanese), `en` (English), `zh-TW` (Tr
 |-----|---------|
 | `epub_pos_{title}__{creator}` | `{spineIdx, ratio, lastOpenedAt, creator, spineCount, cover?, source?, site?}` — reading position + book metadata written by `saveBookMeta()` on open and `savePos()` on scroll/chapter change. Separator is **double underscore** (v1.8.11+). `source`/`site` (v2.10.0・追加のみ・旧ビルド無視) = 底本 URL とサイト表示名（読みかけリストのサイトバッジ用。quota 超過時は cover→source/site の順に落として読書位置を優先）。 |
 | `epub_last_book` | `{title, bookKey}` — for the resume banner |
-| `epub_settings` | `{fontMode, fontSize, lineHeight, theme, themeAuto, themeLight, themeDark, margin, writingMode, fwdBtnSize, tapZone, autoOpenLast, ttsRate, ttsVoice, driveAutoSave, fontBold, fontStrokeLevel, spreadMode, fxlZoomLevel, fxlRegionOrder, fxlLtrAutoFlip, toolbarHidden, brightness, warmth, fsHud, setGroupsOpen}` — **端末ローカルに閉じる**（しおり JSON にも Drive 同期にも含めない。端末ごとに画面サイズ・DPI・フォント資産・OS が違うため） |
+| `epub_settings` | `{fontMode, fontSize, lineHeight, letterSpacing, theme, themeAuto, themeLight, themeDark, margin, writingMode, fwdBtnSize, tapZone, autoOpenLast, ttsRate, ttsVoice, driveAutoSave, fontBold, fontStrokeLevel, spreadMode, fxlZoomLevel, fxlRegionOrder, fxlLtrAutoFlip, toolbarHidden, brightness, warmth, fsHud, setGroupsOpen, orientationLock}` — **端末ローカルに閉じる**（しおり JSON にも Drive 同期にも含めない。端末ごとに画面サイズ・DPI・フォント資産・OS が違うため） |
 | `epub_lang` | selected UI language (`ja` / `en` / `zh-TW` / `zh-CN`) |
 | `epub_consolidate_v1` | one-shot flag set after `consolidateBookmarks()` runs once at startup |
 | `epub_tap_guide_v1` | one-shot flag set after the tap guide has been shown once (v2.8.0) |
