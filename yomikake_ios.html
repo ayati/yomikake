@@ -689,6 +689,21 @@
   body.fullscreen #statusbar {
     position:fixed; bottom:-200px; left:0; right:0; opacity:0; pointer-events:none;
   }
+  /* 全画面（読書モード）中の時計・進捗（B-9）。全画面では OS のステータスバーも
+     #statusbar も見えず、時刻も読了率も分からなくなるため隅に小さく出す。
+     pointer-events:none は必須 — tapZone が 'lshape'/'tb' のとき下端はページ送り帯であり、
+     HUD がタップを吸うと「ここだけ反応しない」死角ができてタップガイドが嘘をつく。
+     位置は右下（下端中央は #btn-scroll-fwd が占める）。
+     バッテリー残量は入れない（getBattery() は Chromium 限定で iOS Safari に無い）。 */
+  #fs-hud {
+    position:fixed; right:14px; bottom:max(10px, env(safe-area-inset-bottom, 10px));
+    z-index:45; display:none; gap:10px; align-items:center;
+    font-size:11px; font-variant-numeric:tabular-nums; letter-spacing:.3px;
+    color:var(--ui-text); opacity:.38; pointer-events:none; user-select:none;
+  }
+  body.fullscreen #fs-hud { display:flex; }
+  body.fullscreen.fs-hud-off #fs-hud { display:none; }
+  #fs-hud-pct { opacity:.85; }
   #fs-exit-zone {
     position:fixed; top:0; left:0; right:0; height:16px; z-index:50;
     background:var(--accent); opacity:.15; cursor:pointer;
@@ -938,6 +953,14 @@
           <option value="small" data-i18n="fwdSize.small">小</option>
           <option value="medium" data-i18n="fwdSize.medium">中</option>
           <option value="large" data-i18n="fwdSize.large">大</option>
+        </select>
+      </div>
+      <div class="set-row">
+        <span class="set-label" data-i18n="settings.fsHud">全画面の隅表示</span>
+        <select class="modern-select" id="fs-hud-select" onchange="changeFsHud(this.value)">
+          <option value="both" data-i18n="fsHud.both">時刻＋進捗</option>
+          <option value="clock" data-i18n="fsHud.clock">時刻のみ</option>
+          <option value="off" data-i18n="fsHud.off">表示しない</option>
         </select>
       </div>
       <div class="set-row">
@@ -1245,6 +1268,7 @@
   <div id="progress-tooltip"></div>
 </div>
 
+<div id="fs-hud" aria-hidden="true"><span id="fs-hud-time"></span><span id="fs-hud-pct"></span></div>
 <div id="fs-exit-zone" onclick="showFsExitBtn()"></div>
 <button id="fs-exit-btn" onclick="toggleFullscreen()" data-i18n="btn.fullscreen.exit">読書モード終了</button>
 
@@ -1540,6 +1564,10 @@ const I18N = {
     'btn.fullscreen':            'フルスクリーン',
     'btn.fullscreen.exit':       '読書モード終了',
     'settings.driveGroup':       'Google Drive',
+    'settings.fsHud':              '全画面の隅表示',
+    'fsHud.both':                  '時刻＋進捗',
+    'fsHud.clock':                 '時刻のみ',
+    'fsHud.off':                   '表示しない',
     'settings.brightness':         '画面の明るさ',
     'settings.warmth':             '暖色フィルタ',
     'settings.reset':              '表示設定を初期値に戻す',
@@ -1878,6 +1906,10 @@ const I18N = {
     'btn.fullscreen':            'Fullscreen',
     'btn.fullscreen.exit':       'Exit reader',
     'settings.driveGroup':       'Google Drive',
+    'settings.fsHud':              'Fullscreen corner',
+    'fsHud.both':                  'Clock + progress',
+    'fsHud.clock':                 'Clock only',
+    'fsHud.off':                   'Hidden',
     'settings.brightness':         'Brightness',
     'settings.warmth':             'Warm filter',
     'settings.reset':              'Reset display settings',
@@ -2216,6 +2248,10 @@ const I18N = {
     'btn.fullscreen':            '全螢幕',
     'btn.fullscreen.exit':       '結束閱讀模式',
     'settings.driveGroup':       'Google Drive',
+    'settings.fsHud':              '全螢幕角落顯示',
+    'fsHud.both':                  '時刻＋進度',
+    'fsHud.clock':                 '僅時刻',
+    'fsHud.off':                   '不顯示',
     'settings.brightness':         '畫面亮度',
     'settings.warmth':             '暖色濾鏡',
     'settings.reset':              '將顯示設定回復預設值',
@@ -2554,6 +2590,10 @@ const I18N = {
     'btn.fullscreen':            '全屏',
     'btn.fullscreen.exit':       '退出阅读模式',
     'settings.driveGroup':       'Google Drive',
+    'settings.fsHud':              '全屏角落显示',
+    'fsHud.both':                  '时刻＋进度',
+    'fsHud.clock':                 '仅时刻',
+    'fsHud.off':                   '不显示',
     'settings.brightness':         '屏幕亮度',
     'settings.warmth':             '暖色滤镜',
     'settings.reset':              '将显示设置恢复默认值',
@@ -2771,6 +2811,7 @@ const state = {
   toolbarHidden:[],        // ツールバーで隠す項目のキー配列（epub_settings に永続化）
   brightness:100,          // 画面の明るさ 30–100（%）。100 = フィルタ無し（epub_settings に永続化）
   warmth:0,                // 暖色フィルタ 0–5。0 = 無し（epub_settings に永続化）
+  fsHud:'both',            // 全画面時の隅表示 'off'|'clock'|'both'（epub_settings に永続化）
   ttsRate:1.0,             // 読み上げ速度 0.5–2.0（epub_settings に永続化）
   ttsVoice:'',             // 読み上げ音声 voiceURI（'' = 自動。epub_settings に永続化）
   bookLang:'ja',           // OPF dc:language 先頭2文字（セッションのみ・非永続）
@@ -5519,6 +5560,7 @@ function updatePageInfo() {
   // 縦書きは右→左方向に読み進めるためバーを右端起点に
   fill.style.marginLeft = isVerticalAxis() ? 'auto' : '';
   updateJumpPanel();
+  updateFsHudPct();
 }
 
 // ══════════════════════════════════════════
@@ -5638,6 +5680,7 @@ function saveSettings() {
       toolbarHidden: state.toolbarHidden,
       brightness:    state.brightness,
       warmth:        state.warmth,
+      fsHud:         state.fsHud,
       fontBold:      state.fontBold,
       fontStrokeLevel: state.fontStrokeLevel,
       spreadMode:    state.spreadMode,
@@ -5688,6 +5731,11 @@ function loadSettings() {
       const el = document.getElementById('warmth-range'); if (el) el.value = String(state.warmth);
     }
     applyScreenFilter();
+    if (['off','clock','both'].indexOf(s.fsHud) >= 0) {
+      state.fsHud = s.fsHud;
+      const el = document.getElementById('fs-hud-select'); if (el) el.value = s.fsHud;
+    }
+    syncFsHud();
     if (typeof s.fontBold === 'boolean') { state.fontBold = s.fontBold; updateFontBoldToggleUI(); }
     if (typeof s.fontStrokeLevel === 'number' && [0,1,2,3].indexOf(s.fontStrokeLevel) >= 0) {
       state.fontStrokeLevel = s.fontStrokeLevel;
@@ -7231,6 +7279,46 @@ function updateFilterIndicator() {
   if (btn) btn.classList.toggle('filter-on', state.brightness < 100 || state.warmth > 0);
 }
 
+
+// ══════════════════════════════════════════
+//  全画面 HUD（時計・進捗・B-9）
+// ══════════════════════════════════════════
+let _fsHudTimer = null;
+
+function updateFsHudTime() {
+  const el = document.getElementById('fs-hud-time');
+  if (!el) return;
+  el.textContent = new Date().toLocaleTimeString(
+    _lang === 'ja' ? 'ja-JP' : _lang, { hour: '2-digit', minute: '2-digit' });
+}
+
+// 進捗は進捗バーと同じ式を使う（数字とバーがズレないこと）
+function updateFsHudPct() {
+  const el = document.getElementById('fs-hud-pct');
+  if (!el) return;
+  if (state.fsHud !== 'both' || !state.spine.length) { el.textContent = ''; return; }
+  const total = state.spine.length, cur = state.currentSpineIdx + 1;
+  const pct = total > 1 ? Math.min(100, (cur - 1 + _intraChapterRatio) / (total - 1) * 100) : 100;
+  el.textContent = Math.round(pct) + '%';
+}
+
+// 全画面の出入り（キー・ボタン・ブラウザ側の解除）すべてから呼ぶ同期点
+function syncFsHud() {
+  document.body.classList.toggle('fs-hud-off', state.fsHud === 'off');
+  if (_fsHudTimer) { clearInterval(_fsHudTimer); _fsHudTimer = null; }
+  if (!state.fullscreen || state.fsHud === 'off') return;
+  updateFsHudTime();
+  updateFsHudPct();
+  _fsHudTimer = setInterval(updateFsHudTime, 30000);  // 全画面の間だけ動かす
+}
+
+function changeFsHud(v) {
+  if (['off', 'clock', 'both'].indexOf(v) < 0) return;
+  state.fsHud = v;
+  syncFsHud();
+  saveSettings();
+}
+
 function changeBrightness(v) {
   const n = parseInt(v, 10);
   if (!(n >= 30 && n <= 100)) return;
@@ -7273,7 +7361,7 @@ const DISPLAY_DEFAULTS = {
   fontBold:false, fontStrokeLevel:0,
   spreadMode:'auto', fxlZoomLevel:2.0, fxlRegionOrder:'story', fxlLtrAutoFlip:true,
   toolbarHidden:[],
-  brightness:100, warmth:0,
+  brightness:100, warmth:0, fsHud:'both',
 };
 
 // state の表示系プロパティを UI へ一括反映する。loadSettings() は
@@ -7304,6 +7392,8 @@ function syncAllSettingsUI() {
   setVal('brightness-range', String(state.brightness));
   setVal('warmth-range', String(state.warmth));
   applyScreenFilter();
+  setVal('fs-hud-select', state.fsHud);
+  syncFsHud();
 }
 
 function resetDisplaySettings() {
@@ -9480,6 +9570,7 @@ function toggleFullscreen() {
     if (document.fullscreenElement) document.exitFullscreen();
     _clearFsExitBtn();
   }
+  syncFsHud();
 }
 
 function showFsExitBtn() {
@@ -9502,6 +9593,7 @@ document.addEventListener('fullscreenchange', () => {
     state.fullscreen = false;
     document.body.classList.remove('fullscreen');
     _clearFsExitBtn();
+    syncFsHud();
   }
 });
 
@@ -9541,6 +9633,7 @@ updateAutoOpenToggleUI();
 applyToolbarPrefs();
 updateToolbarPrefsUI();
 applyScreenFilter();
+syncFsHud();
 ttsInit();
 updateTapZoneBodyClass();
 updateFontBoldToggleUI();

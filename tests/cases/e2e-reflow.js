@@ -41,6 +41,25 @@ fetch('tests/.fixtures/reflow.epub')
     T('リセット後も本は開いたまま', !!state.epub && state.currentSpineIdx === before);
     T('リセットでテーマが標準に', state.theme === '' && !state.themeAuto);
 
+    // 全画面 HUD：本を開いた実レイアウトで、次へボタンと重ならないこと
+    state.tapZone = 'center'; updateTapZoneBodyClass();   // ボタンが実在する設定にする
+    state.fullscreen = true; document.body.classList.add('fullscreen'); syncFsHud();
+    var hud = document.getElementById('fs-hud').getBoundingClientRect();
+    var fwd = document.getElementById('btn-scroll-fwd').getBoundingClientRect();
+    T('全画面HUDが実寸を持つ', hud.width > 0 && hud.height > 0,
+      Math.round(hud.width) + 'x' + Math.round(hud.height));
+    T('次へボタンも実寸を持つ', fwd.width > 0 && fwd.height > 0,
+      Math.round(fwd.width) + 'x' + Math.round(fwd.height));
+    T('全画面HUDが次へボタンと重ならない',
+      (hud.right < fwd.left || hud.left > fwd.right || hud.bottom < fwd.top || hud.top > fwd.bottom),
+      'hud=' + Math.round(hud.left) + ',' + Math.round(hud.top) + '-' +
+      Math.round(hud.right) + ',' + Math.round(hud.bottom) +
+      ' fwd=' + Math.round(fwd.left) + ',' + Math.round(fwd.top) + '-' +
+      Math.round(fwd.right) + ',' + Math.round(fwd.bottom));
+    T('全画面HUDに進捗が入る', /%$/.test(document.getElementById('fs-hud-pct').textContent),
+      document.getElementById('fs-hud-pct').textContent);
+    state.fullscreen = false; document.body.classList.remove('fullscreen'); syncFsHud();
+
     closeBook();
     T('closeBook できる', !state.epub);
     T('closeBook でツールバーが「開く」に戻る',
