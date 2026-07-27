@@ -36,7 +36,12 @@ resetDisplaySettings();
 var diffs = [];
 Object.keys(DISPLAY_DEFAULTS).forEach(function (k) {
   var d = DISPLAY_DEFAULTS[k], a = state[k];
-  var same = Array.isArray(d) ? (Array.isArray(a) && a.length === 0) : a === d;
+  // オブジェクト（setGroupsOpen）はコピーされるので参照比較ではなく中身で比べる。
+  // 参照が同一だとリセットが既定値そのものを汚すので、そこも弾く。
+  var same;
+  if (Array.isArray(d))            same = Array.isArray(a) && a.length === 0;
+  else if (d && typeof d === 'object') same = (a !== d) && JSON.stringify(a) === JSON.stringify(d);
+  else                             same = a === d;
   if (!same) diffs.push(k + '=' + JSON.stringify(a));
 });
 T('全 state が既定に戻る', diffs.length === 0, diffs.join(' '));

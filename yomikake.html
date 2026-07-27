@@ -57,6 +57,15 @@
   .pop-body { padding:0 12px 12px; flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; }
   
   .set-group { margin-top:20px; padding-bottom:4px; }
+  /* 設定グループの折りたたみ（B-5）。9グループが縦に並ぶとスマホで下端まで遠い。
+     #fxl-settings-group は <h4> を持たず「レイアウトの続き」として連続表示させる設計なので
+     折りたたみ対象にしない。#reset-group も1行なので対象外。 */
+  details.set-group > summary { list-style:none; cursor:pointer; display:flex; align-items:center; padding:2px 0 10px; border-radius:8px; }
+  details.set-group > summary::-webkit-details-marker { display:none; }
+  details.set-group > summary::after { content:'▾'; margin-left:auto; margin-right:8px; font-size:11px; opacity:.5; transition:transform .15s; }
+  details.set-group[open] > summary::after { transform:rotate(180deg); }
+  details.set-group > summary > h4 { margin-bottom:0; }
+  details.set-group > summary:hover > h4 { opacity:.9; }
   .set-group h4 { font-size:12px; font-weight:600; color:var(--ui-text); opacity:0.6; text-transform:uppercase; margin:0 8px 12px; letter-spacing:0.5px; }
   .set-row { display:flex; align-items:center; justify-content:space-between; padding:8px; border-radius:8px; }
   .set-row:hover { background:var(--hover-bg); }
@@ -814,8 +823,8 @@
     <button class="icon-btn" onclick="toggleSettings()" style="padding:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
   </div>
   <div class="pop-body">
-    <div class="set-group">
-      <h4 data-i18n="settings.color">カラー</h4>
+    <details class="set-group" id="color-group" open>
+      <summary><h4 data-i18n="settings.color">カラー</h4></summary>
       <div class="set-row set-row-stack">
         <span class="set-label" data-i18n="settings.theme">テーマ</span>
         <div class="theme-options">
@@ -900,10 +909,10 @@
           <span class="range-val" id="warmth-val">0</span>
         </div>
       </div>
-    </div>
+    </details>
 
-    <div class="set-group fxl-hide-group">
-      <h4 data-i18n="settings.typography">タイポグラフィ</h4>
+    <details class="set-group fxl-hide-group" id="typography-group" open>
+      <summary><h4 data-i18n="settings.typography">タイポグラフィ</h4></summary>
       <div class="set-row">
         <span class="set-label" data-i18n="settings.font">フォント</span>
         <div id="font-picker">
@@ -944,10 +953,10 @@
           <option value="3" data-i18n="stroke.strong">強</option>
         </select>
       </div>
-    </div>
+    </details>
 
-    <div class="set-group">
-      <h4 data-i18n="settings.layout">レイアウト</h4>
+    <details class="set-group" id="layout-group" open>
+      <summary><h4 data-i18n="settings.layout">レイアウト</h4></summary>
       <div class="set-row fxl-hide-row">
         <span class="set-label" data-i18n="settings.writingMode">組方向</span>
         <select class="modern-select" id="writing-mode-select" onchange="changeWritingMode(this.value)">
@@ -990,7 +999,7 @@
           <option value="center" data-i18n="tapZone.center">ボタン（上下＋章送り）</option>
         </select>
       </div>
-    </div>
+    </details>
 
     <div class="set-group" id="fxl-settings-group" style="display:none">
       <div class="set-row">
@@ -1025,8 +1034,8 @@
       </div>
     </div>
 
-    <div class="set-group" id="toolbar-settings-group">
-      <h4 data-i18n="settings.toolbarGroup">ツールバーに表示</h4>
+    <details class="set-group" id="toolbar-settings-group">
+      <summary><h4 data-i18n="settings.toolbarGroup">ツールバーに表示</h4></summary>
       <div class="set-row" id="tbitem-flash">
         <span class="set-label" data-i18n="settings.tbFlash">👁 操作を見せる</span>
         <button class="tb-item-toggle" data-tbkey="flash" onclick="toggleToolbarItem(this.dataset.tbkey)">ON</button>
@@ -1056,36 +1065,36 @@
         <button class="tb-item-toggle" data-tbkey="fxlZoom" onclick="toggleToolbarItem(this.dataset.tbkey)">ON</button>
       </div>
       <span style="font-size:11px;opacity:.6;line-height:1.5;padding:0 8px;display:block;" data-i18n="settings.toolbarHelp">開く・目次・設定は常に表示されます</span>
-    </div>
+    </details>
 
-    <div class="set-group" id="tts-settings-group">
-      <h4 data-i18n="settings.ttsGroup">🔊 読み上げ</h4>
+    <details class="set-group" id="tts-settings-group">
+      <summary><h4 data-i18n="settings.ttsGroup">🔊 読み上げ</h4></summary>
       <div class="set-row">
         <span class="set-label" data-i18n="settings.ttsVoice">音声</span>
         <select class="modern-select" id="tts-voice-select" onchange="changeTtsVoice(this.value)">
           <option value="" data-i18n="tts.voiceAuto">自動</option>
         </select>
       </div>
-    </div>
-    <div class="set-group" id="drive-auto-group">
-      <h4 data-i18n="settings.driveGroup">Google Drive</h4>
+    </details>
+    <details class="set-group" id="drive-auto-group">
+      <summary><h4 data-i18n="settings.driveGroup">Google Drive</h4></summary>
       <div class="set-row">
         <span class="set-label" data-i18n="settings.driveAutoSave">しおり自動保存</span>
         <button id="drive-auto-toggle" onclick="toggleDriveAutoSave()"
                 style="border:1px solid var(--ui-border);border-radius:8px;padding:6px 16px;min-width:60px;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;">OFF</button>
       </div>
-    </div>
-    <div class="set-group" id="bookmark-io-group">
-      <h4 data-i18n="settings.bookmarkGroup">🔖 しおりデータ（JSON）</h4>
+    </details>
+    <details class="set-group" id="bookmark-io-group">
+      <summary><h4 data-i18n="settings.bookmarkGroup">🔖 しおりデータ（JSON）</h4></summary>
       <div class="set-row" style="gap:8px;">
         <button class="set-io-btn" onclick="document.getElementById('bookmark-input').click()"
                 data-i18n="settings.bookmarkImport">📥 読み込み</button>
         <button class="set-io-btn" onclick="exportBookmarks()"
                 data-i18n="settings.bookmarkExport">📤 書き出し</button>
       </div>
-    </div>
-    <div class="set-group" id="cache-group">
-      <h4 data-i18n="cache.group">📂 ePub キャッシュ（オフライン用）</h4>
+    </details>
+    <details class="set-group" id="cache-group">
+      <summary><h4 data-i18n="cache.group">📂 ePub キャッシュ（オフライン用）</h4></summary>
       <div class="set-row">
         <span class="set-label" data-i18n="settings.autoOpenLast">起動時に前回の本を開く</span>
         <button id="auto-open-toggle" onclick="toggleAutoOpenLast()"
@@ -1098,9 +1107,9 @@
                 style="margin-top:4px;width:100%;border:1px solid var(--ui-border);border-radius:8px;padding:7px 14px;font-size:13px;font-weight:600;cursor:pointer;background:var(--ui-bg);color:var(--ui-text);transition:all .15s;"
                 data-i18n="cache.clearBtn">クリア</button>
       </div>
-    </div>
-    <div class="set-group">
-      <h4 data-i18n="settings.language">言語</h4>
+    </details>
+    <details class="set-group" id="lang-group">
+      <summary><h4 data-i18n="settings.language">言語</h4></summary>
       <div class="set-row">
         <select class="modern-select lang-select" onchange="setLang(this.value)" title="Language / 言語">
           <option value="ja">日本語</option>
@@ -1109,7 +1118,7 @@
           <option value="zh-CN">简体中文</option>
         </select>
       </div>
-    </div>
+    </details>
     <div class="set-group" id="reset-group">
       <div class="set-row">
         <button id="settings-reset-btn" onclick="resetDisplaySettings()"
@@ -2835,6 +2844,7 @@ const state = {
   brightness:100,          // 画面の明るさ 30–100（%）。100 = フィルタ無し（epub_settings に永続化）
   warmth:0,                // 暖色フィルタ 0–5。0 = 無し（epub_settings に永続化）
   fsHud:'both',            // 全画面時の隅表示 'off'|'clock'|'both'（epub_settings に永続化）
+  setGroupsOpen:{},        // 設定グループの開閉 {groupId:bool}（epub_settings に永続化・Init で既定値を流し込む）
   ttsRate:1.0,             // 読み上げ速度 0.5–2.0（epub_settings に永続化）
   ttsVoice:'',             // 読み上げ音声 voiceURI（'' = 自動。epub_settings に永続化）
   bookLang:'ja',           // OPF dc:language 先頭2文字（セッションのみ・非永続）
@@ -5414,6 +5424,7 @@ function saveSettings() {
       brightness:    state.brightness,
       warmth:        state.warmth,
       fsHud:         state.fsHud,
+      setGroupsOpen: state.setGroupsOpen,
       fontBold:      state.fontBold,
       fontStrokeLevel: state.fontStrokeLevel,
       spreadMode:    state.spreadMode,
@@ -5469,6 +5480,12 @@ function loadSettings() {
       const el = document.getElementById('fs-hud-select'); if (el) el.value = s.fsHud;
     }
     syncFsHud();
+    if (s.setGroupsOpen && typeof s.setGroupsOpen === 'object') {
+      Object.keys(SET_GROUP_DEFAULT_OPEN).forEach(k => {
+        if (typeof s.setGroupsOpen[k] === 'boolean') state.setGroupsOpen[k] = s.setGroupsOpen[k];
+      });
+    }
+    applySetGroupsOpen();
     if (typeof s.fontBold === 'boolean') { state.fontBold = s.fontBold; updateFontBoldToggleUI(); }
     if (typeof s.fontStrokeLevel === 'number' && [0,1,2,3].indexOf(s.fontStrokeLevel) >= 0) {
       state.fontStrokeLevel = s.fontStrokeLevel;
@@ -7572,6 +7589,39 @@ function updateToolbarPrefsUI() {
 // ══════════════════════════════════════════
 // 対象は「表示」に関わるものだけ。しおり・ePubキャッシュ・言語・読み上げ設定
 // （ttsRate/ttsVoice）・Drive自動保存・起動時自動オープン・読みかけリスト設定は触らない。
+
+// ══════════════════════════════════════════
+//  設定グループの折りたたみ（B-5）
+// ══════════════════════════════════════════
+// 既定はよく使う3つだけ開く。#fxl-settings-group と #reset-group は
+// <details> 化していない（前者は「レイアウトの続き」として連続表示させる設計、
+// 後者は1行なので畳む意味がない）。
+const SET_GROUP_DEFAULT_OPEN = {
+  'color-group': true, 'typography-group': true, 'layout-group': true,
+  'toolbar-settings-group': false, 'tts-settings-group': false,
+  'drive-auto-group': false, 'bookmark-io-group': false,
+  'cache-group': false, 'lang-group': false,
+};
+
+function applySetGroupsOpen() {
+  Object.keys(SET_GROUP_DEFAULT_OPEN).forEach(id => {
+    const el = document.getElementById(id);
+    if (el && el.tagName === 'DETAILS') el.open = !!state.setGroupsOpen[id];
+  });
+}
+
+function _wireSetGroupToggles() {
+  Object.keys(SET_GROUP_DEFAULT_OPEN).forEach(id => {
+    const el = document.getElementById(id);
+    if (!el || el.tagName !== 'DETAILS') return;
+    el.addEventListener('toggle', () => {
+      if (state.setGroupsOpen[id] === el.open) return;
+      state.setGroupsOpen[id] = el.open;
+      saveSettings();
+    });
+  });
+}
+
 const DISPLAY_DEFAULTS = {
   fontMode:'publisher', fontSize:100, lineHeight:2.0,
   theme:'', themeAuto:false, themeLight:'', themeDark:'dark',
@@ -7580,6 +7630,7 @@ const DISPLAY_DEFAULTS = {
   spreadMode:'auto', fxlZoomLevel:2.0, fxlRegionOrder:'story', fxlLtrAutoFlip:true,
   toolbarHidden:[],
   brightness:100, warmth:0, fsHud:'both',
+  setGroupsOpen: SET_GROUP_DEFAULT_OPEN,
 };
 
 // state の表示系プロパティを UI へ一括反映する。loadSettings() は
@@ -7612,13 +7663,15 @@ function syncAllSettingsUI() {
   applyScreenFilter();
   setVal('fs-hud-select', state.fsHud);
   syncFsHud();
+  applySetGroupsOpen();
 }
 
 function resetDisplaySettings() {
   if (!confirm(t('settings.resetConfirm'))) return;
   Object.keys(DISPLAY_DEFAULTS).forEach(k => {
     const v = DISPLAY_DEFAULTS[k];
-    state[k] = Array.isArray(v) ? v.slice() : v;
+    state[k] = Array.isArray(v) ? v.slice()
+             : (v && typeof v === 'object') ? Object.assign({}, v) : v;
   });
   state.fxlZoom.level = state.fxlZoomLevel;
   syncAllSettingsUI();
@@ -9865,7 +9918,10 @@ initLang();
 applyI18n();
 updateCloseBookBtnVisibility();  // 左上ボタンの初期状態（未オープン=「開く」）を確定
 document.getElementById('toc-btn').classList.add('active');
+state.setGroupsOpen = Object.assign({}, SET_GROUP_DEFAULT_OPEN);
 loadSettings();
+applySetGroupsOpen();  // loadSettings は保存値が無いと早期 return するのでここでも当てる
+_wireSetGroupToggles();
 // OS テーマ連動：初回適用（まだ何も描いていないので rerender は不要）
 applyAutoTheme(false);
 if (_darkMQ) {
