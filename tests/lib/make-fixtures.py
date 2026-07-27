@@ -3,8 +3,9 @@
 
   python3 tests/lib/make-fixtures.py
 
-- reflow.epub : リフロー本（4章・縦書き）
-- fxl.epub    : 固定レイアウト本（4ページ・rtl・pre-paginated）
+- reflow.epub  : リフロー本（4章・ルビと縦中横を含む）
+- reflow2.epub : もう1冊のリフロー本（書名・著者違い＝bookKey が別になる）
+- fxl.epub     : 固定レイアウト本（4ページ・rtl・pre-paginated）
 
 実書籍に依存せずに E2E を回せるようにするのが目的。個人の蔵書（temp_sample/）は
 gitignore されているため、クローン直後でもテストが通る状態を保つ。
@@ -48,7 +49,7 @@ def opf(title, creator, items, refs, extra_meta='', ppd='rtl'):
             % (title, title, creator, extra_meta, ''.join(items), ppd, ''.join(refs)))
 
 
-def build_reflow(path):
+def build_reflow(path, title='テスト用リフロー', creator='テスト作者'):
     z = zipfile.ZipFile(path, 'w', zipfile.ZIP_DEFLATED)
     z.writestr('mimetype', 'application/epub+zip')
     z.writestr('META-INF/container.xml', CONTAINER)
@@ -73,7 +74,7 @@ def build_reflow(path):
                '<head><title>目次</title></head><body><nav epub:type="toc"><ol>%s</ol></nav></body></html>'
                % ''.join(navpoints))
     items.append('<item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>')
-    z.writestr('OEBPS/content.opf', opf('テスト用リフロー', 'テスト作者', items, refs))
+    z.writestr('OEBPS/content.opf', opf(title, creator, items, refs))
     z.close()
 
 
@@ -104,7 +105,9 @@ def build_fxl(path):
 def main():
     out = os.path.normpath(OUT_DIR)
     os.makedirs(out, exist_ok=True)
-    for name, fn in (('reflow.epub', build_reflow), ('fxl.epub', build_fxl)):
+    for name, fn in (('reflow.epub', build_reflow),
+                     ('reflow2.epub', lambda p: build_reflow(p, 'テスト用リフロー2', 'べつの作者')),
+                     ('fxl.epub', build_fxl)):
         p = os.path.join(out, name)
         fn(p)
         print('%s (%d bytes)' % (p, os.path.getsize(p)))

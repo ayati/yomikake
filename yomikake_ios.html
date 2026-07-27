@@ -973,6 +973,12 @@
           <option value="large" data-i18n="fwdSize.large">大</option>
         </select>
       </div>
+      <div class="set-row">
+        <span class="set-label" data-i18n="settings.bookPrefs">本ごとに表示設定を覚える</span>
+        <button id="book-prefs-toggle" onclick="toggleBookPrefs()"
+                style="border:1px solid var(--ui-border);border-radius:8px;padding:6px 16px;min-width:60px;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;">ON</button>
+      </div>
+      <span style="font-size:11px;opacity:.6;line-height:1.5;padding:0 8px;display:block;" data-i18n="settings.bookPrefsHelp">組方向・フォント・文字サイズ・見開き・ズームモードを本ごとに記録します</span>
       <div class="set-row" id="orientation-lock-row">
         <span class="set-label" data-i18n="settings.orientationLock">画面の向き（全画面時）</span>
         <select class="modern-select" id="orientation-lock-select" onchange="changeOrientationLock(this.value)">
@@ -1606,6 +1612,8 @@ const I18N = {
     'settings.driveGroup':       'Google Drive',
     'settings.fsHud':              '全画面の隅表示',
     'settings.orientationLock':    '画面の向き（全画面時）',
+    'settings.bookPrefs':          '本ごとに表示設定を覚える',
+    'settings.bookPrefsHelp':      '組方向・フォント・文字サイズ・見開き・ズームモードを本ごとに記録します',
     'orient.off':                  '固定しない',
     'orient.portrait':             '縦で固定',
     'orient.landscape':            '横で固定',
@@ -1617,7 +1625,7 @@ const I18N = {
     'settings.warmth':             '暖色フィルタ',
     'settings.reset':              '表示設定を初期値に戻す',
     'settings.resetHelp':          'しおり・キャッシュ・言語・読み上げ設定は変更されません',
-    'settings.resetConfirm':       '表示設定（テーマ・フォント・レイアウト・ツールバー）を初期値に戻します。\n\nしおり・ePubキャッシュ・言語・読み上げ設定は変更されません。',
+    'settings.resetConfirm':       '表示設定（テーマ・フォント・レイアウト・ツールバー）を初期値に戻し、本ごとに覚えた設定もすべて消します。\n\nしおり・ePubキャッシュ・言語・読み上げ設定は変更されません。',
     'toast.settingsReset':         '表示設定を初期値に戻しました',
     'settings.toolbarGroup':            'ツールバーに表示',
     'settings.tbFlash':                 '👁 操作を見せる',
@@ -1955,6 +1963,8 @@ const I18N = {
     'settings.driveGroup':       'Google Drive',
     'settings.fsHud':              'Fullscreen corner',
     'settings.orientationLock':    'Orientation (fullscreen)',
+    'settings.bookPrefs':          'Remember settings per book',
+    'settings.bookPrefsHelp':      'Writing mode, font, size, spread and zoom mode are stored per book',
     'orient.off':                  'Do not lock',
     'orient.portrait':             'Lock portrait',
     'orient.landscape':            'Lock landscape',
@@ -1966,7 +1976,7 @@ const I18N = {
     'settings.warmth':             'Warm filter',
     'settings.reset':              'Reset display settings',
     'settings.resetHelp':          'Bookmarks, cache, language and read-aloud settings are kept',
-    'settings.resetConfirm':       'Reset display settings (theme, fonts, layout, toolbar) to their defaults.\n\nBookmarks, ePub cache, language and read-aloud settings are not affected.',
+    'settings.resetConfirm':       'Reset display settings (theme, fonts, layout, toolbar) to their defaults and clear all per-book settings.\n\nBookmarks, ePub cache, language and read-aloud settings are not affected.',
     'toast.settingsReset':         'Display settings reset',
     'settings.toolbarGroup':            'Show in toolbar',
     'settings.tbFlash':                 '👁 Show controls',
@@ -2304,6 +2314,8 @@ const I18N = {
     'settings.driveGroup':       'Google Drive',
     'settings.fsHud':              '全螢幕角落顯示',
     'settings.orientationLock':    '畫面方向（全螢幕時）',
+    'settings.bookPrefs':          '為每本書記住顯示設定',
+    'settings.bookPrefsHelp':      '排版方向・字型・字級・跨頁・縮放模式會依書籍分別記錄',
     'orient.off':                  '不固定',
     'orient.portrait':             '固定直向',
     'orient.landscape':            '固定橫向',
@@ -2315,7 +2327,7 @@ const I18N = {
     'settings.warmth':             '暖色濾鏡',
     'settings.reset':              '將顯示設定回復預設值',
     'settings.resetHelp':          '書籤・快取・語言・朗讀設定不會變更',
-    'settings.resetConfirm':       '將顯示設定（主題・字型・版面・工具列）回復為預設值。\n\n書籤・ePub 快取・語言・朗讀設定不受影響。',
+    'settings.resetConfirm':       '將顯示設定（主題・字型・版面・工具列）回復為預設值，並清除所有依書籍記錄的設定。\n\n書籤・ePub 快取・語言・朗讀設定不受影響。',
     'toast.settingsReset':         '已回復預設顯示設定',
     'settings.toolbarGroup':            '工具列顯示',
     'settings.tbFlash':                 '👁 顯示控制項',
@@ -2653,6 +2665,8 @@ const I18N = {
     'settings.driveGroup':       'Google Drive',
     'settings.fsHud':              '全屏角落显示',
     'settings.orientationLock':    '画面方向（全屏时）',
+    'settings.bookPrefs':          '为每本书记住显示设置',
+    'settings.bookPrefsHelp':      '排版方向・字体・字号・跨页・缩放模式会按书籍分别记录',
     'orient.off':                  '不固定',
     'orient.portrait':             '固定竖向',
     'orient.landscape':            '固定横向',
@@ -2664,7 +2678,7 @@ const I18N = {
     'settings.warmth':             '暖色滤镜',
     'settings.reset':              '将显示设置恢复默认值',
     'settings.resetHelp':          '书签・缓存・语言・朗读设置不会更改',
-    'settings.resetConfirm':       '将显示设置（主题・字体・版面・工具栏）恢复为默认值。\n\n书签・ePub 缓存・语言・朗读设置不受影响。',
+    'settings.resetConfirm':       '将显示设置（主题・字体・版面・工具栏）恢复为默认值，并清除所有按书籍记录的设置。\n\n书签・ePub 缓存・语言・朗读设置不受影响。',
     'toast.settingsReset':         '已恢复默认显示设置',
     'settings.toolbarGroup':            '工具栏显示',
     'settings.tbFlash':                 '👁 显示控件',
@@ -2880,6 +2894,7 @@ const state = {
   warmth:0,                // 暖色フィルタ 0–5。0 = 無し（epub_settings に永続化）
   fsHud:'both',            // 全画面時の隅表示 'off'|'clock'|'both'（epub_settings に永続化）
   orientationLock:'off',   // 画面の向き 'off'|'portrait'|'landscape'（全画面時のみ・epub_settings に永続化）
+  bookPrefsEnabled:true,   // 本ごとに表示設定を覚える（epub_settings に永続化。実データは epub_book_prefs）
   setGroupsOpen:{},        // 設定グループの開閉 {groupId:bool}（epub_settings に永続化・Init で既定値を流し込む）
   ttsRate:1.0,             // 読み上げ速度 0.5–2.0（epub_settings に永続化）
   ttsVoice:'',             // 読み上げ音声 voiceURI（'' = 自動。epub_settings に永続化）
@@ -3607,6 +3622,8 @@ async function loadEpub(file) {
     if (!localStorage.getItem(state.bookKey)) {
       migrateLegacyBookmark(titleText, state.bookCreator, state.bookKey);
     }
+    // 本ごとの表示設定を最初の描画より前に当てる（開いてから切り替わるチラつきを避ける）
+    applyBookPrefs(state.bookKey);
 
     // 表紙サムネイル抽出（非同期、失敗しても続行）
     state.bookCoverDataUri = '';
@@ -5768,6 +5785,7 @@ function saveSettings() {
       warmth:        state.warmth,
       fsHud:         state.fsHud,
       orientationLock: state.orientationLock,
+      bookPrefsEnabled: state.bookPrefsEnabled,
       setGroupsOpen: state.setGroupsOpen,
       fontBold:      state.fontBold,
       fontStrokeLevel: state.fontStrokeLevel,
@@ -5841,6 +5859,8 @@ function loadSettings() {
     applySetGroupsOpen();
     if (['off','portrait','landscape'].indexOf(s.orientationLock) >= 0) state.orientationLock = s.orientationLock;
     updateOrientationLockUI();
+    if (typeof s.bookPrefsEnabled === 'boolean') state.bookPrefsEnabled = s.bookPrefsEnabled;
+    updateBookPrefsToggleUI();
     if (typeof s.fontBold === 'boolean') { state.fontBold = s.fontBold; updateFontBoldToggleUI(); }
     if (typeof s.fontStrokeLevel === 'number' && [0,1,2,3].indexOf(s.fontStrokeLevel) >= 0) {
       state.fontStrokeLevel = s.fontStrokeLevel;
@@ -6538,6 +6558,7 @@ function rerenderKeepPos() {
 function changeFont(v) {
   state.fontMode = v;
   saveSettings();
+  _bpSet('fontMode', v);
   updateFontPickerUI();
   rerenderKeepPos();
 }
@@ -6546,6 +6567,7 @@ function changeFontSize(d) {
   state.fontSize = Math.max(60, Math.min(400, state.fontSize + d * step));
   document.getElementById('font-size-display').textContent = state.fontSize + '%';
   saveSettings();
+  _bpSet('fontSize', state.fontSize);
   rerenderKeepPos();
 }
 // 行間・字間のスライダー。
@@ -6689,6 +6711,7 @@ function changeMargin(v) {
 function changeWritingMode(v) {
   state.writingMode = v;
   saveSettings();
+  _bpSet('writingMode', v);
   rerenderKeepPos();
 }
 // 太字トグル（2-A）
@@ -6775,6 +6798,7 @@ function changeSpreadMode(v) {
   if (v !== 'auto' && v !== 'single' && v !== 'spread') return;
   state.spreadMode = v;
   saveSettings();
+  _bpSet('spreadMode', v);
   if (state.renderMode === 'fxl' && state.fxlPairs) {
     renderFxlPair(state.currentSpineIdx);
   }
@@ -6795,6 +6819,7 @@ function changeFxlRegionOrder(v) {
   if (v !== 'story' && v !== 'yonkoma' && v !== 'vfill' && v !== 'hfill') return;
   state.fxlRegionOrder = v;
   saveSettings();
+  _bpSet('fxlRegionOrder', v);
   syncFxlAxisModeUI();
   if (state.fxlZoomEnabled) {
     const before = _fxlLastSpreadState;
@@ -7503,6 +7528,113 @@ function updateToolbarPrefsUI() {
 // （ttsRate/ttsVoice）・Drive自動保存・起動時自動オープン・読みかけリスト設定は触らない。
 
 
+
+// ══════════════════════════════════════════
+//  本ごとの表示設定（B-7）
+// ══════════════════════════════════════════
+// 覚えるのは「本が変われば変わるべき」5 つだけ。テーマ・明るさ・余白・行間などは
+// 読者の目や環境で決まるもので、本が変わっても変わってほしくないので対象外。
+//
+// しおり（epub_pos_*）の値には入れず別キーにする。しおりは Drive 同期・JSON 書き出し・
+// 墓標マージの対象なので、そこに端末固有の表示設定を混ぜると「表示設定は端末ローカルに
+// 閉じる」という方針と矛盾する。別キーであること自体が同期に載せない構造的な保証になる。
+const BOOK_PREFS_KEY   = 'epub_book_prefs';
+const BOOK_PREFS_MAX   = 300;                        // 冊数の上限
+const BOOK_PREFS_MAXMS = 730 * 24 * 60 * 60 * 1000;  // 最終更新からの保持期間（730日）
+
+function _bpLoad() {
+  try {
+    const o = JSON.parse(localStorage.getItem(BOOK_PREFS_KEY));
+    if (o && o.books && typeof o.books === 'object') return o;
+  } catch (e) { /* 破損時は黙って初期化 */ }
+  return { v: 1, books: {} };
+}
+
+function _bpSave(all) {
+  try { localStorage.setItem(BOOK_PREFS_KEY, JSON.stringify(_bpPrune(all))); }
+  catch (e) { notifyStorageError(); }   // 保存に失敗しても読書は続けられるので致命扱いしない
+}
+
+// 古い順・件数超過で剪定する（墓標 _rlSavePurged と同じ考え方）
+function _bpPrune(all) {
+  const now = Date.now();
+  const keys = Object.keys(all.books)
+    .filter(k => !(typeof all.books[k].t === 'number' && now - all.books[k].t > BOOK_PREFS_MAXMS))
+    .sort((a, b) => (all.books[b].t || 0) - (all.books[a].t || 0));
+  const kept = {};
+  keys.slice(0, BOOK_PREFS_MAX).forEach(k => { kept[k] = all.books[k]; });
+  all.books = kept;
+  return all;
+}
+
+function _bpGet(bookKey) {
+  const e = _bpLoad().books[bookKey];
+  return (e && typeof e === 'object') ? e : null;
+}
+
+// 触った項目だけを記録する。全項目のスナップショットにすると、一度開いただけの本が
+// 古い設定を丸ごと抱え込み、グローバルを変えても反映されない状態になる。
+function _bpSet(key, value) {
+  if (!state.bookPrefsEnabled || !state.bookKey) return;
+  const all = _bpLoad();
+  const e = all.books[state.bookKey] || (all.books[state.bookKey] = {});
+  e[key] = value;
+  e.t = Date.now();
+  _bpSave(all);
+}
+
+function _bpDelete(bookKey) {
+  const all = _bpLoad();
+  if (all.books[bookKey]) { delete all.books[bookKey]; _bpSave(all); }
+}
+
+function _bpClearAll() {
+  try { localStorage.removeItem(BOOK_PREFS_KEY); } catch (e) {}
+}
+
+// loadEpub() で bookKey 確定後・最初の描画より前に呼ぶ。
+// 値域はグローバル設定と同じ検証を通す（壊れた値のまま描画に入らない）。
+function applyBookPrefs(bookKey) {
+  if (!state.bookPrefsEnabled || !bookKey) return;
+  const p = _bpGet(bookKey);
+  if (!p) return;
+  if (['vertical', 'horizontal', 'publisher'].indexOf(p.writingMode) >= 0)
+    state.writingMode = p.writingMode;
+  if (typeof p.fontSize === 'number' && p.fontSize >= 60 && p.fontSize <= 400)
+    state.fontSize = p.fontSize;
+  if (typeof p.fontMode === 'string' && _bpFontUsable(p.fontMode))
+    state.fontMode = p.fontMode;
+  if (['auto', 'single', 'spread'].indexOf(p.spreadMode) >= 0)
+    state.spreadMode = p.spreadMode;
+  if (['story', 'yonkoma', 'vfill', 'hfill'].indexOf(p.fxlRegionOrder) >= 0)
+    state.fxlRegionOrder = p.fxlRegionOrder;
+  syncAllSettingsUI();
+}
+
+// ローカルフォントは端末ごとに実体の有無が違う。無い書体を指定して既定へ
+// フォールバックするより、グローバル設定のままにするほうが混乱が少ない。
+function _bpFontUsable(key) {
+  if (key.indexOf('custom:') === 0)
+    return state.customFonts.some(f => f.id === key.slice(7));
+  return FONTS[key] !== undefined;
+}
+
+function toggleBookPrefs() {
+  state.bookPrefsEnabled = !state.bookPrefsEnabled;
+  saveSettings();
+  updateBookPrefsToggleUI();
+}
+
+function updateBookPrefsToggleUI() {
+  const btn = document.getElementById('book-prefs-toggle');
+  if (!btn) return;
+  const on = !!state.bookPrefsEnabled;
+  btn.textContent = on ? 'ON' : 'OFF';
+  btn.style.background  = on ? 'var(--accent)' : '';
+  btn.style.color       = on ? '#fff' : '';
+  btn.style.borderColor = on ? 'var(--accent)' : 'var(--ui-border)';
+}
+
 // ══════════════════════════════════════════
 //  画面の向きロック（B-13）
 // ══════════════════════════════════════════
@@ -7640,6 +7772,7 @@ function resetDisplaySettings() {
              : (v && typeof v === 'object') ? Object.assign({}, v) : v;
   });
   state.fxlZoom.level = state.fxlZoomLevel;
+  _bpClearAll();   // 残すと本を開き直した瞬間に復活し「リセットが効かない」ように見える
   syncAllSettingsUI();
   saveSettings();
   rerenderKeepPos();
@@ -8757,6 +8890,7 @@ function _rlAddTombstone(bookKey) {
 // 墓標には触らない（iOS は FSA 非対応のためハンドル処理なし）
 function _rlPurgeLocalData(bookKey) {
   try { localStorage.removeItem(bookKey); } catch (e) {}
+  _bpDelete(bookKey);
   try { const m = _rdLoadBookStats(); if (m[bookKey]) { delete m[bookKey]; _rdSaveBookStats(m); } } catch (e) {}
   if (_cachedKeys.has(bookKey)) {
     _idbDelete(bookKey).catch(() => {});
@@ -9877,6 +10011,7 @@ updateToolbarPrefsUI();
 applyScreenFilter();
 syncFsHud();
 updateOrientationLockUI();
+updateBookPrefsToggleUI();
 ttsInit();
 updateTapZoneBodyClass();
 updateFontBoldToggleUI();
