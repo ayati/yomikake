@@ -1072,6 +1072,18 @@
     <details class="set-group" id="tts-settings-group">
       <summary><h4 data-i18n="settings.ttsGroup">🔊 読み上げ</h4></summary>
       <div class="set-row">
+        <span class="set-label" data-i18n="settings.ttsRate">速度</span>
+        <select class="modern-select" id="tts-rate-select" onchange="setTtsRate(this.value)">
+          <option value="0.50">0.5x</option>
+          <option value="0.75">0.75x</option>
+          <option value="1.00" selected>1.0x</option>
+          <option value="1.25">1.25x</option>
+          <option value="1.50">1.5x</option>
+          <option value="1.75">1.75x</option>
+          <option value="2.00">2.0x</option>
+        </select>
+      </div>
+      <div class="set-row">
         <span class="set-label" data-i18n="settings.ttsVoice">音声</span>
         <select class="modern-select" id="tts-voice-select" onchange="changeTtsVoice(this.value)">
           <option value="" data-i18n="tts.voiceAuto">自動</option>
@@ -1407,6 +1419,7 @@ const I18N = {
     'tts.done':             '読み上げが終わりました',
     'settings.ttsGroup':    '🔊 読み上げ',
     'settings.ttsVoice':    '音声',
+    'settings.ttsRate':     '速度',
     'tts.voiceAuto':        '自動',
     'tts.speed':            '速度',
     'btn.help':             'ヘルプ',
@@ -1750,6 +1763,7 @@ const I18N = {
     'tts.done':             'Finished reading',
     'settings.ttsGroup':    '🔊 Read aloud',
     'settings.ttsVoice':    'Voice',
+    'settings.ttsRate':     'Speed',
     'tts.voiceAuto':        'Auto',
     'tts.speed':            'Speed',
     'btn.help':             'Help',
@@ -2093,6 +2107,7 @@ const I18N = {
     'tts.done':             '朗讀結束',
     'settings.ttsGroup':    '🔊 朗讀',
     'settings.ttsVoice':    '語音',
+    'settings.ttsRate':     '速度',
     'tts.voiceAuto':        '自動',
     'tts.speed':            '速度',
     'btn.help':             '說明',
@@ -2436,6 +2451,7 @@ const I18N = {
     'tts.done':             '朗读结束',
     'settings.ttsGroup':    '🔊 朗读',
     'settings.ttsVoice':    '语音',
+    'settings.ttsRate':     '速度',
     'tts.voiceAuto':        '自动',
     'tts.speed':            '速度',
     'btn.help':             '帮助',
@@ -5784,14 +5800,18 @@ async function ttsLoadChapterAndSpeak(idx, startIdx, skipToNext) {
   ttsSpeakNext();
 }
 
-function changeTtsRate(delta) {
-  var r = Math.round(((state.ttsRate || 1) + delta) * 100) / 100;
-  r = Math.max(0.5, Math.min(2, r));
+// 絶対値セッター。バーの ＋/－（changeTtsRate）と設定パネルのセレクトの共通経路。
+function setTtsRate(v) {
+  var r = Math.round(parseFloat(v) * 100) / 100;
+  if (!(r >= 0.5 && r <= 2)) return;
   if (r === state.ttsRate) { updateTtsUI(); return; }
   state.ttsRate = r;
   saveSettings();
   updateTtsUI();
   if (_tts.active && !_tts.paused) ttsSpeakNext();   // 現チャンクを新速度で再生し直す
+}
+function changeTtsRate(delta) {
+  setTtsRate(Math.max(0.5, Math.min(2, Math.round(((state.ttsRate || 1) + delta) * 100) / 100)));
 }
 
 function changeTtsVoice(uri) {
@@ -5828,6 +5848,10 @@ function updateTtsUI() {
   }
   var rl = document.getElementById('tts-rate-label');
   if (rl) rl.textContent = (state.ttsRate || 1).toFixed(2).replace(/0$/, '') + 'x';
+  // 設定パネルのセレクトも同期する。option の value は toFixed(2) と一致する文字列
+  // （'1.00' 等）で書いてあること — '1' だと一致せず空欄になる
+  var rs = document.getElementById('tts-rate-select');
+  if (rs) rs.value = (state.ttsRate || 1).toFixed(2);
   var pr = document.getElementById('tts-progress');
   if (pr) pr.textContent = _tts.active ? (Math.min(_tts.idx + 1, _tts.chunks.length) + ' / ' + _tts.chunks.length) : '';
 }
@@ -5841,7 +5865,11 @@ function ttsReleaseWakeLock() {
 }
 
 function ttsInit() {
-  if (!_ttsSupported) { var b = document.getElementById('tts-btn'); if (b) b.style.display = 'none'; return; }
+  if (!_ttsSupported) {
+    var b = document.getElementById('tts-btn'); if (b) b.style.display = 'none';
+    var g = document.getElementById('tts-settings-group'); if (g) g.style.display = 'none';
+    return;   // 音声ゼロ環境で「音声：自動」だけの空グループを残さない
+  }
   try { speechSynthesis.addEventListener('voiceschanged', buildTtsVoiceSelect); } catch(e){}
   window.addEventListener('beforeunload', function(){ try { speechSynthesis.cancel(); } catch(e){} });
   document.addEventListener('visibilitychange', function(){
