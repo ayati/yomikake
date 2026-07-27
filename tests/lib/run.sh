@@ -58,6 +58,28 @@ for c in tests/cases/*.js; do
 done
 
 echo
+echo "══ 画素テスト ══"
+for px in tests/pixel/*.sh; do
+  [ -f "$px" ] || continue
+  name="$(basename "$px" .sh)"
+  [ -n "$FILTER" ] && [[ "$name" != *"$FILTER"* ]] && continue
+  chmod +x "$px" 2>/dev/null || true
+  for h in "${HTML[@]}"; do
+    out="$("$px" "$h")"
+    p=$(echo "$out" | grep -c '^PASS' || true)
+    f=$(echo "$out" | grep -c '^FAIL' || true)
+    s=$(echo "$out" | grep -c '^SKIP' || true)
+    if [ "$s" -gt 0 ]; then printf "  %-18s %-16s SKIP\n" "$h" "$name"; continue; fi
+    printf "  %-18s %-16s PASS=%-3s FAIL=%s\n" "$h" "$name" "$p" "$f"
+    pass=$((pass+p)); fail=$((fail+f))
+    if [ "$f" -gt 0 ]; then
+      echo "$out" | grep '^FAIL' | sed 's/^/      /'
+      failed_lines+=("$h / $name (画素)")
+    fi
+  done
+done
+
+echo
 echo "══ 結果 ══"
 echo "  PASS=$pass  FAIL=$fail"
 if [ "$fail" -gt 0 ]; then

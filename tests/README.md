@@ -25,6 +25,7 @@ Chrome は自動探索する（Playwright のキャッシュ／`/usr/bin/chromiu
 - 設定の保存・復元・不正値の除去
 - DOM の状態遷移（クラス付与、トグル、表示/非表示）
 - CSS の計算値・実測ジオメトリ（グリッドの列数、パネルの位置と寸法、折り返しの有無）
+- 実際に描画された画素（明るさフィルタが本当に効いているか、対象外の UI を巻き込んでいないか）
 - i18n 4 言語のキーが揃っていること
 - 実 ePub を開いてからの表示設定変更（読書位置の保持、`mode-fxl` の維持、`closeBook`）
 
@@ -51,8 +52,15 @@ tests/
   lib/dom-test.sh       HTML の末尾に assertion を注入して headless Chrome で実行
   lib/syntax-check.js   inline <script> を vm.Script でパースするだけ
   lib/make-fixtures.py  テスト用の小さな ePub を生成（tests/.fixtures/・gitignore）
-  cases/*.js            テストケース本体
+  lib/pixel-test.sh     スクリーンショットを撮って画素を読む（Pillow が要る。無ければ SKIP）
+  cases/*.js            DOM テストのケース本体
+  pixel/*.sh            画素テストのケース本体（PASS/FAIL 行を print する）
 ```
+
+**画素テスト**は「CSS 変数は入っているのに実際には見えていない」類の事故を拾うためにある。
+たとえば明るさフィルタは、重ね順を1つ間違えると本文の下に潜って何も起きない／
+逆に操作系 UI まで暗くしてしまうが、computed style だけ見ても気づけない。
+実際に描画された画素を測れば一発で分かる。
 
 `temp_sample/`（個人の蔵書）には依存しない。E2E は `make-fixtures.py` が生成する
 **リフロー本（4章）と FXL 本（4ページ・rtl・pre-paginated）** を使うので、
