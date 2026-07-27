@@ -20,12 +20,14 @@ declare -A CASE_ENV=(
   [e2e-fxl]="RAF_SHIM=1 VTB=30000"
   [typography]="RAF_SHIM=1 VTB=30000"
   [book-prefs]="RAF_SHIM=1 VTB=40000"
+  [fxl-zoom-tapguide]="RAF_SHIM=1 VTB=30000"
 )
 declare -A CASE_FLAGS=(
   [e2e-reflow]="--allow-file-access-from-files"
   [e2e-fxl]="--allow-file-access-from-files"
   [typography]="--allow-file-access-from-files"
   [book-prefs]="--allow-file-access-from-files"
+  [fxl-zoom-tapguide]="--allow-file-access-from-files"
 )
 
 pass=0; fail=0; failed_lines=()

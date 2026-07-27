@@ -4916,6 +4916,10 @@ function resetFxlZoom() {
 
 function enableFxlZoom(startRegionIdx) {
   if (state.renderMode !== 'fxl' || !state.fxlPairs) return;
+  // 帯ガイドが出たままズームに入ると、無効になった帯を示し続けることになる
+  // （ツールバーの 🔍 ボタンはガイドのオーバーレイ外なので、この経路が実在する）
+  hideTapGuide();
+  hideTapMenu();
   const before = isEffectiveSpread();
   state.fxlZoomEnabled = true;
   state.fxlZoom.level = state.fxlZoomLevel;
@@ -5493,7 +5497,8 @@ function runTapAction(a) {
 // 現在のゾーン配置を読書領域に重畳表示する。
 // #page-container は本オープン中のみ .visible なので、未オープン時は呼ばない。
 function showTapGuide() {
-  if (!state.epub) return;
+  // ズーム中はタップ帯が効かないので帯ガイドも出さない（showNavHint 側と二重の防御）
+  if (!state.epub || state.fxlZoomEnabled) return;
   const ov = document.getElementById('tap-guide-overlay');
   if (!ov) return;
   // 3x3 のセルに分割し、各セル中心の tapZoneAction() の結果でそのまま塗る。
@@ -5601,7 +5606,11 @@ function hideTapGuide() {
 // タップページ送りが有効なら帯ガイド、「なし（中央のみ）」や本未オープン時は
 // 従来どおりナビボタンを点滅させる（設定に合った操作方法だけを見せる）。
 function showNavHint() {
-  if (state.epub && state.tapZone !== 'center') { showTapGuide(); return; }
+  // FXL ズーム中はタップ帯が無効（handleFxlTap が early return し、代わりに
+  // Next/Back ボタンが ZoomStep の操作子になる＝実質「ボタン」設定と同じ）。
+  // ここで帯ガイドを出すと「反応すると示した場所が無反応」になり、
+  // 「ガイドで示した通りに動く」という保証が崩れる。
+  if (state.epub && state.tapZone !== 'center' && !state.fxlZoomEnabled) { showTapGuide(); return; }
   // 「ボタン」へ切り替えた直後など、帯ガイドが出たままなら必ず消してからボタンを示す
   // （両方が同時に見えると、どちらが有効な操作系か分からなくなる）
   hideTapGuide();
