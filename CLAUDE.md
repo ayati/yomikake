@@ -108,6 +108,18 @@ Most features exist in both files. As a rule:
 - **マップのキー存在判定は `hasOwnKey(obj, k)` を使う**（`k in obj` / `obj[k] !== undefined` は禁止）— プロトタイプチェーンを拾うため `'constructor'` や `'toString'` が検証を通ってしまう。検証対象は localStorage 由来の値で、たとえば `FONTS['constructor']` は関数を返し、そのまま `font-family` へ文字列化されて流れ込む。`THEME_CONTENT` / `I18N` / `FONTS` の判定はすべてこれに統一済み（v2.16.0）。
 - 完全削除（`_rlPurgeLocalData`）では該当エントリも消す。論理削除（`markAsFinished`）では消さない。
 
+**読了管理と同期（v2.17.0）** (`_posAtEnd`, `showSyncFinishedToast`, `state`/しおり値の `finishedAt`/`finishedCount`, `_rlCollect` の `atEnd`/`finished`/`newCh`/`hasMore`, `_rlPrefs.filterHasMore` — 設計書 `design_finished_sync.md`)。
+
+- **「読了」は位置からの派生値ではなく記録**。しおり値に `finishedAt`（初読了日・最古を採る）と `finishedCount`（**最後に読み終えた版の `spineCount`**・最大を採る）を持ち、位置とは独立にマージする。これ以前は `spineIdx >= spineCount-1 && ratio > 0.9` の計算結果しかなく、**別端末で読了 → 読みかけ端末が本を開いたまま同期 → `savePos` が位置を戻す → 自動保存が Drive の読了まで消す**という逆流が起きていた。
+- **`_rlCollect` が出す 4 語を使い分ける**: `atEnd`（いま末尾にいる）/ `finished`（`!!finishedAt || atEnd`）/ `newCh`（読了した版より増えた章数）/ `hasMore`（`newCh>0 && !atEnd`）。**隠す・進捗100%・purge 判定は `atEnd`、読了バッジ・読了冊数・著者集計・読了タイムラインは `finished`**。混同すると再読中の本が本棚から消える／読了統計が減る。
+- **`finished` に `atEnd` を OR で残すのは必須** — (1) v2.16.0 以前のデータと旧ビルドの端末には `finishedAt` が無い、(2) 論理削除（`markAsFinished`）は意図的に `finishedAt` を刻まず位置だけ末尾に書く。
+- **`!atEnd` は 2 つの別事象の合流点**（設計の核心）。読了本で `atEnd` が外れる経路は「位置が戻った（再読）」と「**分母が増えた（連載に新章）**」の 2 つあり、比較式では区別できない。`finishedCount` との差 `newCh` で分離し、後者を `🆕 続きN章` バッジ＋`filterHasMore` チップとして見せる（**読了本は本棚から消えるので、連載の更新に気づく手段が今までゼロだった**）。
+- **`_rdMarkFinishedAt()` は早期 return しない** — `finishedAt` は初回のみ、`finishedCount` は**毎回**更新する。早期 return すると旧データ・同期で昇格したエントリに `finishedCount` が永久に入らない。
+- **`spineCount` と `finishedCount` は合流則が逆** — `_rdMergePosBest` の `spineCount` は**位置の勝者（base）から採る**（`Math.max` だと「他人の分母 × 自分の位置」で読了が 79% に化ける）。`finishedCount` は最大。前者は位置とセット、後者は読了とセットで所属が違う。
+- **取り込み時に旧データを昇格させる**（`_posAtEnd`）— 両側に `finishedAt` が無くどちらかが末尾なら `finishedAt = lastOpenedAt` / `finishedCount = その値の spineCount` を刻む。これで旧ビルドが書いた Drive/JSON からも読了が伝わる。判定は必ず**生の値**に対して行う（`merged` に対して行うと base 差し替え後の混合値を見る）。
+- **同期告知トーストの条件は `isAhead && !isNotFinal && !_bookFinished`** — `isAhead` を外すと、自分が最終章を読んでいるだけの平常時に毎回「別の端末で読み終えています」が出る。`isNotFinal` ガード自体（位置ジャンプの抑制）は残し、**読了の取り込みだけを分離**する。`driveDownload` / インポートでは `jumped` を立てず `finishedNotice` フラグ経由で件数トーストの**後**に出す（アクショントーストは後勝ち）。
+- **読了の取り消しボタンは作らない** — 取り消しの同期には墓標相当の仕組みが要る。「本を開いて読み進めれば `atEnd` が false になり再読中として本棚に戻る」で代替する。
+
 When fixing a bug or adding a feature that is not in the "only" lists above, apply the change to **both files**.
 
 ## Architecture
@@ -317,7 +329,7 @@ Both files support **4 languages**: `ja` (Japanese), `en` (English), `zh-TW` (Tr
 
 | Key | Content |
 |-----|---------|
-| `epub_pos_{title}__{creator}` | `{spineIdx, ratio, lastOpenedAt, creator, spineCount, cover?, source?, site?}` — reading position + book metadata written by `saveBookMeta()` on open and `savePos()` on scroll/chapter change. Separator is **double underscore** (v1.8.11+). `source`/`site` (v2.10.0・追加のみ・旧ビルド無視) = 底本 URL とサイト表示名（読みかけリストのサイトバッジ用。quota 超過時は cover→source/site の順に落として読書位置を優先）。 |
+| `epub_pos_{title}__{creator}` | `{spineIdx, ratio, lastOpenedAt, creator, spineCount, finishedAt?, finishedCount?, cover?, source?, site?}` — reading position + book metadata written by `saveBookMeta()` on open and `savePos()` on scroll/chapter change. Separator is **double underscore** (v1.8.11+). `source`/`site` (v2.10.0・追加のみ・旧ビルド無視) = 底本 URL とサイト表示名（読みかけリストのサイトバッジ用。quota 超過時は cover→source/site の順に落として読書位置を優先）。`finishedAt`/`finishedCount` (v2.17.0) = **読了の記録**（位置と独立・§読了管理と同期）。quota 対策でもこの 2 つは絶対に落とさない。 |
 | `epub_last_book` | `{title, bookKey}` — for the resume banner |
 | `epub_settings` | `{fontMode, fontSize, lineHeight, letterSpacing, theme, themeAuto, themeLight, themeDark, margin, writingMode, fwdBtnSize, tapZone, autoOpenLast, ttsRate, ttsVoice, driveAutoSave, fontBold, fontStrokeLevel, spreadMode, fxlZoomLevel, fxlRegionOrder, fxlLtrAutoFlip, toolbarHidden, brightness, warmth, fsHud, setGroupsOpen, orientationLock, bookPrefsEnabled}` — **端末ローカルに閉じる**（しおり JSON にも Drive 同期にも含めない。端末ごとに画面サイズ・DPI・フォント資産・OS が違うため） |
 | `epub_lang` | selected UI language (`ja` / `en` / `zh-TW` / `zh-CN`) |
