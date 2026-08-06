@@ -121,6 +121,53 @@ fetch('tests/.fixtures/reflow.epub')
   closeModal(true);
 })
 .then(function () {
+  // 設定パネルから開いたときにモーダルが後ろへ隠れないこと。
+  // #settings-popover は z-index:500、#modal-overlay は 200 なので、
+  // 設定を開いたままだとモーダルが背後に描画されて「押しても何も起きない」ように見える
+  var pop = document.getElementById('settings-popover');
+  if (!pop.classList.contains('show')) toggleSettings();
+  T('設定パネルが開いた（前提）', pop.classList.contains('show'));
+  showTtsHandoff();
+  T('受け渡しを開くと設定パネルが閉じる', !pop.classList.contains('show'));
+  T('モーダルは開いている',
+    document.getElementById('modal-overlay').classList.contains('show'));
+  closeModal(true);
+})
+.then(function () {
+  // 狭幅端末でプレイヤーバーからボタンがはみ出さないこと（Android で 📤 が切れた回帰）。
+  //
+  // ⚠ headless Chrome はウィンドウを 500px 未満に縮められない（--window-size を渡しても
+  //   innerWidth は 500 で頭打ち）。実機の不具合は 343px 相当で起きたので、幾何だけでは
+  //   この回帰を再現できない。そこで「溢れを構造的に不可能にしている仕組み」＝
+  //   flex-wrap:wrap そのものを検査する。これが外れたら幅に関係なく再発しうる。
+  document.body.classList.add('tts-active');
+  var bar = document.getElementById('tts-bar');
+  T('バーは折り返す（どの幅でも溢れない保証）',
+    getComputedStyle(bar).flexWrap === 'wrap', getComputedStyle(bar).flexWrap);
+  var barRect = bar.getBoundingClientRect();
+  T('プレイヤーバーが表示されている', barRect.width > 0, String(Math.round(barRect.width)));
+  T('バーが画面幅に収まる',
+    barRect.left >= -1 && barRect.right <= window.innerWidth + 1,
+    Math.round(barRect.left) + '-' + Math.round(barRect.right) + ' / ' + window.innerWidth);
+  var out = [];
+  Array.prototype.forEach.call(bar.children, function (el) {
+    var r = el.getBoundingClientRect();
+    if (r.width === 0) return;
+    if (r.left < barRect.left - 1 || r.right > barRect.right + 1) {
+      out.push((el.id || el.className || el.tagName) + '@' + Math.round(r.left) + '-' + Math.round(r.right));
+    }
+  });
+  T('バーの中身が枠からはみ出さない', out.length === 0, out.join(' '));
+  var hb = document.getElementById('tts-handoff-btn').getBoundingClientRect();
+  T('受け渡しボタンが枠内に収まる',
+    hb.right <= barRect.right + 1 && hb.left >= barRect.left - 1,
+    Math.round(hb.left) + '-' + Math.round(hb.right) + ' / 枠 ' +
+    Math.round(barRect.left) + '-' + Math.round(barRect.right));
+  T('受け渡しボタンが画面内にある', hb.right <= window.innerWidth + 1,
+    Math.round(hb.right) + ' / ' + window.innerWidth);
+  document.body.classList.remove('tts-active');
+})
+.then(function () {
   // 共有経路：File として渡っているか・BOM が付いているか
   var shared = null;
   Object.defineProperty(navigator, 'canShare', {

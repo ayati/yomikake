@@ -428,7 +428,10 @@
     padding:5px 8px; box-shadow:0 4px 16px var(--shadow); z-index:40;
     backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
-    -webkit-user-select:none; user-select:none; max-width:calc(100vw - 24px); }
+    -webkit-user-select:none; user-select:none; max-width:calc(100vw - 24px);
+    /* 中身が縮まない flex なので、max-width を超えると溢れてピルの外へ描画される
+       （狭幅 Android で 📤 が切れて操作が分からなくなった）。折り返しで必ず収める */
+    flex-wrap:wrap; justify-content:center; row-gap:2px; }
   body.tts-active #tts-bar { display:flex; }
   #tts-bar button { background:transparent; border:none; color:var(--ui-text);
     cursor:pointer; padding:6px; border-radius:50%; display:flex; align-items:center;
@@ -660,6 +663,12 @@
 
   /* ── スマホ向け ── */
   @media (max-width: 640px) {
+    /* 狭幅では 1 段に収まるよう詰める（収まらなければ base の flex-wrap が折り返す） */
+    #tts-bar { gap:0; padding:5px 6px; }
+    #tts-bar button { min-width:30px; padding:6px 3px; }
+    #tts-bar .tts-sep { margin:0 1px; }
+    #tts-bar .tts-rate { min-width:34px; }
+    #tts-bar .tts-progress { min-width:34px; }
     #statusbar { display:none; }
     #reading-area { padding:var(--page-padding,8px); }
     .chapter-btn { width:36px; height:60px; opacity:.3; border-radius:12px; }
@@ -6715,6 +6724,11 @@ function _handoffSyncUI() {
 
 function showTtsHandoff() {
   if (!state.epub) { showToast(t('handoff.noBook')); return; }
+  // ⚠ #settings-popover は z-index:500、#modal-overlay は 200。設定パネルから開くと
+  //   モーダルが設定の後ろに隠れて「押しても何も起きない」ように見える。先に設定を閉じる。
+  //   （modal 側を上げる手は loading:250 / toast:300 まで押し上げる必要があり波及が大きい）
+  var _pop = document.getElementById('settings-popover');
+  if (_pop && _pop.classList.contains('show')) toggleSettings();
   var isFxl = state.renderMode === 'fxl';
   var canEpub = !!(state.bookKey && _cachedKeys.has(state.bookKey));
   // FXL は本文テキストを取り出せないので ePub 実体を渡す道しか無い

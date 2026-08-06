@@ -29,7 +29,8 @@ declare -A CASE_FLAGS=(
   [typography]="--allow-file-access-from-files"
   [book-prefs]="--allow-file-access-from-files"
   [fxl-zoom-tapguide]="--allow-file-access-from-files"
-  [tts-handoff]="--allow-file-access-from-files"
+  # 受け渡しはプレイヤーバーの狭幅レイアウトも見るので Android スマホ相当の実寸で走らせる
+  [tts-handoff]="--allow-file-access-from-files --window-size=412,915"
 )
 
 pass=0; fail=0; failed_lines=()
