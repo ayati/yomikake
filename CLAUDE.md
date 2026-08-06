@@ -136,6 +136,20 @@ Most features exist in both files. As a rule:
 - `ttsKeepAlive` の既定は Android でも **ON のまま**。効果が無いだけで害も無く、端末ごとに初期値を変えると説明が難しくなる。
 - テストは `tests/cases/tts-background.js`（両ファイル各 69 assertion）。**自動テストで担保できないのは「キープアライブが実環境で実際に効くか」だけ**で、それは上記の実機確認で決着済み。
 
+**外部の読み上げアプリへの受け渡し（v2.19.0）** (`ttsHandoffText`, `_handoffStartChunk`, `_handoffSliceFrom`, `_handoffChapterHead`, `_handoffFilename`, `_handoffDeliver`, `_handoffEpub`, `_handoffAdvance`, `ttsHandoffRun`, `_handoffSyncUI`, `showTtsHandoff` — 設計書 `design_tts_background.md` Phase F)。
+
+- **Android Chrome は背面で `speechSynthesis` を止めるのでキープアライブ（v2.18.0）では届かない。** そこで yomikake は「蔵書・しおり・読書位置」を持ったまま、**読み上げの実行だけを外部アプリ（@Voice Aloud Reader 等）へ委託する**。
+- **往路（どこから読むか）は渡せるが、復路（どこまで聴いたか）を取る API は存在しない。** そこで受け渡しの既定単位を **1 章**にし、「この章を渡す」操作自体を進捗の記録にする。章の粒度は目次・進捗バー・章送りと一致するので、ズレを手で直す動線が既にある。
+- **連携先ごとの分岐コードは書かない（設計の核心）** — Web からはインストール済みアプリを列挙できず、名指し起動もできない（`intent://` は URI 長で破綻・iOS では不可）。**宛先は OS の共有シートに委ね**、yomikake は「どの範囲を・どの形式で・どこから」作る責務だけを持つ。この形なら **@Voice 以外のアプリは実装ゼロで既に対応済み**になり、連携先が増えても増えるのはヘルプの記述だけ。
+- **`ttsExtractText()` / `ttsSplitChunks()` をそのまま再利用する。** ルビ rt 優先・タグ除去済みのプレーンテキストは外部読み上げアプリに渡す形としてそのまま最適で、これが Phase F の実装コストを極小にしている。
+- **チャンク列を join してはいけない** — 1 文 1 段落になり受け側の段落ナビが細かくなりすぎる。`_handoffSliceFrom()` はチャンクを**開始位置の目印としてだけ**使い、本文は `ttsExtractText()` の行構造（＝段落）をそのまま渡す。目印の文が本文中に見つからなければ**章まるごと**にフォールバックする（読み飛ばしより安全側）。
+- **経路は 3 段**: `navigator.share({files})` → `navigator.share({text})` → `.txt` ダウンロード。**テキスト直接共有は `range==='chapter'` のときだけ許す**（Android の Intent extras にサイズ上限があり、全文を載せると TransactionTooLargeException で落ちる）。共有シートを閉じただけの `AbortError` は失敗トーストを出さない。
+- **BOM 付き UTF-8 で書き出す**（一部の Android リーダーが Shift_JIS と誤判定するため）。**ソースには不可視文字を置かず `'﻿'` のエスケープ表記で書くこと**（編集で黙って消える）。また **`Blob.text()` は仕様どおり BOM を剥がす**ので、テストは生バイト（`arrayBuffer()`）で確かめる。
+- **FXL 本は ePub 実体の受け渡しのみ。** 本文テキストを取り出せないので範囲選択を出さず、IDB キャッシュも無ければモーダルごと開かない。ePub 実体は `_idbGet(state.bookKey).buf` から `File` を作って共有する（位置は伝わらないが蔵書ごと移せる。iOS でも有効）。
+- **「しおりを進める」チェックは `range==='chapter'` のときだけ有効**（`_handoffSyncUI()` が他の範囲で disabled にしチェックも外す）。既定 OFF — 渡したが聴かなかった場合に位置が進みすぎるため。
+- 制限事項は**ヘルプ本文ではなくモーダル内の注記**（`handoff.note`）に置いた。使う直前に目に入るほうが伝わり、`help.body` を 4 言語ぶん膨らませずに済む。
+- テストは `tests/cases/tts-handoff.js`（両ファイル各 58 assertion・fixture の実本を開いて生成テキストを検証）。**実機必須**: 共有シートに @Voice が出るか、実際に読めるか、テキスト量の上限。
+
 When fixing a bug or adding a feature that is not in the "only" lists above, apply the change to **both files**.
 
 ## Architecture

@@ -1118,6 +1118,11 @@
                 style="border:1px solid var(--ui-border);border-radius:8px;padding:6px 16px;min-width:60px;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;">ON</button>
       </div>
       <span style="font-size:11px;opacity:.6;line-height:1.5;padding:0 8px;display:block;" data-i18n="settings.ttsKeepAliveHelp">他のアプリや別タブに切り替えても読み上げが続くよう、聞こえない音を鳴らして再生を維持します。他アプリの音楽が止まる場合は OFF に</span>
+      <div class="set-row" style="gap:8px;">
+        <button class="set-io-btn" onclick="showTtsHandoff()"
+                data-i18n="settings.ttsHandoff">📤 外部の読み上げアプリへ渡す</button>
+      </div>
+      <span style="font-size:11px;opacity:.6;line-height:1.5;padding:0 8px;display:block;" data-i18n="settings.ttsHandoffHelp">いま読んでいる位置から本文を書き出して、@Voice Aloud Reader などの読み上げアプリに渡します。Android で他のアプリを使いながら聴きたいときに</span>
     </details>
     <details class="set-group" id="drive-auto-group">
       <summary><h4 data-i18n="settings.driveGroup">Google Drive</h4></summary>
@@ -1320,6 +1325,8 @@
         <button onclick="changeTtsRate(0.25)" aria-label="faster">＋</button>
         <span class="tts-sep"></span>
         <span class="tts-progress" id="tts-progress"></span>
+        <span class="tts-sep"></span>
+        <button id="tts-handoff-btn" onclick="showTtsHandoff()" data-i18n-title="btn.handoff">📤</button>
       </div>
     </div>
     <div id="finished-banner">
@@ -1453,6 +1460,30 @@ const I18N = {
     'settings.ttsRate':     '速度',
     'settings.ttsKeepAlive':     'バックグラウンド維持',
     'settings.ttsKeepAliveHelp': '他のアプリや別タブに切り替えても読み上げが続くよう、聞こえない音を鳴らして再生を維持します。他アプリの音楽が止まる場合は OFF に',
+    'btn.handoff':                 '外部の読み上げアプリへ渡す',
+    'settings.ttsHandoff':         '📤 外部の読み上げアプリへ渡す',
+    'settings.ttsHandoffHelp':     'いま読んでいる位置から本文を書き出して、@Voice Aloud Reader などの読み上げアプリに渡します。Android で他のアプリを使いながら聴きたいときに',
+    'handoff.title':               '📤 外部の読み上げアプリへ渡す',
+    'handoff.current':             '現在地',
+    'handoff.range':               '渡す範囲',
+    'handoff.rangeChapter':        'この章（いまの位置から）',
+    'handoff.rangeToEnd':          'いまの位置から最後まで',
+    'handoff.rangeBook':           '全文（最初から）',
+    'handoff.rangeEpub':           'ePub ファイルごと',
+    'handoff.advance':             '渡したあと、しおりを次の章の先頭へ進める',
+    'handoff.advanceHint':         '「渡す→聴く→戻ってまた渡す」を繰り返せます。聴かなかったときは位置が進みすぎるのでご注意ください',
+    'handoff.note':                '※ どこまで聴いたかは戻ってきません。ずれたら章送りで直してください。読み上げの速度・音声は渡した先のアプリの設定になります。',
+    'handoff.share':               '共有',
+    'handoff.download':            'ダウンロード',
+    'handoff.cancel':              'キャンセル',
+    'handoff.empty':               '渡せる本文が見つかりませんでした',
+    'handoff.noCache':             'この本の ePub は端末に保存されていません',
+    'handoff.noBook':              '本を開いてからお使いください',
+    'handoff.shareUnavailable':    'この環境では共有できません。ダウンロードをお使いください',
+    'handoff.fxl':                 '固定レイアウトの本は本文を取り出せません',
+    'toast.handoffDone':           '{chapter} を渡しました',
+    'toast.handoffEpub':           'ePub ファイルを渡しました',
+    'toast.handoffFailed':         '受け渡しに失敗しました',
     'tts.voiceAuto':        '自動',
     'tts.speed':            '速度',
     'btn.help':             'ヘルプ',
@@ -1806,6 +1837,30 @@ const I18N = {
     'settings.ttsRate':     'Speed',
     'settings.ttsKeepAlive':     'Keep playing in background',
     'settings.ttsKeepAliveHelp': 'Plays an inaudible tone so speech keeps going when you switch apps or tabs. Turn off if it interrupts music in other apps.',
+    'btn.handoff':                 'Send to a read-aloud app',
+    'settings.ttsHandoff':         '📤 Send to a read-aloud app',
+    'settings.ttsHandoffHelp':     'Exports the text from where you are now and hands it to a read-aloud app such as @Voice Aloud Reader. Useful on Android for listening while using other apps.',
+    'handoff.title':               '📤 Send to a read-aloud app',
+    'handoff.current':             'Current position',
+    'handoff.range':               'What to send',
+    'handoff.rangeChapter':        'This chapter (from here)',
+    'handoff.rangeToEnd':          'From here to the end',
+    'handoff.rangeBook':           'Whole book (from the start)',
+    'handoff.rangeEpub':           'The ePub file itself',
+    'handoff.advance':             'Move the bookmark to the next chapter afterwards',
+    'handoff.advanceHint':         'Lets you repeat send, listen, come back and send again. Note the position moves even if you did not listen.',
+    'handoff.note':                'Note: how far you listened does not come back. Use chapter navigation to correct it. Speed and voice are set in the receiving app.',
+    'handoff.share':               'Share',
+    'handoff.download':            'Download',
+    'handoff.cancel':              'Cancel',
+    'handoff.empty':               'No text found to send',
+    'handoff.noCache':             'The ePub file for this book is not stored on this device',
+    'handoff.noBook':              'Open a book first',
+    'handoff.shareUnavailable':    'Sharing is not available here. Please use Download.',
+    'handoff.fxl':                 'Fixed-layout books have no extractable text',
+    'toast.handoffDone':           'Sent {chapter}',
+    'toast.handoffEpub':           'Sent the ePub file',
+    'toast.handoffFailed':         'Could not send',
     'tts.voiceAuto':        'Auto',
     'tts.speed':            'Speed',
     'btn.help':             'Help',
@@ -2159,6 +2214,30 @@ const I18N = {
     'settings.ttsRate':     '速度',
     'settings.ttsKeepAlive':     '背景播放維持',
     'settings.ttsKeepAliveHelp': '播放聽不見的聲音，讓您切換到其他應用程式或分頁時朗讀仍能繼續。若會中斷其他應用程式的音樂請關閉。',
+    'btn.handoff':                 '傳送到朗讀應用程式',
+    'settings.ttsHandoff':         '📤 傳送到朗讀應用程式',
+    'settings.ttsHandoffHelp':     '從目前閱讀的位置匯出內文，傳送到 @Voice Aloud Reader 等朗讀應用程式。適合在 Android 上一邊使用其他應用程式一邊聆聽。',
+    'handoff.title':               '📤 傳送到朗讀應用程式',
+    'handoff.current':             '目前位置',
+    'handoff.range':               '傳送範圍',
+    'handoff.rangeChapter':        '本章（從目前位置起）',
+    'handoff.rangeToEnd':          '從目前位置到最後',
+    'handoff.rangeBook':           '全文（從頭開始）',
+    'handoff.rangeEpub':           'ePub 檔案本身',
+    'handoff.advance':             '傳送後將書籤移到下一章開頭',
+    'handoff.advanceHint':         '可以重複「傳送→聆聽→回來再傳送」。若沒有聆聽，位置會前進過多，請留意。',
+    'handoff.note':                '※ 聽到哪裡不會傳回來。若有偏差請用章節導覽調整。朗讀速度與語音由接收的應用程式設定。',
+    'handoff.share':               '分享',
+    'handoff.download':            '下載',
+    'handoff.cancel':              '取消',
+    'handoff.empty':               '找不到可傳送的內文',
+    'handoff.noCache':             '本裝置未儲存這本書的 ePub 檔案',
+    'handoff.noBook':              '請先開啟書籍',
+    'handoff.shareUnavailable':    '此環境無法分享，請使用下載',
+    'handoff.fxl':                 '固定版面的書籍無法取出內文',
+    'toast.handoffDone':           '已傳送 {chapter}',
+    'toast.handoffEpub':           '已傳送 ePub 檔案',
+    'toast.handoffFailed':         '傳送失敗',
     'tts.voiceAuto':        '自動',
     'tts.speed':            '速度',
     'btn.help':             '說明',
@@ -2512,6 +2591,30 @@ const I18N = {
     'settings.ttsRate':     '速度',
     'settings.ttsKeepAlive':     '后台播放维持',
     'settings.ttsKeepAliveHelp': '播放听不见的声音，让您切换到其他应用或标签页时朗读仍能继续。若会中断其他应用的音乐请关闭。',
+    'btn.handoff':                 '发送到朗读应用',
+    'settings.ttsHandoff':         '📤 发送到朗读应用',
+    'settings.ttsHandoffHelp':     '从当前阅读的位置导出正文，发送到 @Voice Aloud Reader 等朗读应用。适合在 Android 上一边使用其他应用一边收听。',
+    'handoff.title':               '📤 发送到朗读应用',
+    'handoff.current':             '当前位置',
+    'handoff.range':               '发送范围',
+    'handoff.rangeChapter':        '本章（从当前位置起）',
+    'handoff.rangeToEnd':          '从当前位置到最后',
+    'handoff.rangeBook':           '全文（从头开始）',
+    'handoff.rangeEpub':           'ePub 文件本身',
+    'handoff.advance':             '发送后将书签移到下一章开头',
+    'handoff.advanceHint':         '可以重复「发送→收听→返回再发送」。若没有收听，位置会前进过多，请留意。',
+    'handoff.note':                '※ 听到哪里不会传回来。若有偏差请用章节导航调整。朗读速度与语音由接收的应用设置。',
+    'handoff.share':               '分享',
+    'handoff.download':            '下载',
+    'handoff.cancel':              '取消',
+    'handoff.empty':               '找不到可发送的正文',
+    'handoff.noCache':             '本设备未保存这本书的 ePub 文件',
+    'handoff.noBook':              '请先打开书籍',
+    'handoff.shareUnavailable':    '此环境无法分享，请使用下载',
+    'handoff.fxl':                 '固定版面的书籍无法取出正文',
+    'toast.handoffDone':           '已发送 {chapter}',
+    'toast.handoffEpub':           '已发送 ePub 文件',
+    'toast.handoffFailed':         '发送失败',
     'tts.voiceAuto':        '自动',
     'tts.speed':            '速度',
     'btn.help':             '帮助',
@@ -6189,6 +6292,207 @@ function ttsInit() {
   buildTtsVoiceSelect();
   updateTtsKeepAliveUI();
   updateTtsUI();
+}
+
+// ══════════════════════════════════════════
+//  外部の読み上げアプリへの受け渡し（design_tts_background.md Phase F）
+// ══════════════════════════════════════════
+// Android Chrome はタブが背面に回ると speechSynthesis を止めるため、キープアライブ
+// （Phase A）では届かない。そこで yomikake は「蔵書・しおり・読書位置」を持ったまま、
+// 読み上げの実行だけを外部アプリ（@Voice Aloud Reader 等）へ委託する。
+//
+// ⚠ 往路（どこから読むか）は渡せるが、復路（どこまで聴いたか）を取る API は存在しない。
+//   そこで受け渡しの既定単位を「1 章」にし、「この章を渡す」操作自体を進捗の記録にする。
+//
+// ⚠ 連携先ごとの分岐は書かない。Web からはインストール済みアプリを列挙できず、特定アプリの
+//   名指し起動もできない（intent:// は URI 長で破綻し iOS では不可）。宛先は OS の共有シートに
+//   委ね、yomikake は「どの範囲を・どの形式で・どこから」作るかだけを持つ。この形なら
+//   @Voice 以外のアプリは実装ゼロで既に対応済みになる。
+
+// 現在章のどのチャンクから渡すか（＝しおり位置の文）
+function _handoffStartChunk(spineIdx, chunkCount) {
+  if (spineIdx !== state.currentSpineIdx || chunkCount <= 0) return 0;
+  if (_tts.active && _tts.spineIdx === spineIdx) return _tts.idx;
+  var r = _intraChapterRatio || 0;
+  return Math.max(0, Math.min(chunkCount - 1, Math.floor(r * chunkCount)));
+}
+
+// 段落構造を保ったまま「開始チャンクの文」以降を切り出す。
+// チャンク列を join すると 1 文 1 段落になって段落ナビが細かくなりすぎるので、
+// チャンクは開始位置の目印にだけ使い、本文は ttsExtractText の行構造をそのまま渡す
+function _handoffSliceFrom(text, chunks, startChunk) {
+  if (!(startChunk > 0)) return text;
+  if (startChunk >= chunks.length) return '';
+  var at = text.indexOf(chunks[startChunk]);
+  return at >= 0 ? text.slice(at) : text;   // 見つからなければ章まるごと（安全側）
+}
+
+function _handoffChapterHead(spineIdx) {
+  return '──── ' + chapterLabelForSpine(spineIdx) + ' ────';
+}
+
+// range: 'chapter'（現在章の現在位置から）/ 'toEnd'（現在位置から末尾まで）/ 'book'（全文）
+async function ttsHandoffText(range) {
+  var from = (range === 'book') ? 0 : state.currentSpineIdx;
+  var to   = (range === 'chapter') ? state.currentSpineIdx : state.spine.length - 1;
+  var out  = ['『' + (state.bookTitle || '') + '』'
+              + (state.bookCreator ? '　' + state.bookCreator : '')];
+  for (var i = from; i <= to; i++) {
+    var item = state.spine[i];
+    if (!item) continue;
+    var html = '';
+    try { html = await state.epub.file(item.absPath).async('text'); } catch (e) { continue; }
+    var text = ttsExtractText(html);
+    if (!text) continue;
+    // 現在章だけしおり位置の文から始める（'book' は本の頭から読み直す指定なので触らない）
+    if (range !== 'book' && i === state.currentSpineIdx) {
+      var chunks = ttsSplitChunks(text);
+      text = _handoffSliceFrom(text, chunks, _handoffStartChunk(i, chunks.length));
+    }
+    if (!text) continue;
+    out.push(_handoffChapterHead(i));
+    out.push(text);
+  }
+  return out.join('\n\n');
+}
+
+function _handoffFilename(range, ext) {
+  var base = String(state.bookTitle || 'book').replace(/[\\\/:*?"<>|\r\n]/g, '_').slice(0, 60);
+  if (range === 'chapter') base += '_' + (state.currentSpineIdx + 1);
+  return base + ext;
+}
+
+// 共有 or ダウンロード。戻り値 true で「渡せた」
+async function _handoffDeliver(mode, blob, name, allowTextShare, text) {
+  if (mode === 'share') {
+    var file = null;
+    try { file = new File([blob], name, { type: blob.type }); } catch (e) {}
+    if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file], title: state.bookTitle || '' });
+      return true;
+    }
+    // ファイル共有が使えない環境向けのテキスト直接共有。ただし Android の Intent extras には
+    // サイズ上限（TransactionTooLargeException）があるので 1 章のときだけに限る
+    if (allowTextShare && navigator.share) {
+      await navigator.share({ title: state.bookTitle || '', text: text });
+      return true;
+    }
+    showToast(t('handoff.shareUnavailable'));
+    return false;
+  }
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url; a.download = name; a.click();
+  setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  return true;
+}
+
+// ePub 実体をそのまま渡す（IDB キャッシュから）。位置は伝わらないが蔵書ごと移せる
+async function _handoffEpub(mode) {
+  if (!state.bookKey) return false;
+  var cached = await _idbGet(state.bookKey);
+  var data = cached && (cached.buf || cached.blob);
+  if (!data) { showToast(t('handoff.noCache')); return false; }
+  var blob = new Blob([data], { type: 'application/epub+zip' });
+  var name = cached.name || _handoffFilename('book', '.epub');
+  var ok = await _handoffDeliver(mode, blob, name, false, '');
+  if (ok) showToast(t('toast.handoffEpub'));
+  return ok;
+}
+
+function _handoffAdvance() {
+  var next = state.currentSpineIdx + 1;
+  if (next >= state.spine.length) return;
+  renderPage(next, 'start');
+}
+
+async function ttsHandoffRun(mode) {
+  var sel = document.querySelector('input[name="handoff-range"]:checked');
+  var range = sel ? sel.value : 'chapter';
+  var adv = document.getElementById('handoff-advance');
+  var advance = !!(adv && adv.checked && range === 'chapter');
+  var label = chapterLabelForSpine(state.currentSpineIdx);
+  closeModal(true);
+  try {
+    if (range === 'epub') { await _handoffEpub(mode); return; }
+    var text = await ttsHandoffText(range);
+    if (!text) { showToast(t('handoff.empty')); return; }
+    // BOM 付き UTF-8。付けないと一部の Android リーダーが Shift_JIS と誤判定する
+    var blob = new Blob(['\uFEFF' + text], { type: 'text/plain' });
+    var ok = await _handoffDeliver(mode, blob, _handoffFilename(range, '.txt'),
+                                   range === 'chapter', text);
+    if (!ok) return;
+    showToast(t('toast.handoffDone', { chapter: label }));
+    if (advance) _handoffAdvance();
+  } catch (e) {
+    if (e && e.name === 'AbortError') return;   // 共有シートを閉じただけ
+    showToast(t('toast.handoffFailed'));
+  }
+}
+
+// 「しおりを進める」は 1 章を渡したときだけ意味がある
+function _handoffSyncUI() {
+  var sel = document.querySelector('input[name="handoff-range"]:checked');
+  var row = document.getElementById('handoff-advance-row');
+  var adv = document.getElementById('handoff-advance');
+  if (!row || !adv) return;
+  var on = sel && sel.value === 'chapter';
+  adv.disabled = !on;
+  if (!on) adv.checked = false;
+  row.style.opacity = on ? '' : '.45';
+}
+
+function showTtsHandoff() {
+  if (!state.epub) { showToast(t('handoff.noBook')); return; }
+  var isFxl = state.renderMode === 'fxl';
+  var canEpub = !!(state.bookKey && _cachedKeys.has(state.bookKey));
+  // FXL は本文テキストを取り出せないので ePub 実体を渡す道しか無い
+  if (isFxl && !canEpub) { showToast(t('handoff.fxl')); return; }
+  var canShare = typeof navigator.share === 'function';
+  var pct = Math.round(((_tts.active && _tts.chunks.length)
+    ? _tts.idx / _tts.chunks.length : (_intraChapterRatio || 0)) * 100);
+
+  var radio = function (val, key, checked) {
+    return '<label style="display:flex;align-items:center;gap:8px;padding:6px 0;cursor:pointer;">'
+      + '<input type="radio" name="handoff-range" value="' + val + '"'
+      + (checked ? ' checked' : '') + ' onchange="_handoffSyncUI()">'
+      + '<span>' + t(key) + '</span></label>';
+  };
+  var ranges = isFxl ? '' :
+      radio('chapter', 'handoff.rangeChapter', true)
+    + radio('toEnd',   'handoff.rangeToEnd',   false)
+    + radio('book',    'handoff.rangeBook',    false);
+  if (canEpub) ranges += radio('epub', 'handoff.rangeEpub', isFxl);
+
+  var btn = function (fn, labelKey, primary) {
+    return '<button onclick="' + fn + '" style="font-size:14px;font-weight:600;padding:10px 20px;'
+      + 'border-radius:8px;cursor:pointer;'
+      + (primary ? 'border:none;background:var(--accent);color:#fff;'
+                 : 'border:1px solid var(--ui-border);background:var(--ui-bg);color:var(--ui-text);')
+      + '">' + t(labelKey) + '</button>';
+  };
+
+  document.getElementById('modal-title').textContent = t('handoff.title');
+  document.getElementById('modal-close').style.display = '';
+  document.getElementById('modal-body').innerHTML =
+      '<p style="margin:0 0 14px;font-size:13px;opacity:.75;">' + t('handoff.current') + '：'
+        + esc(chapterLabelForSpine(state.currentSpineIdx)) + '　' + pct + '%</p>'
+    + '<div style="font-size:13px;font-weight:600;margin-bottom:4px;">' + t('handoff.range') + '</div>'
+    + '<div style="margin-bottom:14px;">' + ranges + '</div>'
+    + '<label id="handoff-advance-row" style="display:flex;align-items:flex-start;gap:8px;'
+      + 'cursor:pointer;font-size:13px;">'
+      + '<input type="checkbox" id="handoff-advance" style="margin-top:3px;">'
+      + '<span>' + t('handoff.advance')
+      + '<br><span style="font-size:11px;opacity:.6;">' + t('handoff.advanceHint') + '</span></span>'
+    + '</label>'
+    + '<p style="font-size:11px;opacity:.6;line-height:1.6;margin:16px 0 0;">' + t('handoff.note') + '</p>'
+    + '<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;flex-wrap:wrap;">'
+      + btn('closeModal(true)', 'handoff.cancel', false)
+      + btn("ttsHandoffRun('download')", 'handoff.download', !canShare)
+      + (canShare ? btn("ttsHandoffRun('share')", 'handoff.share', true) : '')
+    + '</div>';
+  document.getElementById('modal-overlay').classList.add('show');
+  _handoffSyncUI();
 }
 
 function htmlToText(html) {
