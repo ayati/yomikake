@@ -5,7 +5,7 @@
  * リリースで yomikake.html を更新したら VERSION を上げること（§運用メモ）。
  * ロールバック: このファイルを「全 caches 削除＋self.registration.unregister()」の空実装に差し替える。
  */
-const VERSION = 'yomikake-shell-v2.17.0';
+const VERSION = 'yomikake-shell-v2.18.0';
 const SHELL = [
   './yomikake.html', './yomikake_ios.html',
   './manifest.webmanifest', './manifest_ios.webmanifest',
