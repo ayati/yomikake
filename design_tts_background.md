@@ -479,12 +479,16 @@ yomikake が持つ責務は「**どの範囲を・どの形式で・どこから
 ```js
 // epub_settings に追加
 ttsKeepAlive: true,      // Phase A。既定 ON
-ttsHandoffRange: 'chapter',  // Phase F。最後に選んだ範囲を覚える
 ```
 
-いずれも **`resetDisplaySettings()` の対象外**（読み上げ設定は触らない方針）。
-`loadSettings()` に検証付き復元を足す（`ttsKeepAlive` は boolean、
-`ttsHandoffRange` は `'chapter'|'toEnd'|'book'|'epub'` のホワイトリスト）。
+**`resetDisplaySettings()` の対象外**（読み上げ設定は触らない方針）。
+`loadSettings()` に検証付き復元を足す（`ttsKeepAlive` は boolean）。
+
+> **`ttsHandoffRange`（最後に選んだ範囲を覚える）は実装しなかった。**
+> 想定する使い方は「1 章を渡す → 聴く → 戻ってまた渡す」の周回で、既定の `'chapter'` が
+> そのまま正解になる。全文や ePub 実体は基本的に 1 回きりの操作なので、それを覚えて
+> 次回の既定にすると**周回のたびに選び直すことになり、むしろ手数が増える**。
+> Phase F で永続化するものは無い。
 
 ## i18n（4 言語すべてに追加）
 
