@@ -1094,6 +1094,12 @@
           <option value="" data-i18n="tts.voiceAuto">自動</option>
         </select>
       </div>
+      <div class="set-row">
+        <span class="set-label" data-i18n="settings.ttsKeepAlive">バックグラウンド維持</span>
+        <button id="tts-keepalive-toggle" onclick="toggleTtsKeepAlive()"
+                style="border:1px solid var(--ui-border);border-radius:8px;padding:6px 16px;min-width:60px;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;">ON</button>
+      </div>
+      <span style="font-size:11px;opacity:.6;line-height:1.5;padding:0 8px;display:block;" data-i18n="settings.ttsKeepAliveHelp">他のアプリや別タブに切り替えても読み上げが続くよう、聞こえない音を鳴らして再生を維持します。他アプリの音楽が止まる場合は OFF に</span>
     </details>
     <details class="set-group" id="drive-auto-group">
       <summary><h4 data-i18n="settings.driveGroup">Google Drive</h4></summary>
@@ -1426,6 +1432,8 @@ const I18N = {
     'settings.ttsGroup':    '🔊 読み上げ',
     'settings.ttsVoice':    '音声',
     'settings.ttsRate':     '速度',
+    'settings.ttsKeepAlive':     'バックグラウンド維持',
+    'settings.ttsKeepAliveHelp': '他のアプリや別タブに切り替えても読み上げが続くよう、聞こえない音を鳴らして再生を維持します。他アプリの音楽が止まる場合は OFF に',
     'tts.voiceAuto':        '自動',
     'tts.speed':            '速度',
     'btn.help':             'ヘルプ',
@@ -1776,6 +1784,8 @@ const I18N = {
     'settings.ttsGroup':    '🔊 Read aloud',
     'settings.ttsVoice':    'Voice',
     'settings.ttsRate':     'Speed',
+    'settings.ttsKeepAlive':     'Keep playing in background',
+    'settings.ttsKeepAliveHelp': 'Plays an inaudible tone so speech keeps going when you switch apps or tabs. Turn off if it interrupts music in other apps.',
     'tts.voiceAuto':        'Auto',
     'tts.speed':            'Speed',
     'btn.help':             'Help',
@@ -2126,6 +2136,8 @@ const I18N = {
     'settings.ttsGroup':    '🔊 朗讀',
     'settings.ttsVoice':    '語音',
     'settings.ttsRate':     '速度',
+    'settings.ttsKeepAlive':     '背景播放維持',
+    'settings.ttsKeepAliveHelp': '播放聽不見的聲音，讓您切換到其他應用程式或分頁時朗讀仍能繼續。若會中斷其他應用程式的音樂請關閉。',
     'tts.voiceAuto':        '自動',
     'tts.speed':            '速度',
     'btn.help':             '說明',
@@ -2476,6 +2488,8 @@ const I18N = {
     'settings.ttsGroup':    '🔊 朗读',
     'settings.ttsVoice':    '语音',
     'settings.ttsRate':     '速度',
+    'settings.ttsKeepAlive':     '后台播放维持',
+    'settings.ttsKeepAliveHelp': '播放听不见的声音，让您切换到其他应用或标签页时朗读仍能继续。若会中断其他应用的音乐请关闭。',
     'tts.voiceAuto':        '自动',
     'tts.speed':            '速度',
     'btn.help':             '帮助',
@@ -2905,6 +2919,7 @@ const state = {
   setGroupsOpen:{},        // 設定グループの開閉 {groupId:bool}（epub_settings に永続化・Init で既定値を流し込む）
   ttsRate:1.0,             // 読み上げ速度 0.5–2.0（epub_settings に永続化）
   ttsVoice:'',             // 読み上げ音声 voiceURI（'' = 自動。epub_settings に永続化）
+  ttsKeepAlive:true,       // 読み上げ中のバックグラウンド維持（epub_settings に永続化・リセット対象外）
   bookLang:'ja',           // OPF dc:language 先頭2文字（セッションのみ・非永続）
   fontBold:false,          // 太字表示トグル（epub_settings に永続化）
   fontStrokeLevel:0,       // 縁取りの強さ 0=なし/1=弱/2=中/3=強（epub_settings に永続化）
@@ -5795,6 +5810,7 @@ function saveSettings() {
       autoOpenLast:  state.autoOpenLast,
       ttsRate:       state.ttsRate,
       ttsVoice:      state.ttsVoice,
+      ttsKeepAlive:  state.ttsKeepAlive,
       driveAutoSave: state.driveAutoSave,
       toolbarHidden: state.toolbarHidden,
       brightness:    state.brightness,
@@ -5848,6 +5864,7 @@ function loadSettings() {
     if (typeof s.autoOpenLast === 'boolean') state.autoOpenLast = s.autoOpenLast;
     if (typeof s.ttsRate === 'number' && s.ttsRate >= 0.5 && s.ttsRate <= 2) state.ttsRate = s.ttsRate;
     if (typeof s.ttsVoice === 'string') state.ttsVoice = s.ttsVoice;
+    if (typeof s.ttsKeepAlive === 'boolean') state.ttsKeepAlive = s.ttsKeepAlive;
     if (s.driveAutoSave !== undefined) { state.driveAutoSave = !!s.driveAutoSave; updateAutoSaveToggleUI(); }
     if (Array.isArray(s.toolbarHidden)) {
       const _tbValid = TOOLBAR_ITEMS.map(i => i.key);
@@ -5969,10 +5986,16 @@ function switchSidebarTab(tab) {
 // ══════════════════════════════════════════
 //  読み上げ（TTS・Web Speech API・両ファイル共通）
 //  設計書 design_tts.md。同期ハイライトなし・画面追従は章単位・ルビは rt 優先・Wake Lock あり。
+//  バックグラウンド強化（キープアライブ／Media Session／先読みキュー）は design_tts_background.md。
 // ══════════════════════════════════════════
-let _tts = { active:false, paused:false, chunks:[], idx:0, spineIdx:-1 };
+// _tts.idx      = いま発話中のチャンク（UI 表示としおり保存の基準）
+// _tts.queuedTo = speak() に積み終わったチャンク（排他的上限）
+// この 2 つを分けないと、先読みした分だけしおりが先へ飛ぶ。design_tts_background.md §B-1
+let _tts = { active:false, paused:false, chunks:[], idx:0, queuedTo:0, spineIdx:-1 };
 let _ttsWakeLock = null;
 let _ttsInternalNav = false;   // TTS 自身の章送り renderPage を手動操作と区別する
+let _ttsAdvancing = false;     // ttsAdvanceChapter() の多重発火防止
+const TTS_LOOKAHEAD = 3;       // 先読みして speak() に積むチャンク数
 const _ttsSupported = typeof window !== 'undefined' && 'speechSynthesis' in window
   && typeof SpeechSynthesisUtterance !== 'undefined';
 
@@ -6038,6 +6061,114 @@ function ttsResolveVoice() {
   return null;
 }
 
+// ── Phase A: バックグラウンド維持（キープアライブ音声） ──────────────
+// speechSynthesis はブラウザから見て「メディア再生」ではないので、背面タブの凍結
+// （Page Lifecycle）とタイマースロットリングをそのまま食らう。極小音量のループ音声を
+// 鳴らしてタブを audible にすることで、その対象外にする。
+//
+// ⚠ 完全な無音では効かない — Chrome の AudioStreamMonitor は実際の振幅を見て audible を
+//   判定するため、振幅ゼロのファイルではタブが audible にならずキープアライブとして機能しない。
+//   19kHz / 約 -48dBFS は「成人にはほぼ聞こえず、スマホのスピーカーは帯域外で物理的に出せない」
+//   ぎりぎりの目安。効かない場合は AMP を上げる（-48 → -40 → -34）。
+//   検証は「再生中にタブへスピーカーアイコンが出るか」の目視 — これが audible 判定の直接の証拠。
+//   実機結果(2026-08-06): Windows/Chrome・macOS/Safari・iPhone/iPad Safari で背面再生が継続。
+//   Android Chrome だけは不可 — タブを audible にしても Chrome 側が hidden で読み上げを
+//   止めるため、この手では届かない（Android は外部読み上げアプリへの委託で対応する）。
+const TTS_KEEPALIVE_HZ  = 19000;
+const TTS_KEEPALIVE_AMP = 0.004;
+let _ttsKeepAudio = null;
+
+// 実行時に WAV を組み立てて data URI で返す（外部アセットを増やさず 2 ファイル構成を守る）
+function _ttsMakeKeepAliveUri() {
+  var sr = 44100, n = sr, i;                       // 1 秒・16bit・モノラル
+  var buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf);
+  function put(off, str){ for (var k = 0; k < str.length; k++) v.setUint8(off + k, str.charCodeAt(k)); }
+  put(0, 'RIFF');  v.setUint32(4, 36 + n * 2, true);  put(8, 'WAVEfmt ');
+  v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, sr, true); v.setUint32(28, sr * 2, true);
+  v.setUint16(32, 2, true);  v.setUint16(34, 16, true);
+  put(36, 'data'); v.setUint32(40, n * 2, true);
+  for (i = 0; i < n; i++) {
+    var s = Math.sin(2 * Math.PI * TTS_KEEPALIVE_HZ * i / sr) * TTS_KEEPALIVE_AMP;
+    v.setInt16(44 + i * 2, Math.round(s * 32767), true);
+  }
+  var bytes = new Uint8Array(buf), bin = '';
+  for (i = 0; i < bytes.length; i += 8192) {      // apply の引数上限を避けて分割
+    bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 8192));
+  }
+  return 'data:audio/wav;base64,' + btoa(bin);
+}
+
+// ⚠ 呼び出しは必ずユーザージェスチャの同期内で（await をまたぐと autoplay policy に弾かれる）
+function _ttsKeepAliveStart() {
+  if (!state.ttsKeepAlive) return;
+  try {
+    if (!_ttsKeepAudio) {
+      _ttsKeepAudio = new Audio(_ttsMakeKeepAliveUri());
+      _ttsKeepAudio.loop = true;
+    }
+    var p = _ttsKeepAudio.play();
+    if (p && p.catch) p.catch(function(){});      // 拒否されても読み上げ自体は続ける
+  } catch(e){}
+}
+function _ttsKeepAliveStop() {
+  if (!_ttsKeepAudio) return;
+  try { _ttsKeepAudio.pause(); _ttsKeepAudio.currentTime = 0; } catch(e){}
+}
+
+// ── Phase A: Media Session（通知・ロック画面の操作子） ────────────────
+// 実音声（キープアライブ）が鳴っていて初めて機能する。speechSynthesis 単体では登録できない。
+let _ttsMsSpine = -1;   // メタデータを組み直した章。毎チャンク作り直さないための番人
+
+function ttsSyncMediaSession() {
+  if (!('mediaSession' in navigator)) return;
+  var ms = navigator.mediaSession;
+  try {
+    if (_tts.active && _ttsMsSpine !== state.currentSpineIdx && typeof MediaMetadata !== 'undefined') {
+      _ttsMsSpine = state.currentSpineIdx;
+      ms.metadata = new MediaMetadata({
+        title:   chapterLabelForSpine(state.currentSpineIdx) || state.bookTitle || '',
+        artist:  state.bookCreator || '',
+        album:   state.bookTitle || '',
+        artwork: state.bookCoverDataUri
+          ? [{ src: state.bookCoverDataUri, sizes: '160x224', type: 'image/jpeg' }] : []
+      });
+    }
+    ms.playbackState = _tts.active ? (_tts.paused ? 'paused' : 'playing') : 'none';
+  } catch(e){}
+}
+
+function _ttsInitMediaSession() {
+  if (!('mediaSession' in navigator)) return;
+  var ms = navigator.mediaSession;
+  [['play',          function(){ ttsResume(); }],
+   ['pause',         function(){ ttsPause(); }],
+   ['stop',          function(){ ttsStop(); }],
+   ['previoustrack', function(){ ttsPrevSent(); }],
+   ['nexttrack',     function(){ ttsNextSent(); }],
+   ['seekbackward',  function(){ ttsPrevSent(); }],
+   ['seekforward',   function(){ ttsNextSent(); }]
+  ].forEach(function(p){ try { ms.setActionHandler(p[0], p[1]); } catch(e){} });
+}
+
+function toggleTtsKeepAlive() {
+  state.ttsKeepAlive = !state.ttsKeepAlive;
+  saveSettings();
+  updateTtsKeepAliveUI();
+  if (_tts.active && !_tts.paused) {
+    if (state.ttsKeepAlive) _ttsKeepAliveStart(); else _ttsKeepAliveStop();
+  }
+}
+function updateTtsKeepAliveUI() {
+  var btn = document.getElementById('tts-keepalive-toggle');
+  if (!btn) return;
+  var on = !!state.ttsKeepAlive;
+  btn.textContent = on ? 'ON' : 'OFF';
+  btn.style.background  = on ? 'var(--accent)' : '';
+  btn.style.color       = on ? '#fff' : '';
+  btn.style.borderColor = on ? 'var(--accent)' : 'var(--ui-border)';
+}
+
 async function ttsPlay() {
   if (!_ttsSupported) { showToast(t('tts.noVoice')); return; }
   if (state.renderMode === 'fxl') return;       // FXL は Phase 2。🔊 も非表示
@@ -6045,61 +6176,107 @@ async function ttsPlay() {
   if (!state.epub) return;
   // iOS ジェスチャアンロック（クリック起点で同期 speak）
   try { var u0 = new SpeechSynthesisUtterance(' '); u0.volume = 0; speechSynthesis.speak(u0); } catch(e){}
+  // キープアライブもジェスチャの同期内で始める（この下は await をまたぐので手遅れになる）。
+  // ⚠ ここから先の早期 return は 4 経路あり、いずれも必ず _ttsKeepAliveStop() すること。
+  _ttsKeepAliveStart();
   if (!ttsResolveVoice()) {
     await new Promise(function(r){ setTimeout(r, 300); });   // voices 未投入かもしれないので一度待つ
-    if (!ttsResolveVoice()) { try{speechSynthesis.cancel();}catch(e){} showToast(t('tts.noVoice')); return; }
+    if (!ttsResolveVoice()) {
+      try{speechSynthesis.cancel();}catch(e){}
+      _ttsKeepAliveStop(); showToast(t('tts.noVoice')); return;
+    }
   }
   var idx = state.currentSpineIdx;
   var item = state.spine[idx];
-  if (!item) return;
+  if (!item) { _ttsKeepAliveStop(); return; }
   var html;
-  try { html = await state.epub.file(item.absPath).async('text'); } catch(e){ return; }
+  try { html = await state.epub.file(item.absPath).async('text'); } catch(e){ _ttsKeepAliveStop(); return; }
   var chunks = ttsSplitChunks(ttsExtractText(html));
-  if (!chunks.length) { showToast(t('tts.done')); return; }
+  if (!chunks.length) { _ttsKeepAliveStop(); showToast(t('tts.done')); return; }
   _tts.active = true; _tts.paused = false; _tts.chunks = chunks; _tts.spineIdx = idx;
   _tts.idx = Math.max(0, Math.min(chunks.length - 1, Math.floor(_intraChapterRatio * chunks.length)));
   document.body.classList.add('tts-active');
   ttsRequestWakeLock();
+  ttsSyncMediaSession();
   updateTtsUI();
-  ttsSpeakNext();
+  ttsRestartQueue();
 }
 
-function ttsSpeakNext() {
+// ── Phase B: 先読みキュー ─────────────────────────────────────────
+// speechSynthesis.speak() は本来キューなので、数チャンク先まで積んでおけば JS が
+// スロットリングされてもエンジン側が喋り続ける。cancel を伴う唯一の経路が
+// ttsRestartQueue()、補充だけを行うのが ttsFillQueue()。
+
+// 現在位置（_tts.idx）からキューを組み直す。速度・音声変更や手動シークの共通経路
+function ttsRestartQueue() {
   if (!_tts.active || _tts.paused) return;
   if (_tts.idx >= _tts.chunks.length) { ttsAdvanceChapter(); return; }
+  try { speechSynthesis.cancel(); } catch(e){}
+  _tts.queuedTo = _tts.idx;
+  ttsFillQueue();
+  updateTtsUI();
+}
+
+// 足りない分だけ積む。cancel しない。queuedTo で上限が閉じているので多重呼び出しは無害
+function ttsFillQueue() {
+  if (!_tts.active || _tts.paused || _ttsAdvancing) return;
   var voice = ttsResolveVoice();
-  var u = new SpeechSynthesisUtterance(_tts.chunks[_tts.idx]);
+  var rate  = Math.max(0.5, Math.min(2, state.ttsRate || 1));
+  var limit = Math.min(_tts.chunks.length, _tts.idx + TTS_LOOKAHEAD);
+  while (_tts.queuedTo < limit) {
+    var u = _ttsMakeUtterance(_tts.queuedTo, voice, rate);
+    _tts.queuedTo++;
+    try { speechSynthesis.speak(u); } catch(e){}
+  }
+}
+
+// i をクロージャに閉じ込めるため関数に切り出す（ループ変数を共有させない）
+function _ttsMakeUtterance(i, voice, rate) {
+  var u = new SpeechSynthesisUtterance(_tts.chunks[i]);
   if (voice) u.voice = voice;
   u.lang = state.bookLang || 'ja';
-  u.rate = Math.max(0.5, Math.min(2, state.ttsRate || 1));
+  u.rate = rate;
+  // 現在地の確定としおり保存は onstart だけで行う。onend で idx を進めると先読みした分
+  // しおりが先へ飛び、逆に onend で savePos すると 1 つ後ろへずれる。
+  u.onstart = function(){
+    if (!_tts.active || _tts.paused) return;
+    _tts.idx = i;
+    savePos(_tts.chunks.length ? i / _tts.chunks.length : 0);
+    updateTtsUI();
+    ttsFillQueue();   // ⚠ onend との発火順が保証されないので両方から補充する（§B-1）
+  };
   u.onend = function(){
     if (!_tts.active || _tts.paused) return;
-    savePos(_tts.chunks.length ? _tts.idx / _tts.chunks.length : 0);
-    _tts.idx++;
-    ttsSpeakNext();
+    // onstart が発火しないエンジン向けの保険。これが無いと idx が進まずキューが枯れる
+    if (_tts.idx < i + 1 && i + 1 < _tts.chunks.length) _tts.idx = i + 1;
+    if (i >= _tts.chunks.length - 1) { ttsAdvanceChapter(); return; }
+    ttsFillQueue();
   };
   u.onerror = function(ev){
     if (ev.error === 'interrupted' || ev.error === 'canceled') return;  // 自分の cancel 由来は無視
     ttsStop(); showToast(t('tts.noVoice'));
   };
-  try { speechSynthesis.cancel(); } catch(e){}   // 前の残りを消してから
-  speechSynthesis.speak(u);
-  updateTtsUI();
+  return u;
 }
 
 function ttsPause() {
   if (!_tts.active || _tts.paused) return;
   _tts.paused = true;
   try { speechSynthesis.cancel(); } catch(e){}
+  _tts.queuedTo = _tts.idx;
+  _ttsKeepAliveStop();
   ttsReleaseWakeLock();
+  ttsSyncMediaSession();
   updateTtsUI();
 }
 function ttsResume() {
   if (!_tts.active || !_tts.paused) return;
   _tts.paused = false;
+  _ttsKeepAliveStart();   // 通常はバー／ロック画面のボタン＝ジェスチャ内なので再生できる
   ttsRequestWakeLock();
+  ttsSyncMediaSession();
   updateTtsUI();
-  ttsSpeakNext();   // 現チャンク頭から
+  ttsRestartQueue();   // 現チャンク頭から
 }
 
 function ttsStop() {
@@ -6107,42 +6284,60 @@ function ttsStop() {
   var was = _tts.active;
   _tts.active = false; _tts.paused = false;
   try { speechSynthesis.cancel(); } catch(e){}
+  _ttsKeepAliveStop();
   ttsReleaseWakeLock();
   document.body.classList.remove('tts-active');
   if (was) { try { savePos(_tts.chunks.length ? _tts.idx / _tts.chunks.length : _intraChapterRatio); } catch(e){} }
-  _tts.chunks = []; _tts.idx = 0; _tts.spineIdx = -1;
+  _tts.chunks = []; _tts.idx = 0; _tts.queuedTo = 0; _tts.spineIdx = -1;
+  _ttsMsSpine = -1;
+  ttsSyncMediaSession();
   updateTtsUI();
 }
 
+// 一時停止中に前後送りを押したら再生も再開する。キープアライブと Wake Lock は
+// ttsPause() で落としてあるので、ここで掛け直さないと復帰後に背面で止まる
+function _ttsUnpauseForSeek() {
+  if (!_tts.paused) return;
+  _tts.paused = false;
+  _ttsKeepAliveStart();
+  ttsRequestWakeLock();
+  ttsSyncMediaSession();
+}
 function ttsPrevSent() {
   if (!_tts.active) return;
-  _tts.paused = false;
+  _ttsUnpauseForSeek();
   _tts.idx = Math.max(0, _tts.idx - 1);
-  ttsSpeakNext();
+  ttsRestartQueue();
 }
 function ttsNextSent() {
   if (!_tts.active) return;
-  _tts.paused = false;
+  _ttsUnpauseForSeek();
   _tts.idx = Math.min(_tts.chunks.length, _tts.idx + 1);
   if (_tts.idx >= _tts.chunks.length) { ttsAdvanceChapter(); return; }
-  ttsSpeakNext();
+  ttsRestartQueue();
 }
 
 // 章末：次章があれば描画して継続、最終章末尾なら読了扱い
 async function ttsAdvanceChapter() {
-  var next = state.currentSpineIdx + 1;
-  if (next < state.spine.length) {
-    _ttsInternalNav = true;
-    await renderPage(next, 'start');
-    _ttsInternalNav = false;
-    if (!_tts.active) return;   // 途中で停止されたら中断
-    await ttsLoadChapterAndSpeak(next, 0, true);
-  } else {
-    savePos(1.0);
-    _bookFinished = true;
-    ttsStop();
-    showFinishedBanner();
-  }
+  if (_ttsAdvancing) return;   // cancel 由来の onend/onerror が重なっても章送りは 1 回だけ
+  _ttsAdvancing = true;
+  try {
+    var next = state.currentSpineIdx + 1;
+    if (next < state.spine.length) {
+      _ttsInternalNav = true;
+      await renderPage(next, 'start');
+      _ttsInternalNav = false;
+      if (!_tts.active) return;   // 途中で停止されたら中断
+      // ⚠ ここで降ろす — 立てたままだと新章の ttsFillQueue() が自分のフラグで止まる
+      _ttsAdvancing = false;
+      await ttsLoadChapterAndSpeak(next, 0, true);
+    } else {
+      savePos(1.0);
+      _bookFinished = true;
+      ttsStop();
+      showFinishedBanner();
+    }
+  } finally { _ttsAdvancing = false; }
 }
 
 // 手動ナビ（TTS 以外の理由の renderPage）を検知して、新章の頭から読み直す
@@ -6167,13 +6362,15 @@ async function ttsLoadChapterAndSpeak(idx, startIdx, skipToNext) {
   _tts.chunks = ttsSplitChunks(ttsExtractText(html));
   _tts.spineIdx = idx;
   _tts.idx = startIdx || 0;
+  _tts.queuedTo = _tts.idx;
   if (!_tts.chunks.length) {
     if (skipToNext) { state.currentSpineIdx = idx; ttsAdvanceChapter(); }
     else ttsStop();
     return;
   }
+  ttsSyncMediaSession();   // 章が変わったのでメタデータを組み直す
   updateTtsUI();
-  ttsSpeakNext();
+  ttsRestartQueue();
 }
 
 // 絶対値セッター。バーの ＋/－（changeTtsRate）と設定パネルのセレクトの共通経路。
@@ -6184,7 +6381,7 @@ function setTtsRate(v) {
   state.ttsRate = r;
   saveSettings();
   updateTtsUI();
-  if (_tts.active && !_tts.paused) ttsSpeakNext();   // 現チャンクを新速度で再生し直す
+  if (_tts.active && !_tts.paused) ttsRestartQueue();   // 現チャンクを新速度で再生し直す
 }
 function changeTtsRate(delta) {
   setTtsRate(Math.max(0.5, Math.min(2, Math.round(((state.ttsRate || 1) + delta) * 100) / 100)));
@@ -6193,7 +6390,7 @@ function changeTtsRate(delta) {
 function changeTtsVoice(uri) {
   state.ttsVoice = uri || '';
   saveSettings();
-  if (_tts.active && !_tts.paused) ttsSpeakNext();
+  if (_tts.active && !_tts.paused) ttsRestartQueue();
 }
 
 function buildTtsVoiceSelect() {
@@ -6247,15 +6444,21 @@ function ttsInit() {
     return;   // 音声ゼロ環境で「音声：自動」だけの空グループを残さない
   }
   try { speechSynthesis.addEventListener('voiceschanged', buildTtsVoiceSelect); } catch(e){}
-  window.addEventListener('beforeunload', function(){ try { speechSynthesis.cancel(); } catch(e){} });
+  window.addEventListener('beforeunload', function(){
+    try { speechSynthesis.cancel(); } catch(e){}
+    _ttsKeepAliveStop();
+  });
   document.addEventListener('visibilitychange', function(){
     if (document.visibilityState === 'visible' && _tts.active && !_tts.paused) {
       ttsRequestWakeLock();
+      _ttsKeepAliveStart();   // 背面で止められていたら掛け直す
       // 画面ロックで停止していた場合の復帰（best effort）
-      if (!speechSynthesis.speaking && !speechSynthesis.pending) ttsSpeakNext();
+      if (!speechSynthesis.speaking && !speechSynthesis.pending) ttsRestartQueue();
     }
   });
+  _ttsInitMediaSession();
   buildTtsVoiceSelect();
+  updateTtsKeepAliveUI();
   updateTtsUI();
 }
 
