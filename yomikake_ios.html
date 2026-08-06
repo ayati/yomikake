@@ -249,6 +249,9 @@
   .rl-card { display:flex; gap:16px; align-items:stretch; background:var(--ui-bg); border:1px solid var(--ui-border); border-radius:14px; padding:18px 18px; transition:transform .15s, box-shadow .15s; position:relative; overflow:hidden; min-height:96px; }
   .rl-card:hover { transform:translateY(-1px); box-shadow:0 6px 20px var(--shadow); }
   .rl-card.rl-last::before { content:''; position:absolute; left:0; top:0; bottom:0; width:4px; background:var(--accent); border-radius:14px 0 0 14px; }
+  /* キーボード選択リング。.rl-last（左端バー＝前回読んでいた本）とは意味が違うので併存させる。
+     ⚠ .rl-card は overflow:hidden なので box-shadow だとクリップされて見えない。outline を使うこと。 */
+  .rl-card.rl-sel, .rl-card:focus, .rl-card:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
   .rl-thumb { flex-shrink:0; width:54px; height:76px; border-radius:5px; overflow:hidden; background:var(--hover-bg); display:flex; align-items:center; justify-content:center; align-self:flex-start; }
   .rl-thumb img { width:100%; height:100%; object-fit:cover; display:block; }
   .rl-thumb svg { width:28px; height:28px; opacity:.35; stroke:var(--ui-text); }
@@ -365,6 +368,8 @@
 
   #page-container { width:100%; height:100%; display:none; align-items:stretch; justify-content:center; position:relative; }
   #page-container.visible { display:flex; }
+  /* reclaimKeyFocus() が tabindex="-1" を付けて programmatic focus するので枠線を出さない */
+  #page-container:focus { outline:none; }
 
   /* ── FXL (マンガ・雑誌) モード ──
      body.mode-fxl 時は iframe の代わりに #fxl-container を表示し、
@@ -1541,6 +1546,32 @@ const I18N = {
     'guide.menu':           'メニュー表示',
     'guide.tapToClose':     'どこかをタップで閉じる',
     'help.showTapGuide':    '🖐 タップ操作ガイドを表示',
+    'help.keys.title':        'キーボードショートカット',
+    'help.keys.nextPage':     '次のページ',
+    'help.keys.prevPage':     '前のページ',
+    'help.keys.chapter':      '次の章 / 前の章',
+    'help.keys.bookEdge':     '本の先頭 / 末尾',
+    'help.keys.toc':          '目次',
+    'help.keys.search':       '本文を検索',
+    'help.keys.settings':     '表示設定',
+    'help.keys.fontSize':     '文字を大きく / 小さく',
+    'help.keys.fullscreen':   '全画面',
+    'help.keys.readingData':  '読書データ',
+    'help.keys.navHint':      '操作ガイドを表示',
+    'help.keys.openFile':     'ePub を開く',
+    'help.keys.help':         'このヘルプ',
+    'help.keys.closeBook':    '本を閉じてリストへ',
+    'help.keys.tts':          '読み上げ 再生 / 一時停止',
+    'help.keys.ttsStop':      '読み上げ 停止',
+    'help.keys.ttsSent':      '前の文 / 次の文',
+    'help.keys.listTitle':    '読みかけリスト',
+    'help.keys.listMove':     '本を選ぶ',
+    'help.keys.listOpen':     '選んだ本を開く',
+    'help.keys.listFilter':   '絞り込み検索',
+    'help.keys.fxlTitle':     'コマ読みズーム（固定レイアウト本）',
+    'help.keys.fxlZoom':      'ズーム ON / OFF',
+    'help.keys.fxlRegion':    '領域を直接指定',
+    'help.keys.noteFind':     '読書中は Ctrl / Cmd + F がブラウザ検索ではなく本文検索になります。',
     'settings.autoOpenLast': '起動時に前回の本を開く',
     'settings.fwdBtnSize':  '次へボタン',
     'fwdSize.small':        '小',
@@ -1917,6 +1948,32 @@ const I18N = {
     'guide.menu':           'Show controls',
     'guide.tapToClose':     'Tap anywhere to close',
     'help.showTapGuide':    '🖐 Show tap guide',
+    'help.keys.title':        'Keyboard shortcuts',
+    'help.keys.nextPage':     'Next page',
+    'help.keys.prevPage':     'Previous page',
+    'help.keys.chapter':      'Next / previous chapter',
+    'help.keys.bookEdge':     'Start / end of book',
+    'help.keys.toc':          'Table of contents',
+    'help.keys.search':       'Search inside the book',
+    'help.keys.settings':     'Display settings',
+    'help.keys.fontSize':     'Larger / smaller text',
+    'help.keys.fullscreen':   'Fullscreen',
+    'help.keys.readingData':  'Reading stats',
+    'help.keys.navHint':      'Show control guide',
+    'help.keys.openFile':     'Open an ePub',
+    'help.keys.help':         'This help',
+    'help.keys.closeBook':    'Close book, back to list',
+    'help.keys.tts':          'Read aloud: play / pause',
+    'help.keys.ttsStop':      'Read aloud: stop',
+    'help.keys.ttsSent':      'Previous / next sentence',
+    'help.keys.listTitle':    'Reading list',
+    'help.keys.listMove':     'Select a book',
+    'help.keys.listOpen':     'Open the selected book',
+    'help.keys.listFilter':   'Filter',
+    'help.keys.fxlTitle':     'Panel zoom (fixed-layout books)',
+    'help.keys.fxlZoom':      'Zoom on / off',
+    'help.keys.fxlRegion':    'Jump to a region',
+    'help.keys.noteFind':     'While reading, Ctrl / Cmd + F searches the book instead of the browser page.',
     'settings.autoOpenLast': 'Auto-open last book',
     'settings.fwdBtnSize':  'Next button',
     'fwdSize.small':        'Small',
@@ -2293,6 +2350,32 @@ const I18N = {
     'guide.menu':           '顯示控制項',
     'guide.tapToClose':     '點擊任意處關閉',
     'help.showTapGuide':    '🖐 顯示點擊操作說明',
+    'help.keys.title':        '鍵盤快速鍵',
+    'help.keys.nextPage':     '下一頁',
+    'help.keys.prevPage':     '上一頁',
+    'help.keys.chapter':      '下一章 / 上一章',
+    'help.keys.bookEdge':     '書籍開頭 / 結尾',
+    'help.keys.toc':          '目錄',
+    'help.keys.search':       '搜尋內文',
+    'help.keys.settings':     '顯示設定',
+    'help.keys.fontSize':     '放大 / 縮小文字',
+    'help.keys.fullscreen':   '全螢幕',
+    'help.keys.readingData':  '閱讀數據',
+    'help.keys.navHint':      '顯示操作說明',
+    'help.keys.openFile':     '開啟 ePub',
+    'help.keys.help':         '本說明',
+    'help.keys.closeBook':    '關閉書籍並返回列表',
+    'help.keys.tts':          '朗讀：播放 / 暫停',
+    'help.keys.ttsStop':      '朗讀：停止',
+    'help.keys.ttsSent':      '上一句 / 下一句',
+    'help.keys.listTitle':    '待讀清單',
+    'help.keys.listMove':     '選擇書籍',
+    'help.keys.listOpen':     '開啟所選書籍',
+    'help.keys.listFilter':   '篩選',
+    'help.keys.fxlTitle':     '分格閱讀縮放（固定版面書籍）',
+    'help.keys.fxlZoom':      '縮放開 / 關',
+    'help.keys.fxlRegion':    '直接指定區域',
+    'help.keys.noteFind':     '閱讀時 Ctrl / Cmd + F 會搜尋內文，而非瀏覽器的頁面搜尋。',
     'settings.autoOpenLast': '啟動時開啟上次的書',
     'settings.fwdBtnSize':  '前進按鈕',
     'fwdSize.small':        '小',
@@ -2669,6 +2752,32 @@ const I18N = {
     'guide.menu':           '显示控制项',
     'guide.tapToClose':     '点击任意处关闭',
     'help.showTapGuide':    '🖐 显示点击操作说明',
+    'help.keys.title':        '键盘快捷键',
+    'help.keys.nextPage':     '下一页',
+    'help.keys.prevPage':     '上一页',
+    'help.keys.chapter':      '下一章 / 上一章',
+    'help.keys.bookEdge':     '书籍开头 / 结尾',
+    'help.keys.toc':          '目录',
+    'help.keys.search':       '搜索正文',
+    'help.keys.settings':     '显示设置',
+    'help.keys.fontSize':     '放大 / 缩小文字',
+    'help.keys.fullscreen':   '全屏',
+    'help.keys.readingData':  '阅读数据',
+    'help.keys.navHint':      '显示操作说明',
+    'help.keys.openFile':     '打开 ePub',
+    'help.keys.help':         '本帮助',
+    'help.keys.closeBook':    '关闭书籍并返回列表',
+    'help.keys.tts':          '朗读：播放 / 暂停',
+    'help.keys.ttsStop':      '朗读：停止',
+    'help.keys.ttsSent':      '上一句 / 下一句',
+    'help.keys.listTitle':    '待读列表',
+    'help.keys.listMove':     '选择书籍',
+    'help.keys.listOpen':     '打开所选书籍',
+    'help.keys.listFilter':   '筛选',
+    'help.keys.fxlTitle':     '分格阅读缩放（固定版式书籍）',
+    'help.keys.fxlZoom':      '缩放开 / 关',
+    'help.keys.fxlRegion':    '直接指定区域',
+    'help.keys.noteFind':     '阅读时 Ctrl / Cmd + F 会搜索正文，而非浏览器的页面搜索。',
     'settings.autoOpenLast': '启动时打开上次的书',
     'settings.fwdBtnSize':  '前进按钮',
     'fwdSize.small':        '小',
@@ -3804,6 +3913,12 @@ async function loadEpub(file) {
         localStorage.setItem('epub_tap_guide_v1', '1');
       }
     } catch(e) {}
+    // ⚠ ブラウザ／OS のダイアログが閉じた直後はフォーカスがブラウザ UI 側に残り、
+    //   ページの keydown が一切発火しない（Android Chrome の File System Access
+    //   「このサイトに ○○.epub の表示とコピーを許可しますか？」で実測）。
+    //   本を開き終えた時点で読書領域へフォーカスを引き取る。
+    //   ガイド／メニューが開いているときは、そちらが自前で focus を持つので触らない。
+    reclaimKeyFocusPersistent();
     // G2.1: 本文総文字数をバックグラウンドで算出（reflow・初期描画後に遅延起動して体感を阻害しない）
     // v2.4.0: FXL は総ページ数(spineCount)を total に書き込むため同じ経路で呼ぶ（内部でモード分岐）
     setTimeout(() => { _rdComputeBookChars(); }, 1500);
@@ -4189,6 +4304,29 @@ function buildScrollScript(scrollTarget, writingMode, readySeq) {
     window.parent.postMessage({type:'EPUB_LINK',href:href},'*');
   });`;
 
+  // ── キー転送（EPUB_KEY）──
+  // 本文をクリック／タップするとフォーカスが iframe に移り、親の keydown にキーが届かなくなる
+  // （初期からの既知の制限）。ここで拾って親へ中継する。
+  // ⚠ 転送するのはホワイトリストのキーだけ。全部 preventDefault() すると iframe 内の
+  //   Tab 移動やブラウザ既定（Ctrl+C 等）まで殺してしまう。
+  const KEY_HANDLER = `
+  var _KEYS = "| |arrowup|arrowdown|arrowleft|arrowright|pageup|pagedown|home|end|backspace|escape|f1|f11|n|p|b|j|k|q|t|s|d|o|e|r|f|[|]|/|?|+|=|-|,|.|";
+  document.addEventListener('keydown', function(ev){
+    if(ev.isComposing || ev.keyCode === 229) return;
+    var tg = ev.target;
+    if(tg && (tg.tagName === 'INPUT' || tg.tagName === 'TEXTAREA' || tg.isContentEditable)) return;
+    var k = (ev.key || '').toLowerCase();
+    // Ctrl/Cmd+F だけは修飾キー付きでも中継する（親が読書中に全文検索へ差し替える）
+    var isFind = (k === 'f' && (ev.ctrlKey || ev.metaKey) && !ev.altKey);
+    if(!isFind){
+      if(ev.ctrlKey || ev.metaKey || ev.altKey) return;
+      if(_KEYS.indexOf('|' + k + '|') < 0) return;
+    }
+    ev.preventDefault();
+    window.parent.postMessage({type:'EPUB_KEY', key:ev.key, shiftKey:!!ev.shiftKey,
+      ctrlKey:!!ev.ctrlKey, metaKey:!!ev.metaKey, altKey:!!ev.altKey, repeat:!!ev.repeat}, '*');
+  }, true);`;
+
   const INIT_FN = `
   function fixTcy(){
     // WebKit/Chrome は縦書き初回レイアウトで text-combine-upright(縦中横)を左寄せに誤配置する。
@@ -4314,7 +4452,7 @@ function buildScrollScript(scrollTarget, writingMode, readySeq) {
     var dy = e.changedTouches[0].clientY - touchStartY;
     if(Math.abs(dy) > 50) doScroll(dy < 0 ? 1 : -1);
   }, {passive:true});
-${CLICK_HANDLER}
+${CLICK_HANDLER}${KEY_HANDLER}
 ${INIT_FN}
 })();`;
   }
@@ -4474,7 +4612,7 @@ ${INIT_FN}
       if(Math.abs(dy) > 50) doScroll(dy < 0 ? 1 : -1);
     }
   }, {passive:true});
-${CLICK_HANDLER}
+${CLICK_HANDLER}${KEY_HANDLER}
 ${INIT_FN}
 })();`;
   }
@@ -4561,7 +4699,7 @@ ${INIT_FN}
     var dx = e.changedTouches[0].clientX - touchStartX;
     if(Math.abs(dx) > 50) doScroll(dx < 0 ? 1 : -1);
   }, {passive:true});
-${CLICK_HANDLER}
+${CLICK_HANDLER}${KEY_HANDLER}
 ${INIT_FN}
 })();`;
 }
@@ -4581,6 +4719,9 @@ let _editMode          = false;    // 読みかけリスト編集モード
 const _RL_SORTS        = ['recent', 'title', 'author', 'progressHigh', 'progressLow', 'timeLeft'];
 let _rlPrefs           = _rlLoadPrefs(); // 読みかけリスト表示設定 {view, sort, filterReady, showFinished}
 let _rlQuery           = '';       // 読みかけリスト検索文字列（非永続・セッション内のみ）
+// キーボード選択中カードの bookKey（非永続）。⚠ DOM 要素ではなく必ず bookKey で持つこと —
+// _rlRender() は検索 1 文字ごとに innerHTML を作り直すので、要素参照は即座に迷子になる。
+let _rlSelKey          = '';
 const _RD_DEFAULTS     = { authorScope: 'finished', authorLimit: 8, paceUnit: 'week', calWeeks: 53 };
 let _rdPrefs           = _rdLoadPrefs(); // 読書データ表示設定（非同期・端末ローカル）
 const _RD_IDLE_THRESHOLD = 180000; // 180秒（3分）以上の無活動は放置とみなし読書時間に加算しない（G2）
@@ -5593,7 +5734,46 @@ window.addEventListener('message', e => {
   if (e.data.type === 'EPUB_TAP') {
     runTapAction(tapZoneAction(e.data.xr, e.data.yr));
   }
+  if (e.data.type === 'EPUB_KEY') {
+    // 本文クリックで iframe に移ったフォーカスを親へ引き取る。
+    // これ以降のキーは転送を経ずに直接 handleKey へ届くので、
+    // ユーザージェスチャが要る操作（全画面 API・読み上げ開始）も通るようになる。
+    reclaimKeyFocus();
+    handleKey({
+      key: e.data.key, shiftKey: !!e.data.shiftKey, ctrlKey: !!e.data.ctrlKey,
+      metaKey: !!e.data.metaKey, altKey: !!e.data.altKey, repeat: !!e.data.repeat,
+      preventDefault() {},
+    });
+  }
 });
+
+// iframe に奪われたフォーカスを読書領域（親）へ戻す。
+// #page-container は tabindex を持たないので付けてから focus する（showTapMenu と同じ手）。
+function reclaimKeyFocus() {
+  const pc = document.getElementById('page-container');
+  if (!pc) return;
+  // ブラウザ UI 側（アドレスバー・権限プロンプト）にフォーカスが残っているときは
+  // 要素 focus だけでは戻らないことがある。window.focus() は多くの環境で no-op だが無害。
+  try { window.focus(); } catch(e) {}
+  pc.setAttribute('tabindex', '-1');
+  try { pc.focus({ preventScroll: true }); } catch(e) { pc.focus(); }
+}
+
+// ダイアログ明けのフォーカス回復。document.hasFocus() を見ながら短時間だけ粘る。
+// ⚠ ユーザーが自分で何かを触ったら即やめる（触ったものからフォーカスを奪わない）。
+function reclaimKeyFocusPersistent() {
+  let n = 0;
+  const tick = () => {
+    if (_tapGuideOpen || _tapMenuOpen) return;   // ガイド／メニューは自前で focus を持つ
+    const ae = document.activeElement;
+    const mine = ae && ae.id === 'page-container';
+    if (ae && ae !== document.body && !mine) return;              // ユーザーが何かを触った
+    if (mine && (!document.hasFocus || document.hasFocus())) return;  // 回復済み
+    reclaimKeyFocus();
+    if (++n < 8) setTimeout(tick, 250);
+  };
+  tick();
+}
 
 const CENTER_TAP_RATIO = 0.2;  // 中央 ±20%（中央 40%×40% の矩形）= メニュー（全パターン共通）
 const TAP_EDGE_RATIO   = 0.3;  // 端帯 30%。境界 0.3/0.7 で中央矩形とちょうどタイルする
@@ -5848,45 +6028,168 @@ function updatePageInfo() {
 // ══════════════════════════════════════════
 //  Keyboard（Bluetooth キーボード対応）
 // ══════════════════════════════════════════
+// 長押しリピートを許すキー（ページ送り・章送り・文字サイズ）。
+// これ以外は e.repeat で弾く — 長押しでサイドバーが高速トグルして点滅する事故を防ぐ。
+const _KEY_REPEATABLE = new Set([
+  ' ', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'pageup', 'pagedown',
+  'backspace', 'n', 'p', 'b', 'j', 'k', '[', ']', '+', '=', '-',
+]);
+
+// 物理キーボードを一度でも観測したか。ヘルプのショートカット一覧を出すかの判定に使う
+// （セッション内で十分なので localStorage には持たない）。
+let _kbSeen = false;
+
 document.addEventListener('keydown', e => {
-  if (e.target.tagName === 'SELECT' || e.target.tagName === 'INPUT') return;
+  _kbSeen = true;
+  const tg = e.target;
+  if (tg && (tg.tagName === 'SELECT' || tg.tagName === 'INPUT' ||
+             tg.tagName === 'TEXTAREA' || tg.isContentEditable)) return;
+  handleKey(e);
+});
+
+// キー処理の本体。document の keydown と、iframe から中継された EPUB_KEY の両方から呼ばれる。
+// 引数は { key, shiftKey, ctrlKey, metaKey, altKey, repeat, preventDefault() } を持つオブジェクト
+// という緩い契約（e.target は転送元で判定済みなので参照しない）。
+function handleKey(e) {
+  // IME 変換中は一切触らない（Space=確定・矢印=候補選択を奪わない）。
+  // keyCode 229 は isComposing が立たない古い WebKit 向けの保険。
+  if (e.isComposing || e.keyCode === 229) return;
+
+  const raw  = e.key || '';
+  const k    = raw.toLowerCase();
+  const mod  = e.ctrlKey || e.metaKey;
+  const fxl  = state.renderMode === 'fxl';
+
   // 読書データ画面が開いている間はショートカットを止め、Escape で閉じる
   if (document.getElementById('reading-data-overlay').classList.contains('show')) {
-    if (e.key === 'Escape') { closeReadingData(); e.preventDefault(); }
+    if (raw === 'Escape') { closeReadingData(); e.preventDefault(); }
+    return;
+  }
+  // モーダル（ヘルプ／受け渡し／削除確認）表示中は Escape で閉じるだけ。
+  // 裏のページ送りも止める（読書データ画面と同じ扱い）。
+  // ⚠ preventDefault せずに return するので、Tab によるフォーカス移動と
+  //    ボタン上の Enter はブラウザ既定のまま生きている。
+  // ⚠ 削除確認ダイアログに既定フォーカスは与えないこと — Enter 連打で
+  //    完全削除（墓標記録つき）が走る。Escape で閉じられれば十分。
+  const _modalEl = document.getElementById('modal-overlay');
+  if (_modalEl && _modalEl.classList.contains('show')) {
+    if (raw === 'Escape') { closeModal(); e.preventDefault(); }
     return;
   }
   // タップ操作ガイド表示中は全ショートカットを止め、任意キーで閉じる。
   // Escape 優先度チェーンや FXL ズームの Escape 分岐に触れず、裏のページ送りも防ぐ。
   if (_tapGuideOpen) { hideTapGuide(); e.preventDefault(); return; }
   if (_tapMenuOpen)  { hideTapMenu();  e.preventDefault(); return; }
-  switch(e.key) {
+
+  // Ctrl/Cmd+F は読書中だけ奪ってアプリの全文検索を開く。
+  // ブラウザ検索は iframe 内の「現在の章」しか当たらないのに対し、
+  // アプリ側は spine 全体を舐めるので明確に上位互換。
+  // 本を開いていないとき（読みかけリスト）は奪わずブラウザに渡す。
+  if (k === 'f' && mod && !e.altKey) {
+    if (state.epub) { openSearchPane(); e.preventDefault(); }
+    return;
+  }
+  // それ以外の修飾キー付きはアプリのショートカットを発火させない。
+  // これが無いと Ctrl+F が全画面トグルに、Ctrl+Z が FXL ズームに化ける。
+  if (mod || e.altKey) return;
+
+  if (e.repeat && !_KEY_REPEATABLE.has(k)) return;
+
+  // 本を開いていない＝読みかけリスト（読書中とは別の割り当て）
+  if (!state.epub) { handleListKey(e, raw, k); return; }
+
+  switch (k) {
+    // ── ページ送り ─────────────────────────
     case ' ':
       e.shiftKey ? scrollPage(-1) : scrollPage(1);
       e.preventDefault(); break;
-    case 'ArrowDown': case 'PageDown':
+    case 'arrowdown': case 'pagedown':
+    case 'n': case 'j':
       scrollPage(1); e.preventDefault(); break;
-    case 'ArrowUp': case 'PageUp':
+    case 'arrowup': case 'pageup':
+    case 'p': case 'b': case 'k': case 'backspace':
+      // Backspace は preventDefault しないと古いブラウザで履歴 back に化ける
       scrollPage(-1); e.preventDefault(); break;
-    case 'ArrowLeft':
-      if (state.renderMode !== 'fxl') { nextChapter(); e.preventDefault(); }
+
+    // ── 章送り ─────────────────────────────
+    // 矢印は書字方向に連動（縦書きは左が進み側）。タップ帯と同じ isVerticalAxis() 判定なので、
+    // 両者が同時に正しい／同時に間違うことが保証され、ユーザーから見た一貫性は崩れない。
+    case 'arrowleft':
+      if (!fxl) { isVerticalAxis() ? nextChapter() : prevChapter(); e.preventDefault(); }
       break;
-    case 'ArrowRight':
-      if (state.renderMode !== 'fxl') { prevChapter(); e.preventDefault(); }
+    case 'arrowright':
+      if (!fxl) { isVerticalAxis() ? prevChapter() : nextChapter(); e.preventDefault(); }
       break;
-    case 'Home':
-      renderPage(0, 'start'); e.preventDefault(); break;
-    case 'End':
-      if (state.renderMode === 'fxl') {
-        renderFxlPair(state.spine.length - 1);
-      } else {
-        renderPage(state.spine.length-1, 'end');
-      }
+    // 方向非依存の絶対指定（矢印の向きに迷わない逃げ道）
+    case ']':
+      if (!fxl) { nextChapter(); e.preventDefault(); }
+      break;
+    case '[':
+      if (!fxl) { prevChapter(); e.preventDefault(); }
+      break;
+
+    // ── 本の先頭／末尾 ─────────────────────
+    case 'home':
+      fxl ? renderFxlPair(0) : renderPage(0, 'start');
       e.preventDefault(); break;
-    case 'f':
+    case 'end':
+      fxl ? renderFxlPair(state.spine.length - 1) : renderPage(state.spine.length - 1, 'end');
+      e.preventDefault(); break;
+
+    // ── パネル・画面 ───────────────────────
+    case 't':
+      // 閉じている→目次で開く / 検索タブ表示中→目次へ / 目次表示中→閉じる
+      if (!state.sidebarOpen) { switchSidebarTab('toc'); toggleSidebar(); }
+      else if (_sidebarTab !== 'toc') switchSidebarTab('toc');
+      else toggleSidebar();
+      e.preventDefault(); break;
+    case '/':
+      // Firefox のクイック検索を潰すのは意図どおり
+      openSearchPane(); e.preventDefault(); break;
+    case 's':
+      toggleSettings(); e.preventDefault(); break;
+    case '?':
+      showHelp(); e.preventDefault(); break;
+    case 'f1':
+      showHelp(); e.preventDefault(); break;
+    case 'd':
+      openReadingData(); e.preventDefault(); break;
+    case 'o':
+      openFilePicker(); e.preventDefault(); break;
+    case 'e':
+      showNavHint(); e.preventDefault(); break;
+    case 'f': case 'f11':
       toggleFullscreen(); e.preventDefault(); break;
-    case 'Escape':
-      // 優先度: フォントピッカー > 設定 > サイドバー > フルスクリーン（1打で1つだけ閉じる）
-      // （読書データは冒頭の先行ガードで処理済み。iOS は FXL キーボードショートカット未実装）
+    case 'q':
+      closeBook(); e.preventDefault(); break;
+
+    // ── 文字サイズ ─────────────────────────
+    // '=' も拾うのは US 配列で '+' が Shift+= のため。JIS の Shift+; は e.key が '+'。
+    // FXL は画像なので state.fontSize が効かない → 無反応（押しても何も起きないキーは
+    // 「壊れている」と読まれるので、トーストも出さず静かに無視する）。
+    case '+': case '=':
+      if (!fxl) { changeFontSize(1); e.preventDefault(); }
+      break;
+    case '-':
+      if (!fxl) { changeFontSize(-1); e.preventDefault(); }
+      break;
+
+    // ── 読み上げ ───────────────────────────
+    case 'r':
+      if (!_ttsSupported || fxl) break;
+      e.shiftKey ? ttsStop() : ttsPlay();   // ttsPlay() 自身が 再生↔一時停止 のトグル
+      e.preventDefault(); break;
+    // ⚠ ',' '.' は再生中だけ握る。非アクティブ時に握ると将来 ',' を別用途へ回せなくなる。
+    case ',':
+      if (_tts.active) { ttsPrevSent(); e.preventDefault(); }
+      break;
+    case '.':
+      if (_tts.active) { ttsNextSent(); e.preventDefault(); }
+      break;
+
+    case 'escape':
+      // 優先度: フォントピッカー > 設定 > サイドバー > 全画面 > 本を閉じる（1打で1つだけ閉じる）
+      // （読書データ／モーダルは冒頭の先行ガードで処理済み。iOS は FXL キーボードショートカット未実装）
       if (document.getElementById('font-picker-list').classList.contains('open')) {
         closeFontPicker(); e.preventDefault(); break;
       }
@@ -5894,10 +6197,21 @@ document.addEventListener('keydown', e => {
         toggleSettings(); e.preventDefault(); break;
       }
       if (state.sidebarOpen) { toggleSidebar(); e.preventDefault(); break; }
-      if (state.fullscreen) { toggleFullscreen(); e.preventDefault(); }
-      break;
+      if (state.fullscreen) { toggleFullscreen(); e.preventDefault(); break; }
+      // 何も開いていない読書画面での Escape ＝ 本を閉じる（チェーン最後尾）
+      closeBook(); e.preventDefault(); break;
   }
-});
+}
+
+// 全文検索ペインを開いて検索欄にフォーカスを移す。
+// ⚠ フォーカス移動が要点 — 移さないと '/' の直後に打った文字が本文ページ送りに化ける。
+function openSearchPane() {
+  if (!state.epub) return;
+  switchSidebarTab('search');            // 先にタブを立てる（toggleSidebar が focus を拾えるように）
+  if (!state.sidebarOpen) toggleSidebar();
+  const inp = document.getElementById('search-input');
+  if (inp) setTimeout(() => { inp.focus(); inp.select(); }, 60);
+}
 
 // ══════════════════════════════════════════
 //  Settings
@@ -7613,10 +7927,12 @@ function _rlRender(shown, total) {
     const chapterStr = t('readingList.chapter', {n: item.spineIdx + 1, total: item.spineCount});
     // ツールチップ（タイトル全文＋著者＋章数）。&#10; は属性値内の改行
     const tip = esc(item.title) + (item.creator ? '&#10;' + esc(item.creator) : '') + '&#10;' + esc(chapterStr);
-    // グリッド時のみカード全体をボタン化（リスト時は Tab 順を汚さない）
-    const gridAttrs = isGrid
-      ? ` role="button" tabindex="0" onclick="rlCardActivate(this)" onkeydown="if(event.key==='Enter')rlCardActivate(this)"`
-      : '';
+    // キーボード選択（ローミング tabindex）は両ビュー共通。tabindex は _rlSyncSelection() が
+    // 割り当て直すので、ここでは全カードを -1 で出す（Tab 順を汚さない）。
+    // Enter での起動は handleListKey() に一本化してある（inline onkeydown を置くと二重発火する）。
+    // クリックでカード全体を開くのはグリッドのみ（リストは「開く」ボタンの担当）。
+    const gridAttrs = ` role="button" tabindex="-1"` +
+      (isGrid ? ` onclick="rlCardActivate(this)"` : '');
     const thumbHtml = item.cover
       ? `<img src="${esc(item.cover)}" width="48" height="68" alt="" loading="lazy">`
       : BOOK_ICON;
@@ -7661,6 +7977,9 @@ function _rlRender(shown, total) {
   </div>
 </div>`;
   }).join('');
+  // 再レンダー後も選択を維持する（キーは bookKey なので innerHTML 差し替えに耐える）。
+  // ⚠ focus は載せない — 検索欄に入力中にフォーカスを奪うと IME が飛ぶ。
+  _rlSyncSelection(false);
 }
 
 // ── ツール行 UI の状態同期（ラベル・✓・active）──
@@ -7751,8 +8070,136 @@ function toggleRlSortMenu(ev) {
 }
 
 function rlCardActivate(el) {
+  // クリック経路（グリッドのみ）。リストはカード内の「開く」ボタンが担当する。
   if (_rlPrefs.view !== 'grid' || _editMode) return;
+  rlCardOpen(el);
+}
+
+// キーボード起動（Enter / q）。ビューに依らず開く。
+function rlCardOpen(el) {
+  if (!el || _editMode) return;
   openFilePickerForBook(el.dataset.key);
+}
+
+// ══════════════════════════════════════════
+//  読みかけリストのキーボード選択（ローミング tabindex）
+// ══════════════════════════════════════════
+function _rlCards() {
+  return [...document.querySelectorAll('#reading-list-items .rl-card')];
+}
+
+// 選択中カードにちょうど 1 つだけ tabindex="0" を割り当て、可視のリングを付ける。
+// focus=true のときだけフォーカスを載せる。
+// ⚠ 再レンダー（_rlRender 末尾）からは focus=false で呼ぶこと — 検索欄に入力中に
+//   フォーカスを奪うと IME が飛ぶ。
+function _rlSyncSelection(focus) {
+  const items = _rlCards();
+  if (!items.length) { _rlSelKey = ''; return; }
+  // 選択中の本が絞り込みで消えていたら 前回読んでいた本 → 先頭 の順にフォールバック
+  let el = items.find(c => c.dataset.key === _rlSelKey)
+        || items.find(c => c.classList.contains('rl-last'))
+        || items[0];
+  _rlSelKey = el.dataset.key;
+  items.forEach(c => {
+    const on = (c === el);
+    c.tabIndex = on ? 0 : -1;
+    c.classList.toggle('rl-sel', on);
+  });
+  if (focus) {
+    try { el.focus({ preventScroll: false }); } catch(e) { el.focus(); }
+  }
+}
+
+function _rlMoveSel(delta) {
+  const items = _rlCards();
+  if (!items.length) return;
+  const i = items.findIndex(c => c.dataset.key === _rlSelKey);
+  if (i < 0) {
+    _rlSelKey = items[delta > 0 ? 0 : items.length - 1].dataset.key;
+    _rlSyncSelection(true);
+    return;
+  }
+  const ni = i + delta;
+  // 先頭で ↑ → 絞り込み検索欄へ戻す。これが無いと「検索して絞り込んだ後、
+  // キーボードだけで検索条件を直せない」行き止まりになる。
+  if (ni < 0) {
+    const s = document.getElementById('rl-search');
+    if (s && s.offsetParent !== null) { s.focus(); s.select(); return; }
+  }
+  const n = Math.max(0, Math.min(items.length - 1, ni));
+  _rlSelKey = items[n].dataset.key;
+  _rlSyncSelection(true);
+}
+
+function _rlSelEdge(last) {
+  const items = _rlCards();
+  if (!items.length) return;
+  _rlSelKey = items[last ? items.length - 1 : 0].dataset.key;
+  _rlSyncSelection(true);
+}
+
+function _rlOpenSel() {
+  const items = _rlCards();
+  const el = items.find(c => c.dataset.key === _rlSelKey);
+  if (el) rlCardOpen(el);
+}
+
+// 読みかけリスト（本を開いていないとき）のキー割り当て。handleKey() から呼ばれる。
+function handleListKey(e, raw, k) {
+  switch (k) {
+    // グリッドでも ↑↓←→ はすべて「1 つ前／次の本」。列数が auto-fill で可変なので
+    // 行移動にすると画面幅次第で挙動が変わる。
+    case 'arrowdown': case 'arrowright': case 'n': case 'j':
+      _rlMoveSel(1); e.preventDefault(); break;
+    case 'arrowup': case 'arrowleft': case 'p': case 'b': case 'k':
+      _rlMoveSel(-1); e.preventDefault(); break;
+    case 'home':
+      _rlSelEdge(false); e.preventDefault(); break;
+    case 'end':
+      _rlSelEdge(true); e.preventDefault(); break;
+
+    case 'enter':
+      // ⚠ カードにフォーカスがあるときだけ握る。ボタン上の Enter まで奪うと
+      //    ブラウザ既定の活性化と二重に走る。
+      if (document.activeElement && document.activeElement.classList &&
+          document.activeElement.classList.contains('rl-card')) {
+        _rlOpenSel(); e.preventDefault();
+      }
+      break;
+    // 読書中の q（リストへ戻る）と対になる。q で戻って q で同じ本に帰れる。
+    case 'q':
+      _rlOpenSel(); e.preventDefault(); break;
+
+    case '/': {
+      const s = document.getElementById('rl-search');
+      if (s && s.offsetParent !== null) { s.focus(); s.select(); e.preventDefault(); }
+      break;
+    }
+    case 'o':
+      openFilePicker(); e.preventDefault(); break;
+    case 'd':
+      openReadingData(); e.preventDefault(); break;
+    case 's':
+      toggleSettings(); e.preventDefault(); break;
+    case '?': case 'f1':
+      showHelp(); e.preventDefault(); break;
+
+    case 'escape':
+      // 優先度: フォントピッカー > 設定 > 編集モード解除 > 絞り込み解除（1打で1つだけ）
+      if (document.getElementById('font-picker-list').classList.contains('open')) {
+        closeFontPicker(); e.preventDefault(); break;
+      }
+      if (document.getElementById('settings-popover').classList.contains('show')) {
+        toggleSettings(); e.preventDefault(); break;
+      }
+      if (_editMode) { toggleEditMode(); e.preventDefault(); break; }
+      // 条件は clearRlFilters() が実際に消すものだけに合わせる（filterHasMore は対象外）。
+      // 揃えないと「Escape を押したのに何も起きない」ように見える。
+      if (_rlQuery || _rlPrefs.filterReady || _rlPrefs.genre) {
+        clearRlFilters(); e.preventDefault();
+      }
+      break;
+  }
 }
 
 function clearRlFilters() {
@@ -8358,6 +8805,8 @@ function closeBook() {
   hideTapGuide();
   ttsStop();
   if (!state.epub) return;
+  // ⚠ state.bookKey は下でクリアされるので、キーボード選択用にここで退避しておく
+  const closedKey = state.bookKey;
   finalizeCurrentBook();
   _rdFlush(); _rdResetMeasure(); // G2: 計測を確定フラッシュして停止
   dismissFinishedBanner();
@@ -8407,6 +8856,14 @@ function closeBook() {
   wel.style.display = '';
   wel.classList.remove('has-list');
   buildReadingList();
+  // いま閉じた本のカードへフォーカスを載せる。
+  // ⚠ これが無いと「リストへ」ボタン（#open-btn）がフォーカスを保持したままになり、
+  //    Enter を押すと OS のファイルピッカーが開く（最も避けたい誤爆）。
+  // ⚠ フォーカスを動かすのは closeBook 経由のときだけ。buildReadingList() 側に置くと
+  //    起動直後の描画でも勝手にスクロールが飛ぶ。
+  if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+  _rlSelKey = closedKey;
+  _rlSyncSelection(true);
 }
 
 function showFinishedBanner() {
@@ -10519,6 +10976,50 @@ function _helpSourceHtml() {
   }
   return '';
 }
+// ヘルプのキーボードショートカット一覧。
+// 物理キーボードがある環境でだけ出す — タッチ専用端末のヘルプが 2 画面ぶん伸びるのを避ける。
+function _helpKeysHtml() {
+  if (!_kbSeen && !(window.matchMedia && matchMedia('(hover:hover)').matches)) return '';
+  const row = (keys, label) =>
+    '<tr><td style="white-space:nowrap;padding:3px 14px 3px 0;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;opacity:.85;">'
+    + esc(keys) + '</td><td style="padding:3px 0;">' + esc(label) + '</td></tr>';
+  const head = (label) =>
+    '<p style="font-size:12px;font-weight:600;opacity:.6;margin:14px 0 4px;">' + esc(label) + '</p>';
+  const table = (rows) =>
+    '<table style="border-collapse:collapse;font-size:13px;line-height:1.7;">' + rows.join('') + '</table>';
+
+  let out = head(t('help.keys.title')) + table([
+    row('Space / N / J / ↓ / PageDown', t('help.keys.nextPage')),
+    row('Shift+Space / P / B / K / ↑ / Backspace', t('help.keys.prevPage')),
+    row('← →  /  [ ]', t('help.keys.chapter')),
+    row('Home / End', t('help.keys.bookEdge')),
+    row('T', t('help.keys.toc')),
+    row('/  ·  Ctrl+F', t('help.keys.search')),
+    row('S', t('help.keys.settings')),
+    row('+ / -', t('help.keys.fontSize')),
+    row('F / F11', t('help.keys.fullscreen')),
+    row('D', t('help.keys.readingData')),
+    row('E', t('help.keys.navHint')),
+    row('O', t('help.keys.openFile')),
+    row('? / F1', t('help.keys.help')),
+    row('Q / Esc', t('help.keys.closeBook')),
+  ]);
+  if (_ttsSupported) {
+    out += table([
+      row('R', t('help.keys.tts')),
+      row('Shift+R', t('help.keys.ttsStop')),
+      row(', / .', t('help.keys.ttsSent')),
+    ]);
+  }
+  out += head(t('help.keys.listTitle')) + table([
+    row('↑ ↓ / N / P', t('help.keys.listMove')),
+    row('Enter / Q', t('help.keys.listOpen')),
+    row('/', t('help.keys.listFilter')),
+  ]);
+  out += '<p style="font-size:11px;opacity:.5;margin:10px 0 0;line-height:1.6;">'
+       + esc(t('help.keys.noteFind')) + '</p>';
+  return out;
+}
 function updateHelpContent() {
   document.getElementById('modal-title').textContent = t('modal.title.help');
   const bookInfo = state.epub ? [
@@ -10546,7 +11047,8 @@ function updateHelpContent() {
     '</div>',
   ].join('') : '';
   const verLine = '<p style="font-size:11px;opacity:.45;margin:0 0 14px;letter-spacing:.02em;">yomikake v' + esc(APP_VERSION) + '</p>';
-  document.getElementById('modal-body').innerHTML = verLine + bookInfo + t('help.body');
+  document.getElementById('modal-body').innerHTML =
+    verLine + bookInfo + t('help.body') + _helpKeysHtml();
 }
 function showHelp() {
   updateHelpContent();
@@ -10672,6 +11174,19 @@ document.getElementById('search-input').addEventListener('keydown', e => {
 document.getElementById('rl-search').addEventListener('input', e => {
   clearTimeout(_rlSearchTimer);
   _rlSearchTimer = setTimeout(() => { _rlQuery = e.target.value; buildReadingList(); }, 120);
+});
+// ↓ / Enter で絞り込み結果の先頭カードへ移る（キーボードだけで 検索→選択→開く が完結する）。
+// document の keydown は INPUT を素通しするので、ここで個別に拾う。
+document.getElementById('rl-search').addEventListener('keydown', e => {
+  if (e.key !== 'ArrowDown' && e.key !== 'Enter') return;
+  // 120ms デバウンス待ちの入力を先に確定させる（古い一覧の先頭を掴まないため）
+  clearTimeout(_rlSearchTimer);
+  if (_rlQuery !== e.target.value) { _rlQuery = e.target.value; buildReadingList(); }
+  const first = document.querySelector('#reading-list-items .rl-card');
+  if (!first) return;
+  e.preventDefault();
+  _rlSelKey = first.dataset.key;
+  _rlSyncSelection(true);
 });
 document.addEventListener('click', e => {
   const menu = document.getElementById('rl-sort-menu');

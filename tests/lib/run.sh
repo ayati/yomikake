@@ -22,6 +22,7 @@ declare -A CASE_ENV=(
   [book-prefs]="RAF_SHIM=1 VTB=40000"
   [fxl-zoom-tapguide]="RAF_SHIM=1 VTB=30000"
   [tts-handoff]="RAF_SHIM=1 VTB=40000"
+  [keyboard]="RAF_SHIM=1 VTB=40000"
 )
 declare -A CASE_FLAGS=(
   [e2e-reflow]="--allow-file-access-from-files"
@@ -31,6 +32,7 @@ declare -A CASE_FLAGS=(
   [fxl-zoom-tapguide]="--allow-file-access-from-files"
   # 受け渡しはプレイヤーバーの狭幅レイアウトも見るので Android スマホ相当の実寸で走らせる
   [tts-handoff]="--allow-file-access-from-files --window-size=412,915"
+  [keyboard]="--allow-file-access-from-files"
 )
 
 pass=0; fail=0; failed_lines=()
