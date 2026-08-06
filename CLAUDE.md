@@ -148,7 +148,9 @@ Most features exist in both files. As a rule:
 - **FXL 本は ePub 実体の受け渡しのみ。** 本文テキストを取り出せないので範囲選択を出さず、IDB キャッシュも無ければモーダルごと開かない。ePub 実体は `_idbGet(state.bookKey).buf` から `File` を作って共有する（位置は伝わらないが蔵書ごと移せる。iOS でも有効）。
 - **「しおりを進める」チェックは `range==='chapter'` のときだけ有効**（`_handoffSyncUI()` が他の範囲で disabled にしチェックも外す）。既定 OFF — 渡したが聴かなかった場合に位置が進みすぎるため。
 - 制限事項は**ヘルプ本文ではなくモーダル内の注記**（`handoff.note`）に置いた。使う直前に目に入るほうが伝わり、`help.body` を 4 言語ぶん膨らませずに済む。
-- テストは `tests/cases/tts-handoff.js`（両ファイル各 58 assertion・fixture の実本を開いて生成テキストを検証）。**実機必須**: 共有シートに @Voice が出るか、実際に読めるか、テキスト量の上限。
+- **実機確認済み（2026-08-06）**: **Android + @Voice Aloud Reader は良好**。**iOS は受け側アプリが見つからない**（共有自体は成立するが、共有先に出る Voicepaper は処理中のまま再生が始まらない。クリップボード・text 経由も同様）。→ **当面「Android 向けの機能」として説明する**が、機能は全環境で有効なまま残す。**iOS で使える受け側アプリが後から現れてもコード変更は不要で、直すのは注記の文言だけ** — 「連携先ごとの分岐を書かない」設計判断の効果がそのまま出ている。
+- **BOM は残す（結論・再検討不要）。** 外すと受け側が文字コードを推測することになり、日本語テキストを扱う Android アプリに残る「Shift_JIS を先に試す」実装に当たると全文が文字化けする。付けたままのデメリットは「BOM を剥がさないアプリで先頭に U+FEFF が 1 個残る」だけで、zero-width no-break space なので表示・読み上げとも無視される。**BOM なし版のテストは判断材料が増えないので行わない。**
+- テストは `tests/cases/tts-handoff.js`（両ファイル各 58 assertion・fixture の実本を開いて生成テキストを検証）。
 
 When fixing a bug or adding a feature that is not in the "only" lists above, apply the change to **both files**.
 

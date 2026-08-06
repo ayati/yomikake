@@ -1104,7 +1104,7 @@
         <button class="set-io-btn" onclick="showTtsHandoff()"
                 data-i18n="settings.ttsHandoff">📤 外部の読み上げアプリへ渡す</button>
       </div>
-      <span style="font-size:11px;opacity:.6;line-height:1.5;padding:0 8px;display:block;" data-i18n="settings.ttsHandoffHelp">いま読んでいる位置から本文を書き出して、@Voice Aloud Reader などの読み上げアプリに渡します。Android で他のアプリを使いながら聴きたいときに</span>
+      <span style="font-size:11px;opacity:.6;line-height:1.5;padding:0 8px;display:block;" data-i18n="settings.ttsHandoffHelp">いま読んでいる位置から本文を書き出して、読み上げアプリに渡します。主に Android 向け（@Voice Aloud Reader などで動作確認）。他のアプリを使いながら聴きたいときに</span>
     </details>
     <details class="set-group" id="drive-auto-group">
       <summary><h4 data-i18n="settings.driveGroup">Google Drive</h4></summary>
@@ -1443,7 +1443,7 @@ const I18N = {
     'settings.ttsKeepAliveHelp': '他のアプリや別タブに切り替えても読み上げが続くよう、聞こえない音を鳴らして再生を維持します。他アプリの音楽が止まる場合は OFF に',
     'btn.handoff':                 '外部の読み上げアプリへ渡す',
     'settings.ttsHandoff':         '📤 外部の読み上げアプリへ渡す',
-    'settings.ttsHandoffHelp':     'いま読んでいる位置から本文を書き出して、@Voice Aloud Reader などの読み上げアプリに渡します。Android で他のアプリを使いながら聴きたいときに',
+    'settings.ttsHandoffHelp':     'いま読んでいる位置から本文を書き出して、読み上げアプリに渡します。主に Android 向け（@Voice Aloud Reader などで動作確認）。他のアプリを使いながら聴きたいときに',
     'handoff.title':               '📤 外部の読み上げアプリへ渡す',
     'handoff.current':             '現在地',
     'handoff.range':               '渡す範囲',
@@ -1453,7 +1453,7 @@ const I18N = {
     'handoff.rangeEpub':           'ePub ファイルごと',
     'handoff.advance':             '渡したあと、しおりを次の章の先頭へ進める',
     'handoff.advanceHint':         '「渡す→聴く→戻ってまた渡す」を繰り返せます。聴かなかったときは位置が進みすぎるのでご注意ください',
-    'handoff.note':                '※ どこまで聴いたかは戻ってきません。ずれたら章送りで直してください。読み上げの速度・音声は渡した先のアプリの設定になります。',
+    'handoff.note':                '※ 主に Android 向けの機能です（@Voice Aloud Reader などで動作を確認しています）。iPhone・iPad では受け取って読み上げられるアプリを確認できていません。どこまで聴いたかは戻ってきません — ずれたら章送りで直してください。読み上げの速度・音声は渡した先のアプリの設定になります。',
     'handoff.share':               '共有',
     'handoff.download':            'ダウンロード',
     'handoff.cancel':              'キャンセル',
@@ -1819,7 +1819,7 @@ const I18N = {
     'settings.ttsKeepAliveHelp': 'Plays an inaudible tone so speech keeps going when you switch apps or tabs. Turn off if it interrupts music in other apps.',
     'btn.handoff':                 'Send to a read-aloud app',
     'settings.ttsHandoff':         '📤 Send to a read-aloud app',
-    'settings.ttsHandoffHelp':     'Exports the text from where you are now and hands it to a read-aloud app such as @Voice Aloud Reader. Useful on Android for listening while using other apps.',
+    'settings.ttsHandoffHelp':     'Exports the text from where you are now and hands it to a read-aloud app. Aimed at Android (verified with @Voice Aloud Reader), for listening while using other apps.',
     'handoff.title':               '📤 Send to a read-aloud app',
     'handoff.current':             'Current position',
     'handoff.range':               'What to send',
@@ -1829,7 +1829,7 @@ const I18N = {
     'handoff.rangeEpub':           'The ePub file itself',
     'handoff.advance':             'Move the bookmark to the next chapter afterwards',
     'handoff.advanceHint':         'Lets you repeat send, listen, come back and send again. Note the position moves even if you did not listen.',
-    'handoff.note':                'Note: how far you listened does not come back. Use chapter navigation to correct it. Speed and voice are set in the receiving app.',
+    'handoff.note':                'Note: this is aimed at Android (verified with @Voice Aloud Reader). No suitable receiving app has been confirmed on iPhone or iPad. How far you listened does not come back, so use chapter navigation to correct it. Speed and voice are set in the receiving app.',
     'handoff.share':               'Share',
     'handoff.download':            'Download',
     'handoff.cancel':              'Cancel',
@@ -2195,7 +2195,7 @@ const I18N = {
     'settings.ttsKeepAliveHelp': '播放聽不見的聲音，讓您切換到其他應用程式或分頁時朗讀仍能繼續。若會中斷其他應用程式的音樂請關閉。',
     'btn.handoff':                 '傳送到朗讀應用程式',
     'settings.ttsHandoff':         '📤 傳送到朗讀應用程式',
-    'settings.ttsHandoffHelp':     '從目前閱讀的位置匯出內文，傳送到 @Voice Aloud Reader 等朗讀應用程式。適合在 Android 上一邊使用其他應用程式一邊聆聽。',
+    'settings.ttsHandoffHelp':     '從目前閱讀的位置匯出內文，傳送到朗讀應用程式。主要針對 Android（已在 @Voice Aloud Reader 上確認）。適合一邊使用其他應用程式一邊聆聽。',
     'handoff.title':               '📤 傳送到朗讀應用程式',
     'handoff.current':             '目前位置',
     'handoff.range':               '傳送範圍',
@@ -2205,7 +2205,7 @@ const I18N = {
     'handoff.rangeEpub':           'ePub 檔案本身',
     'handoff.advance':             '傳送後將書籤移到下一章開頭',
     'handoff.advanceHint':         '可以重複「傳送→聆聽→回來再傳送」。若沒有聆聽，位置會前進過多，請留意。',
-    'handoff.note':                '※ 聽到哪裡不會傳回來。若有偏差請用章節導覽調整。朗讀速度與語音由接收的應用程式設定。',
+    'handoff.note':                '※ 本功能主要針對 Android（已在 @Voice Aloud Reader 上確認可用）。iPhone、iPad 尚未確認有可接收並朗讀的應用程式。聽到哪裡不會傳回來，若有偏差請用章節導覽調整。朗讀速度與語音由接收的應用程式設定。',
     'handoff.share':               '分享',
     'handoff.download':            '下載',
     'handoff.cancel':              '取消',
@@ -2571,7 +2571,7 @@ const I18N = {
     'settings.ttsKeepAliveHelp': '播放听不见的声音，让您切换到其他应用或标签页时朗读仍能继续。若会中断其他应用的音乐请关闭。',
     'btn.handoff':                 '发送到朗读应用',
     'settings.ttsHandoff':         '📤 发送到朗读应用',
-    'settings.ttsHandoffHelp':     '从当前阅读的位置导出正文，发送到 @Voice Aloud Reader 等朗读应用。适合在 Android 上一边使用其他应用一边收听。',
+    'settings.ttsHandoffHelp':     '从当前阅读的位置导出正文，发送到朗读应用。主要面向 Android（已在 @Voice Aloud Reader 上确认）。适合一边使用其他应用一边收听。',
     'handoff.title':               '📤 发送到朗读应用',
     'handoff.current':             '当前位置',
     'handoff.range':               '发送范围',
@@ -2581,7 +2581,7 @@ const I18N = {
     'handoff.rangeEpub':           'ePub 文件本身',
     'handoff.advance':             '发送后将书签移到下一章开头',
     'handoff.advanceHint':         '可以重复「发送→收听→返回再发送」。若没有收听，位置会前进过多，请留意。',
-    'handoff.note':                '※ 听到哪里不会传回来。若有偏差请用章节导航调整。朗读速度与语音由接收的应用设置。',
+    'handoff.note':                '※ 本功能主要面向 Android（已在 @Voice Aloud Reader 上确认可用）。iPhone、iPad 尚未确认有可接收并朗读的应用。听到哪里不会传回来，若有偏差请用章节导航调整。朗读速度与语音由接收的应用设置。',
     'handoff.share':               '分享',
     'handoff.download':            '下载',
     'handoff.cancel':              '取消',
