@@ -9618,25 +9618,44 @@ async function extractCoverThumb(opfDoc) {
   const absPath = state.opfDir + href;
   const f = state.epub.file(absPath);
   if (!f) return null;
-  const b64 = await f.async('base64');
   const ext = absPath.split('.').pop().toLowerCase();
-  const mime = ext === 'png' ? 'image/png' : ext === 'gif' ? 'image/gif' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
-  const dataUri = `data:${mime};base64,${b64}`;
+  // media-type を最優先する。拡張子だけの三項演算子判定だった頃は
+  // SVG 表紙が image/jpeg 扱いになり、<img> がデコードできず onerror → 表紙なしになっていた
+  const mime = (coverItem.getAttribute('media-type') || '').trim().toLowerCase() || EXT_MIME[ext] || 'image/jpeg';
+  let dataUri;
+  if (mime === 'image/svg+xml' || ext === 'svg') {
+    // SVG 表紙も <img> に読ませて canvas で JPEG 化し、他形式と同じくしおりに載せる。
+    // width/height 属性を持たない SVG は <img> の既定 300×150 に潰されるので viewBox から補う。
+    let svgText = await f.async('string');
+    if (!/<svg[^>]*\s(?:width|height)\s*=/i.test(svgText)) {
+      const vb = svgText.match(/<svg[^>]*\sviewBox\s*=\s*["']\s*[-\d.]+[,\s]+[-\d.]+[,\s]+([\d.]+)[,\s]+([\d.]+)/i);
+      if (vb) svgText = svgText.replace(/<svg\b/i, `<svg width="${vb[1]}" height="${vb[2]}"`);
+    }
+    // 日本語を含むので btoa ではなく percent-encoding で data URI 化する
+    dataUri = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgText);
+  } else {
+    dataUri = `data:${mime};base64,` + await f.async('base64');
+  }
   return new Promise(resolve => {
     const img = new Image();
     img.onload = () => {
       try {
         // グリッド表示のカード幅（約150〜175px）に合わせた解像度。リスト（48px枠）は縮小表示
         const TW = 160, TH = 224;
-        const ir = img.width / img.height, tr = TW / TH;
+        const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
+        if (!iw || !ih) { resolve(null); return; }
+        const ir = iw / ih, tr = TW / TH;
         let sw, sh, sx, sy;
-        if (ir > tr) { sh = img.height; sw = sh * tr; sx = (img.width - sw) / 2; sy = 0; }
-        else         { sw = img.width; sh = sw / tr; sx = 0; sy = (img.height - sh) / 2; }
+        if (ir > tr) { sh = ih; sw = sh * tr; sx = (iw - sw) / 2; sy = 0; }
+        else         { sw = iw; sh = sw / tr; sx = 0; sy = (ih - sh) / 2; }
         const canvas = document.createElement('canvas');
         canvas.width = TW; canvas.height = TH;
         const ctx = canvas.getContext('2d');
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = 'high';
+        // JPEG にアルファは無い。背景透明の SVG/PNG 表紙が真っ黒にならないよう白で埋める
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, TW, TH);
         ctx.drawImage(img, sx, sy, sw, sh, 0, 0, TW, TH);
         // 適応エンコード: 写真調の表紙で肥大化したら品質を段階的に下げる
         // （上限 約28000文字 ≒ バイナリ21KB。localStorage 圧迫を防ぐ）

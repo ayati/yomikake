@@ -3,7 +3,7 @@
 
   python3 tests/lib/make-fixtures.py
 
-- reflow.epub  : リフロー本（4章・ルビと縦中横を含む）
+- reflow.epub  : リフロー本（4章・ルビと縦中横・SVG 表紙を含む）
 - reflow2.epub : もう1冊のリフロー本（書名・著者違い＝bookKey が別になる）
 - fxl.epub     : 固定レイアウト本（4ページ・rtl・pre-paginated）
 
@@ -32,6 +32,14 @@ def png(w, h, rgb):
             + chunk(b'IEND', b''))
 
 
+# 背景を単色ベタで塗る（サムネイルの隅の画素を見れば、内在サイズ補完が効いて
+# レターボックスされていないことを確かめられる）
+COVER_SVG = ('<?xml version="1.0" encoding="UTF-8"?>\n'
+             '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 1200">'
+             '<rect width="800" height="1200" fill="#1a2b3c"/>'
+             '<text x="400" y="620" font-size="120" fill="#f0e6d2" text-anchor="middle"'
+             ' font-family="serif">表紙</text></svg>')
+
 CONTAINER = ('<?xml version="1.0"?><container version="1.0" '
              'xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles>'
              '<rootfile full-path="OEBPS/content.opf" '
@@ -53,7 +61,12 @@ def build_reflow(path, title='テスト用リフロー', creator='テスト作�
     z = zipfile.ZipFile(path, 'w', zipfile.ZIP_DEFLATED)
     z.writestr('mimetype', 'application/epub+zip')
     z.writestr('META-INF/container.xml', CONTAINER)
+    # SVG 表紙（novel_downloader が出すのと同じ形）。width/height を持たず viewBox だけ
+    # なので、しおり用サムネイル生成側の内在サイズ補完も一緒に検証できる。
+    z.writestr('OEBPS/images/cover.svg', COVER_SVG)
     items, refs, navpoints = [], [], []
+    items.append('<item id="cov" href="images/cover.svg" '
+                 'media-type="image/svg+xml" properties="cover-image"/>')
     for i in range(4):
         # ルビと縦中横を含める（字間・行間・縦中横フィックスの検証に要る）
         body = ''.join('<p><ruby>本文<rt>ほんぶん</rt></ruby>です。縦書きの折り返しを'
