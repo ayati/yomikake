@@ -4620,6 +4620,7 @@ function buildScrollScript(scrollTarget, writingMode, readySeq) {
   var initTarget = ${t};
   var body = document.body;
   var ty = 0;
+  var _ratio = 0;   // 直近の読書位置（0=先頭・1=末尾）。resize で引き直すのに使う
   var posTimer = null;
 
   function vh(){ return window.innerHeight; }
@@ -4636,6 +4637,8 @@ function buildScrollScript(scrollTarget, writingMode, readySeq) {
 
   function setTy(y){
     ty = y;
+    var _ms = maxS();
+    _ratio = _ms > 0 ? Math.max(0, Math.min(1, y / _ms)) : 0;
     body.style.setProperty('transform','translateY(-'+y+'px)','important');
     clearTimeout(posTimer);
     posTimer = setTimeout(reportPos, 500);
@@ -4646,6 +4649,18 @@ function buildScrollScript(scrollTarget, writingMode, readySeq) {
     if(ms <= 0){ postPos(0); return; }
     postPos(Math.max(0, Math.min(1, ty / ms)));
   }
+
+  // ⚠ 位置は viewport 寸法に依存する（ms = 本文の長さ − 表示サイズ）。サイドバーの開閉・
+  //   全画面の切替・回転で寸法が変わると、**同じ tx/ty が別の位置を指す**。読書位置（比率）
+  //   を保ったまま引き直す。iframe 側には元々 resize ハンドラが無く、目次から章へ飛んだあと
+  //   サイドバーを閉じると本文がサイドバー幅ぶんずれていた（初期からの不具合）。
+  var _rzW = 0, _rzH = 0, _rzT = null;
+  function reflowKeepPos(){ _snapOrigin = null; var ms = maxS(); setTy(ms > 0 ? _ratio * ms : 0); }
+  window.addEventListener('resize', function(){
+    if(window.innerWidth === _rzW && window.innerHeight === _rzH) return;
+    _rzW = window.innerWidth; _rzH = window.innerHeight;
+    clearTimeout(_rzT); _rzT = setTimeout(reflowKeepPos, 150);
+  });
 
   function applyInit(){
     var ms = maxS();
@@ -4711,6 +4726,7 @@ ${INIT_FN}
   var body = document.body;
   var _axis = null; // 'h' = vertical-rl (translateX), 'v' = horizontal-tb (translateY)
   var tx = 0, ty = 0;
+  var _ratio = 0;   // 直近の読書位置（0=先頭・1=末尾）。resize で引き直すのに使う
   var posTimer = null;
 
   function vw(){ return window.innerWidth; }
@@ -4750,16 +4766,36 @@ ${INIT_FN}
 
   function setTx(x){
     tx = x;
+    var _msx = Math.max(0, body.offsetWidth - vw());
+    _ratio = _msx > 0 ? Math.max(0, Math.min(1, (x + _msx) / _msx)) : 0;
     body.style.setProperty('transform','translateX('+x+'px)','important');
     clearTimeout(posTimer);
     posTimer = setTimeout(reportPos, 500);
   }
   function setTy(y){
     ty = y;
+    var _msy = Math.max(0, body.offsetHeight - vh());
+    _ratio = _msy > 0 ? Math.max(0, Math.min(1, y / _msy)) : 0;
     body.style.setProperty('transform','translateY(-'+y+'px)','important');
     clearTimeout(posTimer);
     posTimer = setTimeout(reportPos, 500);
   }
+
+  // ⚠ 位置は viewport 寸法に依存する（ms = 本文の長さ − 表示サイズ）。サイドバーの開閉・
+  //   全画面の切替・回転で寸法が変わると、**同じ tx/ty が別の位置を指す**。読書位置（比率）
+  //   を保ったまま引き直す。iframe 側には元々 resize ハンドラが無く、目次から章へ飛んだあと
+  //   サイドバーを閉じると本文がサイドバー幅ぶんずれていた（初期からの不具合）。
+  var _rzW = 0, _rzH = 0, _rzT = null;
+  function reflowKeepPos(){
+    _snapOrigin = null;
+    if(detectAxis() === 'h'){ var mx = Math.max(0, body.offsetWidth - vw()); setTx(mx > 0 ? -(1 - _ratio) * mx : 0); }
+    else { var my = Math.max(0, body.offsetHeight - vh()); setTy(my > 0 ? _ratio * my : 0); }
+  }
+  window.addEventListener('resize', function(){
+    if(window.innerWidth === _rzW && window.innerHeight === _rzH) return;
+    _rzW = window.innerWidth; _rzH = window.innerHeight;
+    clearTimeout(_rzT); _rzT = setTimeout(reflowKeepPos, 150);
+  });
 
   function reportPos(){
     var ax = detectAxis(), ms;
@@ -4865,6 +4901,7 @@ ${INIT_FN}
   var initTarget = ${t};
   var body = document.body;
   var tx = 0;
+  var _ratio = 0;   // 直近の読書位置（0=先頭・1=末尾）。resize で引き直すのに使う
   var posTimer = null;
 
   function vw(){ return window.innerWidth; }
@@ -4881,6 +4918,8 @@ ${INIT_FN}
 
   function setTx(x){
     tx = x;
+    var _ms = maxS();
+    _ratio = _ms > 0 ? Math.max(0, Math.min(1, (x + _ms) / _ms)) : 0;
     body.style.setProperty('transform','translateX('+x+'px)','important');
     clearTimeout(posTimer);
     posTimer = setTimeout(reportPos, 500);
@@ -4892,6 +4931,18 @@ ${INIT_FN}
     // ratio: 0=先頭(tx=-ms), 1=末尾(tx=0)
     postPos(Math.max(0, Math.min(1, (tx + ms) / ms)));
   }
+
+  // ⚠ 位置は viewport 寸法に依存する（ms = 本文の長さ − 表示サイズ）。サイドバーの開閉・
+  //   全画面の切替・回転で寸法が変わると、**同じ tx/ty が別の位置を指す**。読書位置（比率）
+  //   を保ったまま引き直す。iframe 側には元々 resize ハンドラが無く、目次から章へ飛んだあと
+  //   サイドバーを閉じると本文がサイドバー幅ぶんずれていた（初期からの不具合）。
+  var _rzW = 0, _rzH = 0, _rzT = null;
+  function reflowKeepPos(){ _snapOrigin = null; var ms = maxS(); setTx(ms > 0 ? -(1 - _ratio) * ms : 0); }
+  window.addEventListener('resize', function(){
+    if(window.innerWidth === _rzW && window.innerHeight === _rzH) return;
+    _rzW = window.innerWidth; _rzH = window.innerHeight;
+    clearTimeout(_rzT); _rzT = setTimeout(reflowKeepPos, 150);
+  });
 
   function applyInit(){
     var ms = maxS();
