@@ -83,6 +83,7 @@ Most features exist in both files. As a rule:
 - **push は 3 段で守る**: (1) ブロック要素どまりの XPointer しか作らない (2) 送る前に自分の解決器へ流して元の要素に戻ることを検算する (3) 戻らなければ親で組み直し、最後は章頭 `/body/DocFragment[N]/body` に落とす。**指す要素は `_intraChapterRatio` から決める** — iframe の中を直接測ると iOS のスクロール機構ぶんだけ別実装が要る。章の XHTML を読んで**テキストを持ついちばん内側のブロック要素**を**文字数で按分**する。この作りだと `ruby`/`rt`/`span` が候補に入らないので (1) が構造的に保証される。
 - **`percentage` は位置に使わない（実測）。** 同じ本のほぼ同じ位置で Android 0.0695 / PocketBook 0.0569（`doc_pages` 187 vs 281）と**22% ずれる**。KOReader 端末どうしでも一致しない量なので、位置の情報源にも本の同定にもしない。使うのはずれの検算だけ。
 - **pull は両方式を試し、順序は設定した方式が先。** 両方に記録がある場合、もう片方は過去の設定で書かれた古い記録でありうる。**push は設定した方式だけ**に書く（使っていない側に古い記録が残ると、後でそれを拾って位置が後退する）。
+- **自動 push のタイミング**: `EPUB_POS`（スクロール）→ `koScheduleAutoPush()` で **60 秒デバウンス**（`AUTO_SAVE_INTERVAL` を Drive 自動保存と共有）。前回送信から 60 秒経っていれば即時。加えて `finalizeCurrentBook()`（リストへ戻る・別の本へ切り替え）と **タブ非表示・`pagehide`** で `koFlushAutoPush()` が保留分を確定させる。**読み上げ中は予約しない**（TTS は文単位で `savePos` するので、無意識スクロール由来の位置を送るとあちらのしおりが読み上げ位置とずれる）。ガードは `koScheduleAutoPush()` の中に置く —— 呼び出し元が増えても効くように。
 - **鉄則: pull が済むまで自動 push を武装しない**（`_koPullDone`）。先行事例（Readest issue #5625）は XPointer の解決に黙って失敗したあと、5 秒後の自動保存が自分のローカル位置でリモートを上書きして正しい位置を破壊した。**同じ位置を送り直さない**（`_koLastPushed`）のも必須 — KOReader 側の `timestamp` を無意味に更新すると、あちらの正しい位置を「古い」と誤判定させる。
 - **FXL は 1 spine = 1 ページなので最も相性が良い**（章内位置の概念が無く、pull も push も無損失）。KOReader は ePub を FXL でも rolling 扱いするので XPointer が来る（`has_pages` が真になるのは PDF/CBZ/DjVu）。
 - 自動同期の既定は **OFF**（Drive 自動保存と同じ。KOReader 側にも自動/手動があり、両方が勝手に動くと「どちらが位置を書いたか」を追えなくなる）。`file://` では機能ごと非表示。

@@ -9804,6 +9804,9 @@ function koAutoPullOnOpen() {
 // 読書位置が動いたとき。Drive 自動保存と同じ 60 秒デバウンス
 function koScheduleAutoPush() {
   if (!_kosync.autoSync || !koConfigured()) return;
+  // 読み上げ中は送らない。TTS は文単位で savePos するので、無意識スクロール由来の
+  // 位置を KOReader へ流し込むと、あちらのしおりが読み上げ位置とずれる
+  if (_tts.active) return;
   if (!state.bookKey || !_koPullDone.has(state.bookKey)) return;   // 鉄則
   if (_koAutoPushBusy) return;
   clearTimeout(_koAutoPushTimer);
@@ -12466,10 +12469,10 @@ window.addEventListener('popstate', () => {
 
 // G2: 読書時間計測の確定フラッシュ。タブ非表示で即確定し、復帰時に離席時間を加算しないよう計測を一時停止
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden) { _rdFlush(); _rdLastActivityTs = 0; flushAutoSave(); }
+  if (document.hidden) { _rdFlush(); _rdLastActivityTs = 0; flushAutoSave(); koFlushAutoPush(); }
   else driveSyncPull(); // タブ復帰時に Drive の最新しおりを取り込む（自動保存ON時のみ・スロットリングあり）
 });
-window.addEventListener('pagehide', () => { _rdFlush(); flushAutoSave(); });
+window.addEventListener('pagehide', () => { _rdFlush(); flushAutoSave(); koFlushAutoPush(); });
 
 // Toolbar horizontal scroll via mouse wheel
 document.getElementById('toolbar').addEventListener('wheel', e => {

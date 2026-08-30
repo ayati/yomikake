@@ -657,6 +657,23 @@ fetch('tests/.fixtures/reflow.epub')
 })
 .then(function () {
   T('位置が動けば送る', window.__koCalls.length === 1, String(window.__koCalls.length));
+  // 読み上げ中は送らない（しおり保護と同じ理由。TTS は文単位で savePos するので、
+  // 無意識スクロール由来の位置を KOReader へ流し込むと、あちらが読み上げ位置とずれる）
+  // ⚠ 予約は setTimeout なので「fetch が飛んでいない」では検査にならない。
+  //    タイマーが張られたかどうかを見る
+  clearTimeout(_koAutoPushTimer); _koAutoPushTimer = null;
+  _tts.active = true;
+  koScheduleAutoPush();
+  T('読み上げ中は push を予約しない', _koAutoPushTimer === null);
+  _tts.active = false;
+  koScheduleAutoPush();
+  T('読み上げていなければ予約する', _koAutoPushTimer !== null);
+  clearTimeout(_koAutoPushTimer); _koAutoPushTimer = null;
+  // 鉄則の側も同じ見かたで確かめる
+  _koPullDone.delete(state.bookKey);
+  koScheduleAutoPush();
+  T('pull 前は予約もしない', _koAutoPushTimer === null);
+  _koPullDone.add(state.bookKey);
   // 本を開いたときの自動 pull も設定に従う
   _kosync.autoSync = false; window.__koCalls = [];
   koAutoPullOnOpen();
