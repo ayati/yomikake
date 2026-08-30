@@ -1186,8 +1186,9 @@
         <span class="set-label" data-i18n="kosync.deviceName">この端末の名前</span>
         <input class="set-input" id="kosync-device" type="text" autocomplete="off" onchange="koSetDeviceName(this.value)">
       </div>
-      <div class="set-row">
+      <div class="set-row" style="gap:8px;">
         <button class="set-io-btn" id="kosync-pull-btn" onclick="koPullForCurrentBook()" data-i18n="kosync.pull">⬇ KOReader から取得</button>
+        <button class="set-io-btn" id="kosync-push-btn" onclick="koPushForCurrentBook()" data-i18n="kosync.push">⬆ KOReader へ送信</button>
       </div>
       <div class="set-row" style="gap:8px;">
         <button class="set-io-btn" id="kosync-test-btn" onclick="koTestConnection()" data-i18n="kosync.test">接続テスト</button>
@@ -1762,6 +1763,10 @@ const I18N = {
     'btn.fullscreen.exit':       '読書モード終了',
     'settings.driveGroup':       'Google Drive',
     'kosync.pull':            '⬇ KOReader から取得',
+    'kosync.push':            '⬆ KOReader へ送信',
+    'toast.kosyncPushed':     '同期サーバーへ送信しました',
+    'toast.kosyncNoHash':     'この本のハッシュがまだ計算されていません',
+    'toast.kosyncPushFail':   '送信できませんでした（{msg}）',
     'toast.kosyncNoBook':     '本を開いてから実行してください',
     'toast.kosyncNotSetUp':   'KOReader 同期の設定を先に済ませてください',
     'toast.kosyncNoRemote':   'この本の記録は同期サーバーにありません',
@@ -2200,6 +2205,10 @@ const I18N = {
     'btn.fullscreen.exit':       'Exit reader',
     'settings.driveGroup':       'Google Drive',
     'kosync.pull':            '⬇ Get from KOReader',
+    'kosync.push':            '⬆ Send to KOReader',
+    'toast.kosyncPushed':     'Sent to the sync server',
+    'toast.kosyncNoHash':     'This book has no hash yet',
+    'toast.kosyncPushFail':   'Could not send ({msg})',
     'toast.kosyncNoBook':     'Open a book first',
     'toast.kosyncNotSetUp':   'Set up KOReader sync first',
     'toast.kosyncNoRemote':   'No record for this book on the sync server',
@@ -2638,6 +2647,10 @@ const I18N = {
     'btn.fullscreen.exit':       '結束閱讀模式',
     'settings.driveGroup':       'Google Drive',
     'kosync.pull':            '⬇ 從 KOReader 取得',
+    'kosync.push':            '⬆ 傳送到 KOReader',
+    'toast.kosyncPushed':     '已傳送到同步伺服器',
+    'toast.kosyncNoHash':     '這本書尚未計算雜湊值',
+    'toast.kosyncPushFail':   '傳送失敗（{msg}）',
     'toast.kosyncNoBook':     '請先開啟書籍',
     'toast.kosyncNotSetUp':   '請先完成 KOReader 同步設定',
     'toast.kosyncNoRemote':   '同步伺服器上沒有這本書的紀錄',
@@ -3076,6 +3089,10 @@ const I18N = {
     'btn.fullscreen.exit':       '退出阅读模式',
     'settings.driveGroup':       'Google Drive',
     'kosync.pull':            '⬇ 从 KOReader 获取',
+    'kosync.push':            '⬆ 发送到 KOReader',
+    'toast.kosyncPushed':     '已发送到同步服务器',
+    'toast.kosyncNoHash':     '这本书尚未计算哈希值',
+    'toast.kosyncPushFail':   '发送失败（{msg}）',
     'toast.kosyncNoBook':     '请先打开书籍',
     'toast.kosyncNotSetUp':   '请先完成 KOReader 同步设置',
     'toast.kosyncNoRemote':   '同步服务器上没有这本书的记录',
@@ -9583,6 +9600,173 @@ async function koPullForCurrentBook(opts) {
   } catch (e) {
     if (e && e.message === 'auth') showToast(t('toast.kosyncAuthFail'));
     else if (!silent) showToast(_koNetMsg(e));
+    return false;
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+// ══════════════════════════════════════════
+//  KOReader 同期 — 位置の送信（push・design_kosync.md §4-3）
+// ══════════════════════════════════════════
+// 外すと KOReader 側が変な位置へ飛ぶので、pull より慎重に組む。3 段で守る:
+//   (1) ブロック要素どまりの XPointer しか作らない
+//       ruby/rt/span のような深い末端まで作っても精度は 1 行しか変わらないのに、
+//       crengine 側の構造と食い違う確率だけが上がる
+//   (2) 送る前に自分の解決器へ流し、元の要素へ戻ることを検算する
+//   (3) 戻らなければ 1 段浅くして試し直し、最後は章頭 /body/DocFragment[N]/body に落とす
+//       この形は crengine が必ず解決できる
+//
+// ⚠ 「ブラウザで作ったパスが crengine で解決されるか」は KOReader 実機でしか
+// 確かめられない（逆方向は §2-5 で実測済み）。だからこの 3 段が要る。
+const KO_BLOCK_TAGS = ['p','div','h1','h2','h3','h4','h5','h6','li','blockquote','pre',
+                       'section','article','figure','figcaption','dd','dt','td','th','tr',
+                       'table','ul','ol','dl','header','footer','aside','nav','main'];
+const KO_BLOCK_SET = new Set(KO_BLOCK_TAGS);
+
+let _koLastPushed = null;   // {bookKey, progress} 同じ位置を送り直さないための記録
+
+// テキストを持つ「いちばん内側の」ブロック要素を文書順に集める
+function koTextBlocks(body) {
+  const out = [];
+  (function walk(el) {
+    const kids = el.children;
+    let hasBlockChild = false;
+    for (let i = 0; i < kids.length; i++) {
+      if (KO_BLOCK_SET.has((kids[i].localName || '').toLowerCase())) { hasBlockChild = true; walk(kids[i]); }
+    }
+    if (!hasBlockChild && el !== body) {
+      const txt = (el.textContent || '').trim();
+      if (txt) out.push({ el: el, len: txt.length });
+    }
+  })(body);
+  return out;
+}
+
+// 読書位置（章内 0〜1）に対応するブロック要素を選ぶ。
+// 要素数ではなく文字数で按分する —— スクロール量は文字量にほぼ比例するため
+function koPickElementForRatio(body, ratio) {
+  const blocks = koTextBlocks(body);
+  if (!blocks.length) return null;
+  let total = 0;
+  for (let i = 0; i < blocks.length; i++) total += blocks[i].len;
+  if (!total) return blocks[0].el;
+  const want = Math.max(0, Math.min(1, +ratio || 0)) * total;
+  let acc = 0;
+  for (let i = 0; i < blocks.length; i++) {
+    acc += blocks[i].len;
+    if (acc >= want) return blocks[i].el;
+  }
+  return blocks[blocks.length - 1].el;
+}
+
+// 要素 → 経路（同名兄弟の 1 始まり添字。koResolveSteps と同じ規則で作る）
+function koPathToElement(body, el) {
+  const steps = [];
+  let cur = el;
+  while (cur && cur !== body) {
+    const parent = cur.parentElement;
+    if (!parent) return null;
+    const ln = (cur.localName || '').toLowerCase();
+    const kids = parent.children;
+    let n = 0;
+    for (let i = 0; i < kids.length; i++) {
+      if ((kids[i].localName || '').toLowerCase() === ln) { n++; if (kids[i] === cur) break; }
+    }
+    steps.unshift({ tag: ln, idx: n });
+    cur = parent;
+  }
+  steps.unshift({ tag: 'body', idx: 1 });
+  return steps;
+}
+
+function koStepsToXPointer(spineIdx, steps) {
+  let s = '/body/DocFragment[' + (spineIdx + 1) + ']';
+  for (let i = 0; i < steps.length; i++) {
+    s += '/' + steps[i].tag + (steps[i].idx > 1 ? '[' + steps[i].idx + ']' : '');
+  }
+  return s;
+}
+
+// 章内位置から、KOReader が解決できる XPointer を組み立てる
+async function koBuildProgress(spineIdx, ratio) {
+  const headSteps = [{ tag: 'body', idx: 1 }];
+  // FXL は 1 spine = 1 ページ。章頭で無損失に表せる（§4-5）
+  if (state.renderMode === 'fxl') return koStepsToXPointer(spineIdx, headSteps);
+  const item = state.spine && state.spine[spineIdx];
+  const f = item && state.epub && state.epub.file(item.absPath);
+  if (!f) return null;
+  let txt;
+  try { txt = await f.async('text'); } catch (e) { return null; }
+  const doc  = _koParseChapter(txt);
+  const body = doc.body;
+  if (!body) return null;
+
+  let steps = headSteps;
+  let node  = koPickElementForRatio(body, ratio);
+  // (2)(3) 検算して、通らなければ 1 段ずつ浅くする
+  while (node && node !== body) {
+    const cand = koPathToElement(body, node);
+    const r = cand && koResolveSteps(doc.documentElement, cand);
+    if (r && r.matched === cand.length && r.el === node) { steps = cand; break; }
+    node = node.parentElement;
+  }
+  return koStepsToXPointer(spineIdx, steps);
+}
+
+// yomikake の進捗（進捗バーと同じ式）。KOReader の percentage は組版後のページ数比で
+// モデルが違うため数値は一致しない。判定には使われないので実害はない（§2-4 / §2-6）
+function koCurrentPercentage() {
+  const denom = Math.max(1, (state.spine ? state.spine.length : 1) - 1);
+  const v = (state.currentSpineIdx + (+_intraChapterRatio || 0)) / denom;
+  return Math.round(Math.max(0, Math.min(1, v)) * 10000) / 10000;
+}
+
+function koDocHashForPush(bookKey) {
+  const d = _koDocGet(bookKey);
+  if (!d) return null;
+  // push は設定した方式にだけ書く。両方に書くと、使っていない側に古い記録が残り、
+  // 後でそれを拾って位置が後退する経路ができる
+  return (_kosync.method === 'filename' ? d.fn : d.bin) || null;
+}
+
+// opts.silent   … 成功トーストを出さない（自動同期向け・Step 5）
+// opts.ifChanged… 前回送った位置と同じなら送らない（自動同期向け・Step 5）
+async function koPushForCurrentBook(opts) {
+  const silent    = !!(opts && opts.silent);
+  const ifChanged = !!(opts && opts.ifChanged);
+  if (!state.epub || !state.bookKey) { if (!silent) showToast(t('toast.kosyncNoBook'));   return false; }
+  if (!koConfigured())               { if (!silent) showToast(t('toast.kosyncNotSetUp')); return false; }
+  const bookKey = state.bookKey;
+  const hash = koDocHashForPush(bookKey);
+  if (!hash) { if (!silent) showToast(t('toast.kosyncNoHash')); return false; }
+  const btn = document.getElementById('kosync-push-btn');
+  if (btn) btn.disabled = true;
+  try {
+    const progress = await koBuildProgress(state.currentSpineIdx, _intraChapterRatio);
+    if (bookKey !== state.bookKey) return false;   // 待っている間に本が変わった
+    if (!progress) { if (!silent) showToast(t('toast.kosyncBadProgress')); return false; }
+    // 同じ位置を送り直さない。KOReader 側の timestamp を無意味に更新すると、
+    // あちらの正しい位置を「古い」と誤判定させてしまう
+    if (ifChanged && _koLastPushed && _koLastPushed.bookKey === bookKey &&
+        _koLastPushed.progress === progress) return false;
+    const d = _koDocGet(bookKey) || {};
+    const r = await koFetch('PUT', '/syncs/progress', {
+      document:   hash,
+      progress:   progress,
+      percentage: koCurrentPercentage(),
+      device:     _kosync.deviceName || 'yomikake',
+      device_id:  _kosync.deviceId,
+      metadata:   { filename: d.name || '', title: state.bookTitle || '', authors: state.bookCreator || '' }
+    });
+    if (r.status === 401) { showToast(t('toast.kosyncAuthFail')); return false; }
+    if (!r.ok) { if (!silent) showToast(t('toast.kosyncPushFail', { msg: 'HTTP ' + r.status })); return false; }
+    _koLastPushed = { bookKey: bookKey, progress: progress };
+    _koDocSet(bookKey, { lastPushAt: Date.now() });
+    if (!silent) showToast(t('toast.kosyncPushed'));
+    return true;
+  } catch (e) {
+    if (!silent) showToast(_koNetMsg(e));
     return false;
   } finally {
     if (btn) btn.disabled = false;

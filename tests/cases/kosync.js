@@ -312,6 +312,61 @@ T('DocFragment だけでも通る（章頭）',
   T('body は 1 番目の body を取る', !!r5 && r5.el === body);
 })();
 
+
+// ══ Step 4: XPointer の生成 ═════════════════════════════
+T('koBuildProgress が定義',       typeof koBuildProgress === 'function');
+T('koPathToElement が定義',       typeof koPathToElement === 'function');
+T('koStepsToXPointer が定義',     typeof koStepsToXPointer === 'function');
+T('koPickElementForRatio が定義', typeof koPickElementForRatio === 'function');
+T('koPushForCurrentBook が定義',  typeof koPushForCurrentBook === 'function');
+
+// 書式（添字 1 は省く。KOReader の実データにも両方の形が出る）
+T('章頭の形', koStepsToXPointer(6, [{ tag: 'body', idx: 1 }]) === '/body/DocFragment[7]/body');
+T('段落つきの形',
+  koStepsToXPointer(2, [{ tag: 'body', idx: 1 }, { tag: 'div', idx: 1 }, { tag: 'p', idx: 88 }]) ===
+  '/body/DocFragment[3]/body/div/p[88]');
+
+// 生成 → 解釈 → 解決の往復（生成規則と解決規則が同じであることの担保）
+(function () {
+  var doc = new DOMParser().parseFromString(
+    '<html><body><h1>t</h1><div><p>a</p><p>b</p><p>c</p></div></body></html>', 'text/html');
+  var body = doc.body, target = doc.querySelectorAll('p')[2];
+  var steps = koPathToElement(body, target);
+  T('経路を組み立てられる',
+    steps.map(function (x) { return x.tag + x.idx; }).join('/') === 'body1/div1/p3',
+    JSON.stringify(steps));
+  var xp = koStepsToXPointer(4, steps);
+  T('XPointer 文字列になる', xp === '/body/DocFragment[5]/body/div/p[3]', xp);
+  var back = koParseXPointer(xp);
+  T('解釈して spine が戻る', back && back.spineIdx === 4);
+  var r = koResolveSteps(doc.documentElement, back.steps);
+  T('往復して同じ要素に戻る', !!r && r.el === target && r.matched === back.steps.length);
+})();
+
+// 章内位置 → ブロック要素（文字数で按分する）
+(function () {
+  var doc = new DOMParser().parseFromString(
+    '<html><body><p>' + new Array(101).join('あ') + '</p>' +
+    '<p>' + new Array(101).join('い') + '</p>' +
+    '<p>' + new Array(101).join('う') + '</p></body></html>', 'text/html');
+  var body = doc.body, ps = doc.querySelectorAll('p');
+  T('ratio 0 は先頭ブロック',   koPickElementForRatio(body, 0)   === ps[0]);
+  T('ratio 0.5 は真ん中',       koPickElementForRatio(body, 0.5) === ps[1]);
+  T('ratio 1 は末尾ブロック',   koPickElementForRatio(body, 1)   === ps[2]);
+  T('範囲外は丸める', koPickElementForRatio(body, -5) === ps[0] && koPickElementForRatio(body, 9) === ps[2]);
+  T('テキストが無ければ null',
+    koPickElementForRatio(new DOMParser().parseFromString('<html><body></body></html>', 'text/html').body, 0.5) === null);
+})();
+
+// いちばん内側のブロックを選ぶ（外側の div を選ばない）
+(function () {
+  var doc = new DOMParser().parseFromString(
+    '<html><body><div><p>あ</p><p>い</p></div></body></html>', 'text/html');
+  var blocks = koTextBlocks(doc.body);
+  T('内側の p を集める', blocks.length === 2 && blocks[0].el.localName === 'p', String(blocks.length));
+  T('外側の div は含めない', blocks.every(function (b) { return b.el.localName !== 'div'; }));
+})();
+
 // ── 本を開いたら対応表ができる（loadEpub 統合）────
 fetch('tests/.fixtures/reflow.epub')
 .then(function (r) { return r.blob(); })
@@ -392,6 +447,70 @@ fetch('tests/.fixtures/reflow.epub')
 })
 .then(function (ok) {
   T('未設定なら pull は何もしない', ok === false);
+})
+.then(function () {
+  // ══ Step 4: 実 ePub に対する生成 ════════════════════
+  // fixture の 1 章は <body><h1 id="top">第N章</h1><p>×40</p></body>。
+  // p の中身は <ruby>…</ruby> と <span class="tcy"> を含むので、
+  // 深く潜る実装だと ruby/span まで経路に入ってしまう
+  _intraChapterRatio = 1;
+  return koBuildProgress(2, 1);
+})
+.then(function (xp) {
+  T('章末は最後の段落を指す', xp === '/body/DocFragment[3]/body/p[40]', String(xp));
+  T('ブロック要素どまり（ruby/rt/span へ潜らない）',
+    xp.indexOf('ruby') < 0 && xp.indexOf('span') < 0 && xp.indexOf('rt') < 0, String(xp));
+  // 生成したものを自分で解決できる＝KOReader へ渡す前の最低条件
+  return koTargetFromProgress(xp);
+})
+.then(function (tgt) {
+  T('自分で生成した XPointer を自分で解決できる',
+    tgt && tgt.spineIdx === 2 && tgt.depth === 'exact', JSON.stringify(tgt));
+  return koBuildProgress(2, 0);
+})
+.then(function (xp) {
+  T('章頭は最初のブロック（見出し）を指す', xp === '/body/DocFragment[3]/body/h1', String(xp));
+  return koBuildProgress(1, 0.5);
+})
+.then(function (xp) {
+  T('中ほどは中ほどの段落', /^\/body\/DocFragment\[2\]\/body\/p\[\d+\]$/.test(xp), String(xp));
+  var n = parseInt(/p\[(\d+)\]/.exec(xp)[1], 10);
+  T('真ん中あたりの段落を選ぶ', n > 10 && n < 30, String(n));
+  return koBuildProgress(999, 0.5);
+})
+.then(function (xp) {
+  T('spine 範囲外は null', xp === null, String(xp));
+  // 進捗の式（進捗バーと同じ）
+  state.currentSpineIdx = 2; _intraChapterRatio = 0;
+  // 小数第 4 位に丸めて送るので、比較の許容差もそれに合わせる
+  T('percentage は (spineIdx + ratio) / (spineCount - 1)',
+    Math.abs(koCurrentPercentage() - 2 / (state.spine.length - 1)) < 1e-4,
+    String(koCurrentPercentage()));
+  T('小数第 4 位に丸める', String(koCurrentPercentage()).replace(/^\d+\.?/, '').length <= 4,
+    String(koCurrentPercentage()));
+  _intraChapterRatio = 1;
+  T('章末なら 1 段ぶん進む',
+    Math.abs(koCurrentPercentage() - 3 / (state.spine.length - 1)) < 1e-4,
+    String(koCurrentPercentage()));
+  T('0〜1 に丸める', koCurrentPercentage() <= 1);
+  // push 先のハッシュは設定した方式のもの（両方には書かない）
+  var d = _koDocGet(state.bookKey);
+  _kosync.method = 'binary';
+  T('binary 設定なら bin を使う', koDocHashForPush(state.bookKey) === d.bin);
+  _kosync.method = 'filename';
+  T('filename 設定なら fn を使う', koDocHashForPush(state.bookKey) === d.fn);
+  _kosync.method = 'binary';
+  T('対応表が無ければ null', koDocHashForPush('epub_pos_無い本__誰か') === null);
+  // 設定が無ければ通信しない
+  koSetServer(''); koSetUsername(''); koSetPassword('');
+  return koPushForCurrentBook({ silent: true });
+})
+.then(function (ok) {
+  T('未設定なら push は何もしない', ok === false);
+  T('送信ボタンがある', !!document.getElementById('kosync-push-btn'));
+  T('取得ボタンと同じ行に並ぶ',
+    document.getElementById('kosync-pull-btn').parentElement ===
+    document.getElementById('kosync-push-btn').parentElement);
 })
 .then(function () {
   // 完全削除で対応表からも消える（論理削除では消さない）
