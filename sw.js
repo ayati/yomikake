@@ -32,6 +32,12 @@ self.addEventListener('fetch', ev => {
   let url;
   try { url = new URL(req.url); } catch (e) { return; }
 
+  // 0) KOReader 同期 API は常にネットワーク直行（design_kosync.md §3-5）。
+  //    Apache のリバースプロキシで同一オリジンになったため、放っておくと下の 3) の
+  //    cache-first の射程に入る。今は素通しになるが、将来ランタイムキャッシュを足した
+  //    瞬間に「しおりが古いまま返る」という壊れ方をするので先に除外しておく。
+  if (url.pathname.startsWith('/kosync/')) return;
+
   // 1) 共有ターゲット受信（POST .../share-receive）: File を専用 IDB に保存し ?shared=1 へリダイレクト
   if (req.method === 'POST' && url.pathname.endsWith('share-receive')) {
     ev.respondWith((async () => {

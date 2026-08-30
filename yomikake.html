@@ -3569,6 +3569,10 @@ async function loadEpub(file, fileHandle = null) {
       cacheEpubFile(file, state.bookKey).catch(() => {});
     }
 
+    // KOReader 同期用のドキュメントハッシュを確定させる（design_kosync.md §4-1）。
+    // 実体が手元にあるのは開いた瞬間だけなので、キャッシュの有無に関わらずここで記録する。
+    koEnsureDocHashes(state.bookKey, file).catch(() => {});
+
     document.getElementById('welcome').style.display = 'none';
     document.getElementById('page-container').classList.add('visible');
     updateCloseBookBtnVisibility();
@@ -8762,6 +8766,231 @@ function updateToolbarPrefsUI() {
 
 
 // ══════════════════════════════════════════
+//  KOReader 同期（kosync）— ドキュメントハッシュ
+// ══════════════════════════════════════════
+// 設計書: design_kosync.md（§2-2 ハッシュ / §4-1 本の同定）
+//
+// KOReader は本を「ファイルのハッシュ」で同定し、yomikake は epub_pos_{title}__{creator}
+// で同定する。ID 空間が別物なので、その対応表をここで持つ。
+//
+// ハッシュは 2 方式ある（KOReader の設定「同期方法」に対応）:
+//   binary   … ファイル内容の partial MD5。KOReader の既定
+//   filename … md5(拡張子込みのベース名)
+// pull は両方試し、push は設定した方式にだけ書く。使っていない側に古い記録が残ると、
+// 後でそれを拾って読書位置が後退する経路ができてしまうため。
+//
+// 対応表は epub_kosync_docs に置く。しおり（epub_pos_*）の値には入れない
+// —— しおりは Drive 同期・JSON 書き出し・墓標マージの対象で、そこに「端末ごとに実体が
+// 違いうるファイル」由来の値を混ぜると壊れる。epub_book_prefs と同じ考え方で、
+// 別キーであること自体が「同期に載せない」構造的な保証になる。
+
+// ── MD5 ────────────────────────────────
+// WebCrypto に MD5 は無いので自前で持つ。partial MD5 は飛び飛びの 12 チャンクを順に
+// 食わせるため、一括ハッシュ関数ではなく逐次 update できる形が要る。
+const _MD5_S = [7,12,17,22,7,12,17,22,7,12,17,22,7,12,17,22,
+                5, 9,14,20,5, 9,14,20,5, 9,14,20,5, 9,14,20,
+                4,11,16,23,4,11,16,23,4,11,16,23,4,11,16,23,
+                6,10,15,21,6,10,15,21,6,10,15,21,6,10,15,21];
+const _MD5_K = (function () {          // K[i] = floor(2^32 * |sin(i+1)|)
+  const k = new Uint32Array(64);
+  for (let i = 0; i < 64; i++) k[i] = (Math.abs(Math.sin(i + 1)) * 4294967296) >>> 0;
+  return k;
+})();
+
+function _md5Round(x, st) {
+  let a = st[0], b = st[1], c = st[2], d = st[3];
+  for (let i = 0; i < 64; i++) {
+    let f, g;
+    if      (i < 16) { f = (b & c) | (~b & d);  g = i; }
+    else if (i < 32) { f = (d & b) | (~d & c);  g = (5 * i + 1) & 15; }
+    else if (i < 48) { f = b ^ c ^ d;           g = (3 * i + 5) & 15; }
+    else             { f = c ^ (b | ~d);        g = (7 * i)     & 15; }
+    const t = (a + f + _MD5_K[i] + x[g]) >>> 0;   // 各項 < 2^32 なので和は倍精度で安全
+    const s = _MD5_S[i];
+    a = d; d = c; c = b;
+    b = (b + (((t << s) | (t >>> (32 - s))) >>> 0)) >>> 0;
+  }
+  st[0] = (st[0] + a) >>> 0; st[1] = (st[1] + b) >>> 0;
+  st[2] = (st[2] + c) >>> 0; st[3] = (st[3] + d) >>> 0;
+}
+
+// 逐次 MD5。update(Uint8Array) を任意回 → hex() で確定する
+function koMd5Create() {
+  const st  = new Uint32Array([0x67452301, 0xefcdab89, 0x98badcfe, 0x10325476]);
+  const buf = new Uint8Array(64);      // 64 バイトに満たない端数を溜める
+  const x   = new Uint32Array(16);
+  let bufLen = 0, total = 0;
+
+  function block(src, off) {
+    for (let i = 0; i < 16; i++) {
+      const j = off + i * 4;
+      x[i] = (src[j] | (src[j + 1] << 8) | (src[j + 2] << 16) | (src[j + 3] << 24)) >>> 0;
+    }
+    _md5Round(x, st);
+  }
+  function absorb(bytes) {             // total を触らない吸収（パディングでも使う）
+    let i = 0;
+    if (bufLen) {
+      const need = 64 - bufLen;
+      if (bytes.length < need) { buf.set(bytes, bufLen); bufLen += bytes.length; return; }
+      buf.set(bytes.subarray(0, need), bufLen); block(buf, 0); bufLen = 0; i = need;
+    }
+    for (; i + 64 <= bytes.length; i += 64) block(bytes, i);
+    if (i < bytes.length) { buf.set(bytes.subarray(i), 0); bufLen = bytes.length - i; }
+  }
+  return {
+    update(bytes) { total += bytes.length; absorb(bytes); },
+    hex() {
+      const bits = total * 8;
+      let padLen = (64 - (bufLen % 64)) % 64;
+      if (padLen < 9) padLen += 64;    // 0x80 の 1 バイト＋長さ 8 バイトが必ず入るように
+      const pad = new Uint8Array(padLen);
+      pad[0] = 0x80;
+      const n = padLen - 8, lo = bits >>> 0, hi = Math.floor(bits / 4294967296) >>> 0;
+      pad[n]     = lo & 255;         pad[n + 1] = (lo >>> 8)  & 255;
+      pad[n + 2] = (lo >>> 16) & 255; pad[n + 3] = (lo >>> 24) & 255;
+      pad[n + 4] = hi & 255;         pad[n + 5] = (hi >>> 8)  & 255;
+      pad[n + 6] = (hi >>> 16) & 255; pad[n + 7] = (hi >>> 24) & 255;
+      absorb(pad);
+      let out = '';
+      for (let i = 0; i < 4; i++) {
+        const v = st[i];
+        for (let j = 0; j < 4; j++) out += ((v >>> (8 * j)) & 255).toString(16).padStart(2, '0');
+      }
+      return out;
+    }
+  };
+}
+
+function koMd5Bytes(bytes) { const m = koMd5Create(); m.update(bytes); return m.hex(); }
+
+// ── partial MD5（Binary 方式）────────────
+// KOReader frontend/util.lua:
+//   for i = -1, 10 do file:seek("set", lshift(1024, 2*i)); sample = file:read(1024) ...
+// lshift は 32bit の BitOp なので i=-1 は 1024<<30 が溢れて 0 になる（実機 3 件で確認済み。
+// 二次情報にある「先頭 256」説は誤り）。seek 先が EOF 以降なら read が nil を返して break。
+const KO_MD5_CHUNK = 1024;
+
+function koPartialMd5Offsets(size) {
+  const offs = [];
+  for (let i = -1; i <= 10; i++) {
+    const off = i < 0 ? 0 : 1024 * Math.pow(4, i);
+    if (off >= size) break;
+    offs.push(off);
+  }
+  return offs;
+}
+
+// Blob / File から。slice で必要な 12KB だけ読むので 100MB 超の本でも軽い
+async function koPartialMd5FromBlob(blob) {
+  const size = blob.size, m = koMd5Create();
+  const offs = koPartialMd5Offsets(size);
+  for (let i = 0; i < offs.length; i++) {
+    const off = offs[i];
+    const b = await blob.slice(off, Math.min(off + KO_MD5_CHUNK, size)).arrayBuffer();
+    m.update(new Uint8Array(b));
+  }
+  return m.hex();
+}
+
+// ArrayBuffer から（IDB キャッシュの buf をそのまま渡せる）
+function koPartialMd5FromBuffer(buf) {
+  const size = buf.byteLength, m = koMd5Create();
+  const offs = koPartialMd5Offsets(size);
+  for (let i = 0; i < offs.length; i++) {
+    const off = offs[i];
+    m.update(new Uint8Array(buf, off, Math.min(KO_MD5_CHUNK, size - off)));
+  }
+  return m.hex();
+}
+
+// ── Filename 方式 ──────────────────────
+// KOReader は md5(ファイル名) を取る。ファイル名はディレクトリを含まない拡張子込みの
+// ベース名で、実体は UTF-8 のバイト列（日本語ファイル名がそのまま来る）
+function koFilenameMd5(name) {
+  const base = String(name || '').split('/').pop().split('\\').pop();
+  if (!base) return '';
+  return koMd5Bytes(new TextEncoder().encode(base));
+}
+
+// ── bookKey ↔ ドキュメントハッシュの対応表 ──
+const KOSYNC_DOCS_KEY   = 'epub_kosync_docs';
+const KOSYNC_DOCS_MAX   = 300;                        // 冊数の上限
+const KOSYNC_DOCS_MAXMS = 730 * 24 * 60 * 60 * 1000;  // 最終更新からの保持期間（730日）
+
+function _koDocsLoad() {
+  try {
+    const o = JSON.parse(localStorage.getItem(KOSYNC_DOCS_KEY));
+    if (o && o.books && typeof o.books === 'object') return o;
+  } catch (e) { /* 破損時は黙って初期化 */ }
+  return { v: 1, books: {} };
+}
+
+function _koDocsPrune(all) {
+  const books = all.books, keys = Object.keys(books), now = Date.now();
+  for (let i = 0; i < keys.length; i++) {
+    const t = books[keys[i]] && books[keys[i]].t;
+    if (!t || now - t > KOSYNC_DOCS_MAXMS) delete books[keys[i]];
+  }
+  const rest = Object.keys(books);
+  if (rest.length > KOSYNC_DOCS_MAX) {
+    rest.sort((a, b) => (books[b].t || 0) - (books[a].t || 0));
+    for (let i = KOSYNC_DOCS_MAX; i < rest.length; i++) delete books[rest[i]];
+  }
+  return all;
+}
+
+function _koDocsSave(all) {
+  try { localStorage.setItem(KOSYNC_DOCS_KEY, JSON.stringify(_koDocsPrune(all))); }
+  catch (e) { notifyStorageError(); }   // 保存に失敗しても読書は続けられるので致命扱いしない
+}
+
+function _koDocGet(bookKey) {
+  if (!bookKey) return null;
+  const all = _koDocsLoad();
+  return hasOwnKey(all.books, bookKey) ? all.books[bookKey] : null;
+}
+
+// 触った項目だけを記録する（全項目のスナップショットにしない。epub_book_prefs と同じ理由）
+function _koDocSet(bookKey, patch) {
+  if (!bookKey || !patch) return null;
+  const all = _koDocsLoad();
+  const cur = hasOwnKey(all.books, bookKey) ? all.books[bookKey] : {};
+  const next = Object.assign({}, cur, patch, { t: Date.now() });
+  all.books[bookKey] = next;
+  _koDocsSave(all);
+  return next;
+}
+
+function _koDocDelete(bookKey) {
+  if (!bookKey) return;
+  const all = _koDocsLoad();
+  if (!hasOwnKey(all.books, bookKey)) return;
+  delete all.books[bookKey];
+  _koDocsSave(all);
+}
+
+// 本を開いたときに 2 方式のハッシュを確定させる。
+// 実体（Blob）が手元にあるのは開いた瞬間だけなので、ここで必ず記録しておく
+// —— 後から「キャッシュを消したのでハッシュが分からない」状態になると push できなくなる。
+async function koEnsureDocHashes(bookKey, file) {
+  if (!bookKey) return null;
+  const cur  = _koDocGet(bookKey);
+  const name = (file && file.name) || (cur && cur.name) || '';
+  const size = (file && file.size) || (cur && cur.size) || 0;
+  // 同じ実体なら計算し直さない（名前とサイズが一致すれば同じファイルとみなす）
+  if (cur && cur.bin && cur.name === name && cur.size === size) return cur;
+  const patch = { name: name, size: size };
+  if (name) patch.fn = koFilenameMd5(name);
+  if (file && typeof file.slice === 'function') {
+    // 読めなくても filename 方式だけで動けるので、失敗は握り潰してよい
+    try { patch.bin = await koPartialMd5FromBlob(file); } catch (e) { /* noop */ }
+  }
+  return _koDocSet(bookKey, patch);
+}
+
+
+// ══════════════════════════════════════════
 //  本ごとの表示設定（B-7）
 // ══════════════════════════════════════════
 // 覚えるのは「本が変われば変わるべき」5 つだけ。テーマ・明るさ・余白・行間などは
@@ -10169,6 +10398,7 @@ function _rlAddTombstone(bookKey) {
 function _rlPurgeLocalData(bookKey) {
   try { localStorage.removeItem(bookKey); } catch (e) {}
   _bpDelete(bookKey);
+  _koDocDelete(bookKey);   // KOReader 同期の対応表。リモートの記録は消さない（他端末の正）
   try { const m = _rdLoadBookStats(); if (m[bookKey]) { delete m[bookKey]; _rdSaveBookStats(m); } } catch (e) {}
   fshDelete(bookKey).then(() => _handleKeys.delete(bookKey)).catch(() => {});
   if (_cachedKeys.has(bookKey)) {

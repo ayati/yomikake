@@ -24,6 +24,7 @@ declare -A CASE_ENV=(
   [tts-handoff]="RAF_SHIM=1 VTB=40000"
   [keyboard]="RAF_SHIM=1 VTB=40000"
   [cover-thumb]="RAF_SHIM=1 VTB=30000"
+  [kosync]="RAF_SHIM=1 VTB=30000"
 )
 declare -A CASE_FLAGS=(
   [e2e-reflow]="--allow-file-access-from-files"
@@ -35,6 +36,7 @@ declare -A CASE_FLAGS=(
   [tts-handoff]="--allow-file-access-from-files --window-size=412,915"
   [keyboard]="--allow-file-access-from-files"
   [cover-thumb]="--allow-file-access-from-files"
+  [kosync]="--allow-file-access-from-files"
 )
 
 pass=0; fail=0; failed_lines=()
