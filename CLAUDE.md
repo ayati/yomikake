@@ -86,7 +86,8 @@ Most features exist in both files. As a rule:
 - **鉄則: pull が済むまで自動 push を武装しない**（`_koPullDone`）。先行事例（Readest issue #5625）は XPointer の解決に黙って失敗したあと、5 秒後の自動保存が自分のローカル位置でリモートを上書きして正しい位置を破壊した。**同じ位置を送り直さない**（`_koLastPushed`）のも必須 — KOReader 側の `timestamp` を無意味に更新すると、あちらの正しい位置を「古い」と誤判定させる。
 - **FXL は 1 spine = 1 ページなので最も相性が良い**（章内位置の概念が無く、pull も push も無損失）。KOReader は ePub を FXL でも rolling 扱いするので XPointer が来る（`has_pages` が真になるのは PDF/CBZ/DjVu）。
 - 自動同期の既定は **OFF**（Drive 自動保存と同じ。KOReader 側にも自動/手動があり、両方が勝手に動くと「どちらが位置を書いたか」を追えなくなる）。`file://` では機能ごと非表示。
-- テストは `tests/cases/kosync.js`（両ファイル各 211 assertion）。`window.fetch` を差し替えて**実際に飛ぶヘッダと本文**まで検査している。**担保できないのは「ブラウザが生成した XPointer を crengine が解決できるか」だけ**で、これは KOReader 実機でしか確かめられない。
+- **実機確認済み（2026-08-30）**: リフロー本・FXL 本（AKIRA1）とも同期成功。これで**「ブラウザが生成した XPointer を crengine が解決できるか」が決着**した（§2-5 で確かめられたのは crengine → ブラウザの向きだけで、逆向きは実機でしか確かめようがなかった）。§4-3 の 3 段の守りは残す —— ePub の作りは千差万別で、章頭フォールバックに落ちる本はいずれ出る。
+- テストは `tests/cases/kosync.js`（両ファイル各 211 assertion）。`window.fetch` を差し替えて**実際に飛ぶヘッダと本文**まで検査している。
 
 **表示設定のきめ細かい改善 第1弾（v2.13.0）** (`applyThemeClass`, `updateMetaThemeColor`, `_darkMQ`, `resolveAutoTheme`, `applyAutoTheme`, `toggleThemeAuto`, `changeAutoTheme`, `syncAutoThemeUI`, `updateThemeAutoToggleUI`, `TOOLBAR_ITEMS`, `applyToolbarPrefs`, `toggleToolbarItem`, `updateToolbarPrefsUI`, `DISPLAY_DEFAULTS`, `syncAllSettingsUI`, `resetDisplaySettings`, `state.themeAuto`/`themeLight`/`themeDark`/`toolbarHidden` — 設計書 `design_display_settings.md`)。
 
