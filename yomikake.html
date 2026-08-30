@@ -1186,6 +1186,9 @@
         <span class="set-label" data-i18n="kosync.deviceName">この端末の名前</span>
         <input class="set-input" id="kosync-device" type="text" autocomplete="off" onchange="koSetDeviceName(this.value)">
       </div>
+      <div class="set-row">
+        <button class="set-io-btn" id="kosync-pull-btn" onclick="koPullForCurrentBook()" data-i18n="kosync.pull">⬇ KOReader から取得</button>
+      </div>
       <div class="set-row" style="gap:8px;">
         <button class="set-io-btn" id="kosync-test-btn" onclick="koTestConnection()" data-i18n="kosync.test">接続テスト</button>
         <button class="set-io-btn" id="kosync-register-btn" onclick="koRegister()" data-i18n="kosync.register">新規登録</button>
@@ -1758,6 +1761,14 @@ const I18N = {
     'btn.fullscreen':            'フルスクリーン',
     'btn.fullscreen.exit':       '読書モード終了',
     'settings.driveGroup':       'Google Drive',
+    'kosync.pull':            '⬇ KOReader から取得',
+    'toast.kosyncNoBook':     '本を開いてから実行してください',
+    'toast.kosyncNotSetUp':   'KOReader 同期の設定を先に済ませてください',
+    'toast.kosyncNoRemote':   'この本の記録は同期サーバーにありません',
+    'toast.kosyncBadProgress':'同期サーバーの位置情報を読み取れませんでした',
+    'toast.kosyncUpToDate':   '同期サーバーより先まで読んでいます',
+    'toast.kosyncAvailable':  '{device} は {pct}% まで読んでいます — タップで移動',
+    'toast.kosyncJumped':     '{n} 章へ移動しました',
     'settings.kosyncGroup':   '📖 KOReader 同期',
     'kosync.server':          '同期サーバー',
     'kosync.serverHelp':      'KOReader の「カスタム同期サーバー」と同じ URL を入れます',
@@ -2188,6 +2199,14 @@ const I18N = {
     'btn.fullscreen':            'Fullscreen',
     'btn.fullscreen.exit':       'Exit reader',
     'settings.driveGroup':       'Google Drive',
+    'kosync.pull':            '⬇ Get from KOReader',
+    'toast.kosyncNoBook':     'Open a book first',
+    'toast.kosyncNotSetUp':   'Set up KOReader sync first',
+    'toast.kosyncNoRemote':   'No record for this book on the sync server',
+    'toast.kosyncBadProgress':'Could not read the position from the sync server',
+    'toast.kosyncUpToDate':   'You are ahead of the sync server',
+    'toast.kosyncAvailable':  '{device} is at {pct}% — tap to go there',
+    'toast.kosyncJumped':     'Moved to chapter {n}',
     'settings.kosyncGroup':   '📖 KOReader sync',
     'kosync.server':          'Sync server',
     'kosync.serverHelp':      'The same URL as KOReader’s “Custom sync server”',
@@ -2618,6 +2637,14 @@ const I18N = {
     'btn.fullscreen':            '全螢幕',
     'btn.fullscreen.exit':       '結束閱讀模式',
     'settings.driveGroup':       'Google Drive',
+    'kosync.pull':            '⬇ 從 KOReader 取得',
+    'toast.kosyncNoBook':     '請先開啟書籍',
+    'toast.kosyncNotSetUp':   '請先完成 KOReader 同步設定',
+    'toast.kosyncNoRemote':   '同步伺服器上沒有這本書的紀錄',
+    'toast.kosyncBadProgress':'無法讀取同步伺服器上的位置',
+    'toast.kosyncUpToDate':   '您已讀到比同步伺服器更前面',
+    'toast.kosyncAvailable':  '{device} 已讀到 {pct}% — 點一下前往',
+    'toast.kosyncJumped':     '已移動到第 {n} 章',
     'settings.kosyncGroup':   '📖 KOReader 同步',
     'kosync.server':          '同步伺服器',
     'kosync.serverHelp':      '與 KOReader 的「自訂同步伺服器」使用相同網址',
@@ -3048,6 +3075,14 @@ const I18N = {
     'btn.fullscreen':            '全屏',
     'btn.fullscreen.exit':       '退出阅读模式',
     'settings.driveGroup':       'Google Drive',
+    'kosync.pull':            '⬇ 从 KOReader 获取',
+    'toast.kosyncNoBook':     '请先打开书籍',
+    'toast.kosyncNotSetUp':   '请先完成 KOReader 同步设置',
+    'toast.kosyncNoRemote':   '同步服务器上没有这本书的记录',
+    'toast.kosyncBadProgress':'无法读取同步服务器上的位置',
+    'toast.kosyncUpToDate':   '您已读到比同步服务器更靠前',
+    'toast.kosyncAvailable':  '{device} 已读到 {pct}% — 点一下前往',
+    'toast.kosyncJumped':     '已移动到第 {n} 章',
     'settings.kosyncGroup':   '📖 KOReader 同步',
     'kosync.server':          '同步服务器',
     'kosync.serverHelp':      '与 KOReader 的“自定义同步服务器”使用相同网址',
@@ -3730,6 +3765,8 @@ async function loadEpub(file, fileHandle = null) {
     // KOReader 同期用のドキュメントハッシュを確定させる（design_kosync.md §4-1）。
     // 実体が手元にあるのは開いた瞬間だけなので、キャッシュの有無に関わらずここで記録する。
     koEnsureDocHashes(state.bookKey, file).catch(() => {});
+    _koPendingTarget = null;   // 前の本の着地点を持ち越さない
+    _koPullDone.clear();
 
     document.getElementById('welcome').style.display = 'none';
     document.getElementById('page-container').classList.add('visible');
@@ -3979,6 +4016,10 @@ async function buildSrcdoc(xhtmlText, xhtmlAbsPath, scrollTarget, readySeq) {
 
   // Always parse as text/html – avoids XML strict errors entirely
   const doc = new DOMParser().parseFromString(xhtmlText, 'text/html');
+
+  // KOReader から受け取った XPointer の着地点に id を打つ（design_kosync.md §4-2）。
+  // renderPage の '#id' 経路に載せるため、DOM をいじる前のここで行う
+  koMarkXPointerTarget(doc);
 
   // ── ePub 内の <script> を除去（XSS 対策）
   //    srcdoc iframe には sandbox がないため、ePub 由来のスクリプトが
@@ -9134,6 +9175,7 @@ function _koDocDelete(bookKey) {
 async function koEnsureDocHashes(bookKey, file) {
   if (!bookKey) return null;
   const cur  = _koDocGet(bookKey);
+  if (!file && !cur) return null;   // 計算する材料が無い
   const name = (file && file.name) || (cur && cur.name) || '';
   const size = (file && file.size) || (cur && cur.size) || 0;
   // 同じ実体なら計算し直さない（名前とサイズが一致すれば同じファイルとみなす）
@@ -9344,6 +9386,207 @@ function updateKosyncUI() {
     const b = document.getElementById(id);
     if (b) b.disabled = !ready;
   });
+}
+
+// ══════════════════════════════════════════
+//  KOReader 同期 — 位置の取得（pull・design_kosync.md §4-2）
+// ══════════════════════════════════════════
+// KOReader は EPUB の位置を crengine の XPointer で持つ:
+//     /body/DocFragment[7]/body/div/p[88]/ruby[6]/rt/text().0
+// DocFragment[N] は N 番目の spine アイテム（1 始まり）で、以降は「同名兄弟の中での
+// 1 始まり添字」。実機 2 台・3 例をこの規則で辿って一致することを確認済み（§2-5）。
+//
+// 着地は 3 段に落とす: 要素解決 → ブロック祖先へ丸める → 章頭。
+// percentage は使わない —— 同じ本の同じ場所でも端末間で 22% ずれるため（§2-6）。
+const KO_TARGET_ID = '__ko_xp_target';
+
+let _koPendingTarget = null;      // {spineIdx, steps} 一回限り。buildSrcdoc が消費する
+const _koPullDone = new Set();    // pull を試した bookKey。Step 5 で push の武装条件に使う
+
+// 末尾の text().N / .N（文字オフセット）は落とす。段落単位で十分で、
+// 文字位置まで再現しても着地の見え方は変わらない
+function koParseXPointer(s) {
+  if (typeof s !== 'string') return null;
+  const m = /^\/body\/DocFragment\[(\d+)\]/.exec(s.trim());
+  if (!m) return null;
+  const frag = parseInt(m[1], 10);
+  if (!(frag >= 1)) return null;
+  const rest = s.trim().slice(m[0].length)
+    .replace(/\/text\(\)\.\d+$/, '')
+    .replace(/\.\d+$/, '');
+  const steps = [];
+  const parts = rest.split('/');
+  for (let i = 0; i < parts.length; i++) {
+    if (!parts[i]) continue;
+    const mm = /^([A-Za-z_][\w\-]*)(?:\[(\d+)\])?$/.exec(parts[i]);
+    if (!mm) return null;
+    const idx = mm[2] ? parseInt(mm[2], 10) : 1;   // 添字なしは 1 番目
+    if (idx < 1) return null;
+    steps.push({ tag: mm[1].toLowerCase(), idx: idx });
+  }
+  return { spineIdx: frag - 1, steps: steps };
+}
+
+// crengine のパスは名前空間を持たないローカル名で書かれる。
+// SVG 要素が裸の svg として出てくる（FXL 本の実例で確認）ので localName で比べる
+function koNthChildByTag(parent, tag, n) {
+  const kids = parent.children;
+  if (!kids) return null;
+  let c = 0;
+  for (let i = 0; i < kids.length; i++) {
+    const ln = (kids[i].localName || kids[i].tagName || '').toLowerCase();
+    if (ln === tag && ++c === n) return kids[i];
+  }
+  return null;
+}
+
+// 辿れたところまで返す。matched < total は「途中で外れた」＝ブロック祖先へ丸めた状態
+function koResolveSteps(rootEl, steps) {
+  if (!rootEl || !steps) return null;
+  let cur = rootEl, matched = 0;
+  for (let i = 0; i < steps.length; i++) {
+    const next = koNthChildByTag(cur, steps[i].tag, steps[i].idx);
+    if (!next) break;
+    cur = next; matched++;
+  }
+  return { el: cur, matched: matched, total: steps.length };
+}
+
+function _koParseChapter(txt) {
+  // buildSrcdoc と同じ前処理（自己終端 <script/> は HTML5 パーサが本文ごと飲み込む）
+  return new DOMParser().parseFromString(
+    txt.replace(/<(script|style)(\s[^>]*)?\s*\/>/gi, (_, tag, a) => '<' + tag + (a || '') + '></' + tag + '>'),
+    'text/html');
+}
+
+// 描画する前に解決できるか確かめる。buildSrcdoc に入ってから外れると
+// 「id が無いので先頭に落ちる」しかできず、呼び出し側が章頭フォールバックを選べない
+async function koResolveInChapter(spineIdx, steps) {
+  const item = state.spine && state.spine[spineIdx];
+  if (!item || !state.epub) return null;
+  const f = state.epub.file(item.absPath);
+  if (!f) return null;
+  let txt;
+  try { txt = await f.async('text'); } catch (e) { return null; }
+  return koResolveSteps(_koParseChapter(txt).documentElement, steps);
+}
+
+// buildSrcdoc から呼ぶ。着地点に id を打って renderPage の '#id' 経路
+// （両ファイルで実績のあるアンカースクロール）に載せる
+function koMarkXPointerTarget(doc) {
+  const p = _koPendingTarget;
+  if (!p) return;
+  if (p.spineIdx !== state.currentSpineIdx) return;
+  _koPendingTarget = null;                 // 一回限り。外れても必ず捨てる
+  const r = koResolveSteps(doc.documentElement, p.steps);
+  // matched < 2 は body までしか辿れていない＝章頭と同じなので id を打たない
+  if (r && r.el && r.matched >= 2) r.el.id = KO_TARGET_ID;
+}
+
+// ── サーバから取る ──────────────────────
+async function koFetchProgress(docHash) {
+  const r = await koFetch('GET', '/syncs/progress/' + encodeURIComponent(docHash));
+  if (r.status === 401) throw new Error('auth');
+  if (!r.ok) return null;                  // 404 = 記録なし
+  const d = r.data;
+  // 記録が無いとき 200＋空ボディを返す実装もあるので、404 だけで判定しない
+  if (!d || typeof d.progress !== 'string' || !d.progress) return null;
+  return d;
+}
+
+async function koGetRemote(bookKey) {
+  const d = _koDocGet(bookKey);
+  if (!d) return null;
+  // 設定した方式を先に見る。両方に記録が残っている場合は、KOReader 側の設定と
+  // 一致するほうを正としたい（もう片方は過去の設定で書かれた古い記録でありうる）
+  const order = _kosync.method === 'filename' ? ['fn', 'bin'] : ['bin', 'fn'];
+  for (let i = 0; i < order.length; i++) {
+    const h = d[order[i]];
+    if (!h) continue;
+    const got = await koFetchProgress(h);
+    if (got) return { remote: got, method: order[i] === 'bin' ? 'binary' : 'filename' };
+  }
+  return null;
+}
+
+// ── progress → 着地点 ──────────────────
+async function koTargetFromProgress(progress) {
+  const xp = koParseXPointer(progress);
+  if (xp) {
+    if (xp.spineIdx < 0 || xp.spineIdx >= state.spine.length) return null;
+    // FXL は 1 spine = 1 ページなので章内位置の概念が無く、ページを開けば無損失（§4-5）
+    if (state.renderMode === 'fxl') return { spineIdx: xp.spineIdx, target: 'start', depth: 'page' };
+    const r = await koResolveInChapter(xp.spineIdx, xp.steps);
+    if (r && r.matched >= 2) {
+      return { spineIdx: xp.spineIdx, target: '#' + KO_TARGET_ID, steps: xp.steps,
+               depth: r.matched === r.total ? 'exact' : 'block' };
+    }
+    return { spineIdx: xp.spineIdx, target: 'start', depth: 'chapter' };
+  }
+  // ページ物（PDF/CBZ）の progress はページ番号の文字列。ePub では来ないが壊れないようにする
+  const n = parseInt(progress, 10);
+  if (!isNaN(n) && n >= 1 && n <= state.spine.length) {
+    return { spineIdx: n - 1, target: 'start', depth: 'chapter' };
+  }
+  return null;
+}
+
+// ── 提案（無断でジャンプしない・design_kosync.md §S4）──
+function showKosyncMoveToast(tgt, device, pct) {
+  const el = document.getElementById('toast');
+  _clearToastAction(el);
+  el.textContent = t('toast.kosyncAvailable', { device: device, pct: pct });
+  el.classList.add('show', 'toast-action');
+  el.style.cursor = 'pointer';
+  clearTimeout(el._timer);
+  const handler = () => {
+    _clearToastAction(el);
+    el.classList.remove('show');
+    // 着地点の id は buildSrcdoc が打つ。renderPage を呼ぶ直前に渡す
+    if (tgt.steps) _koPendingTarget = { spineIdx: tgt.spineIdx, steps: tgt.steps };
+    pushJumpHistory();
+    renderPage(tgt.spineIdx, tgt.target);
+    showToast(t('toast.kosyncJumped', { n: tgt.spineIdx + 1 }));
+  };
+  el._actionHandler = handler;
+  el.addEventListener('click', handler);
+  el._timer = setTimeout(() => { _clearToastAction(el); el.classList.remove('show'); }, 8000);
+}
+
+// ── 取得の入口 ────────────────────────
+// opts.silent    … 何も見つからなくてもトーストを出さない（自動同期向け・Step 5）
+// opts.onlyAhead … ローカルより先へ進んでいるときだけ提案する（自動同期向け・Step 5）
+async function koPullForCurrentBook(opts) {
+  const silent    = !!(opts && opts.silent);
+  const onlyAhead = !!(opts && opts.onlyAhead);
+  if (!state.epub || !state.bookKey) { if (!silent) showToast(t('toast.kosyncNoBook'));   return false; }
+  if (!koConfigured())               { if (!silent) showToast(t('toast.kosyncNotSetUp')); return false; }
+  const btn = document.getElementById('kosync-pull-btn');
+  if (btn) btn.disabled = true;
+  const bookKey = state.bookKey;
+  try {
+    const got = await koGetRemote(bookKey);
+    // 「見に行った」ことは結果に関わらず記録する（Step 5 で push を武装する条件）
+    _koPullDone.add(bookKey);
+    if (bookKey !== state.bookKey) return false;   // 待っている間に本が変わった
+    if (!got) { if (!silent) showToast(t('toast.kosyncNoRemote')); return false; }
+    const tgt = await koTargetFromProgress(got.remote.progress);
+    if (bookKey !== state.bookKey) return false;
+    if (!tgt) { if (!silent) showToast(t('toast.kosyncBadProgress')); return false; }
+    if (onlyAhead && !(tgt.spineIdx > state.currentSpineIdx)) {
+      if (!silent) showToast(t('toast.kosyncUpToDate'));
+      return false;
+    }
+    showKosyncMoveToast(tgt, got.remote.device || 'KOReader',
+                        Math.round((+got.remote.percentage || 0) * 100));
+    return true;
+  } catch (e) {
+    if (e && e.message === 'auth') showToast(t('toast.kosyncAuthFail'));
+    else if (!silent) showToast(_koNetMsg(e));
+    return false;
+  } finally {
+    if (btn) btn.disabled = false;
+  }
 }
 
 
@@ -9617,6 +9860,7 @@ function closeBook() {
   finalizeCurrentBook();
   _rdFlush(); _rdResetMeasure(); // G2: 計測を確定フラッシュして停止
   dismissFinishedBanner();
+  _koPendingTarget = null;   // KOReader 同期の一回限りの着地点を捨てる
   // フルスクリーン解除
   if (state.fullscreen) toggleFullscreen();
   // サイドバー・設定ポップオーバーを閉じる

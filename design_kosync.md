@@ -5,7 +5,7 @@
 関連: `design_finished_sync.md`（読了と同期の合流則）・`design_reading_list_v2.md`（墓標・bookKey）・
 `design_tts_background.md` Phase F（「連携先ごとの分岐を書かない」設計判断の前例）
 
-**実装状況: Step 0〜2 完了（転送層・ドキュメントハッシュ・設定 UI）。** 次は Step 3（pull）。
+**実装状況: Step 0〜3 完了（転送層・ハッシュ・設定 UI・pull）。** 次は Step 4（push）。
 テストは `tests/cases/kosync.js`（両ファイル各 53 assertion）。
 
 調査日: 2026-08-30。外部サーバの実測値は同日 UTC 03:36 のもの。
@@ -387,7 +387,9 @@ epub_kosync_docs = { [bookKey]: { bin, fn, name, size, lastPullAt, lastPushAt, r
   再ダウンロードや `.kepub` 変換をすると一致しない。
 - Filename … 拡張子込みのベース名が一致すること。リネームすると一致しない。
 
-→ **pull は Binary → Filename の順に両方試す**（U3 を無償で拾える）。**push は設定した方式のみ**
+→ **pull は両方試す**（U3 を無償で拾える）。順序は **設定した方式を先**にする —— 両方に記録が
+残っている場合、もう片方は過去の設定で書かれた古い記録でありうるので、KOReader 側の設定と
+一致するほうを正としたい。**push は設定した方式のみ**
 （両方に書くと使っていない側に古い記録が残り、後でそれを pull して後退する経路ができる）。
 
 ### 4-2. 位置の写像 — pull（KOReader → yomikake）
@@ -408,6 +410,18 @@ epub_kosync_docs = { [bookKey]: { bin, fn, name, size, lastPullAt, lastPushAt, r
 2. **ブロック祖先へ丸める**（保険）— 末端が解決できなければ、パスを後ろから削って
    最初に解決できた要素（多くは `p[K]`）で妥協する。行単位の誤差で済む。
 3. **章頭**（最後の砦）— `ratio = 0`。
+
+**実装は既存のアンカースクロールに載せる（重要）。** 解決できた要素に `id="__ko_xp_target"` を
+`buildSrcdoc()` の中で打ち、`renderPage(idx, '#__ko_xp_target')` を呼ぶ。`'#id'` 経路は
+**両ファイルで実績のある処理**（`yomikake.html` は `scrollIntoView`、iOS 版は transform の
+`setTx`/`setTy` 計算）で、しかも id が無ければ自動的に先頭へ落ちる。位置計算を新規に書くと
+iOS のスクロール機構ぶんだけ二重に持つことになるので、そこには手を出さない。
+着地点は **`_koPendingTarget` の一回限り**で渡し、`buildSrcdoc` が消費したら必ず捨てる
+（`_fxlPendingHighlight` と同じ作法）。本の切り替えと `closeBook()` でも掃除する。
+
+**解決の可否は描画前に判定する。** `buildSrcdoc` に入ってから外れると「id が無いので先頭に
+落ちる」しかできず、呼び出し側が章頭フォールバックを選べない。章の XHTML を先に読んで
+`koResolveInChapter()` で確かめてから `renderPage` を呼ぶ。
 
 **`percentage` は章内位置の推定に使わない**（§2-6 の実測。モデルが違い約 2 倍ずれる）。
 使うのは「`DocFragment[N]` が spine 範囲外」「ハッシュが Filename 一致だけで中身が違う疑い」
@@ -614,7 +628,7 @@ KOReader 実機でしか確かめられない**。そこで §4-3 のとおり
 | **0** | ~~C1 プロキシ ＋ KOReader 側 URL 設定~~ **✅ 完了（2026-08-30）** / 残: `sw.js` に除外 1 行（Step 1 と同時に入れる） | **Android・PocketBook の両実機で同期成功**。`https://www.ayati.com/kosync/users/auth` が上流の 401 を返すことも確認済み |
 | **1** | MD5 インライン ＋ `koPartialMd5` / `koFilenameMd5` ＋ `epub_kosync_docs` ＋ `sw.js` 除外 | **✅ 完了（2026-08-30）** — 実蔵書 2 冊で KOReader 実機のサイドカーと一致。`tests/cases/kosync.js`（両ファイル各 53 assertion）|
 | **2** | 設定 UI・認証・接続テスト・登録。i18n 4 言語 | **✅ 完了（2026-08-30）** — 接続テストの実通信は **ayati.com にデプロイしないと試せない**（localhost には `/kosync/` が無く、直接 send2ereader を指すと CORS で弾かれる）。Step 5 まで通してから 1 度デプロイして確認する |
-| **3** | **pull**（U1・U3）: 手動ボタン → §4-2 の 3 段解決でジャンプ・S4 のトースト | 実測 XPointer をテストベクタに入れる（`tests/cases/kosync.js`）＋ 実機 |
+| **3** | **pull**（U1・U3）: 手動ボタン → §4-2 の 3 段解決でジャンプ・S4 のトースト | **✅ 完了（2026-08-30）** — 実測 XPointer 3 例をベクタ化。fixture の実 ePub に対する着地も検証（`tests/cases/kosync.js`）|
 | **4** | **push**（U2）: §4-3 の生成＋自己検算＋章頭フォールバック | **KOReader 実機で送った位置が開くこと**（ここだけは実機でしか確かめられない） |
 | **5** | 自動同期（S5 の安全弁込み） | 実機・2 端末 |
 | **6** | 乱れた ePub での解決失敗を実データで詰める（`autoBoxing` 実例の収集） | 実機 |

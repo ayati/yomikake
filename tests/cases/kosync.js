@@ -243,6 +243,75 @@ T('リセット対象に kosync が入っていない',
   );
 })();
 
+
+// ══ Step 3: XPointer の解釈 ═════════════════════════════
+T('koParseXPointer が定義',   typeof koParseXPointer === 'function');
+T('koResolveSteps が定義',    typeof koResolveSteps === 'function');
+T('koTargetFromProgress が定義', typeof koTargetFromProgress === 'function');
+T('koPullForCurrentBook が定義', typeof koPullForCurrentBook === 'function');
+T('koMarkXPointerTarget が定義', typeof koMarkXPointerTarget === 'function');
+
+// KOReader 実機（Android / PocketBook）から採取した 3 例をそのままベクタにする
+(function () {
+  var a = koParseXPointer('/body/DocFragment[7]/body/div/p[88]/ruby[6]/rt/text().0');
+  T('実機例1: spine を 0 始まりに直す', a && a.spineIdx === 6, JSON.stringify(a && a.spineIdx));
+  T('実機例1: 経路は body/div/p/ruby/rt',
+    a && a.steps.map(function (x) { return x.tag; }).join('/') === 'body/div/p/ruby/rt',
+    a && JSON.stringify(a.steps));
+  T('実機例1: 添字なしは 1、添字ありはその値',
+    a && a.steps[1].idx === 1 && a.steps[2].idx === 88 && a.steps[3].idx === 6 && a.steps[4].idx === 1);
+
+  var b = koParseXPointer('/body/DocFragment[7]/body/div/p[83]/span[1]/text().26');
+  T('実機例2: 文字オフセット .26 は落とす',
+    b && b.steps.map(function (x) { return x.tag; }).join('/') === 'body/div/p/span',
+    b && JSON.stringify(b.steps));
+  T('実機例2: span[1]', b && b.steps[3].idx === 1);
+
+  var c = koParseXPointer('/body/DocFragment[26]/body/div/svg.0');
+  T('実機例3（FXL）: svg.0 のドット記法を落とす',
+    c && c.spineIdx === 25 && c.steps.map(function (x) { return x.tag; }).join('/') === 'body/div/svg',
+    c && JSON.stringify(c));
+})();
+
+// 壊れた入力を拾わない
+T('DocFragment が無い', koParseXPointer('/body/p[1]') === null);
+T('数値だけ', koParseXPointer('123') === null);
+T('空文字', koParseXPointer('') === null);
+T('null', koParseXPointer(null) === null);
+T('DocFragment[0] は無効', koParseXPointer('/body/DocFragment[0]/body') === null);
+T('添字 0 は無効', koParseXPointer('/body/DocFragment[1]/body/p[0]') === null);
+T('不正なタグ名', koParseXPointer('/body/DocFragment[1]/body/<p>') === null);
+T('DocFragment だけでも通る（章頭）',
+  (function () { var x = koParseXPointer('/body/DocFragment[3]'); return x && x.spineIdx === 2 && x.steps.length === 0; })());
+
+// 解決器（同名兄弟の 1 始まり添字・名前空間はローカル名で照合）
+// ⚠ div.innerHTML に <body> は入らない（HTML パーサが落とす）ので、
+//    実際の使われ方と同じく DOMParser で文書ごと組んで documentElement を渡す
+(function () {
+  var doc = new DOMParser().parseFromString(
+    '<html><body><h1>t</h1><p>1</p><p>2</p><p>3</p>' +
+    '<div><span>a</span><span>b</span></div></body></html>', 'text/html');
+  var rootEl = doc.documentElement, body = doc.body;
+  var r1 = koResolveSteps(rootEl, [{ tag: 'body', idx: 1 }, { tag: 'p', idx: 3 }]);
+  T('同名兄弟の 3 番目を取る', !!r1 && r1.el.textContent === '3' && r1.matched === 2,
+    r1 && (r1.el.textContent + '/' + r1.matched));
+  var r2 = koResolveSteps(rootEl, [{ tag: 'body', idx: 1 }, { tag: 'div', idx: 1 }, { tag: 'span', idx: 2 }]);
+  T('入れ子も辿れる', !!r2 && r2.el.textContent === 'b' && r2.matched === 3,
+    r2 && (r2.el.textContent + '/' + r2.matched));
+  var r3 = koResolveSteps(rootEl, [{ tag: 'body', idx: 1 }, { tag: 'p', idx: 99 }]);
+  T('外れたら辿れたところまで返す', !!r3 && r3.matched === 1 && r3.total === 2 && r3.el === body,
+    r3 && (r3.matched + '/' + r3.total));
+  // SVG は SVG 名前空間の要素だが crengine のパスには裸の svg として出る
+  var svg = doc.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  body.appendChild(svg);
+  var r4 = koResolveSteps(rootEl, [{ tag: 'body', idx: 1 }, { tag: 'svg', idx: 1 }]);
+  T('名前空間を無視してローカル名で照合する', !!r4 && r4.el === svg && r4.matched === 2,
+    r4 && String(r4.matched));
+  // head も body と同じ階層にあるが、経路が body から始まるので取り違えない
+  var r5 = koResolveSteps(rootEl, [{ tag: 'body', idx: 1 }]);
+  T('body は 1 番目の body を取る', !!r5 && r5.el === body);
+})();
+
 // ── 本を開いたら対応表ができる（loadEpub 統合）────
 fetch('tests/.fixtures/reflow.epub')
 .then(function (r) { return r.blob(); })
@@ -267,6 +336,62 @@ fetch('tests/.fixtures/reflow.epub')
   return koPartialMd5FromBlob(f).then(function (h) {
     T('binary ハッシュが実体から再計算した値と一致', d.bin === h, String(d.bin) + ' / ' + h);
   });
+})
+.then(function () {
+  // ══ Step 3: 実 ePub に対する着地 ════════════════════
+  // fixture は <body><h1 id="top">…</h1><p>×40</p></body>。
+  // p の中身は <ruby>本文<rt>ほんぶん</rt></ruby>…<span class="tcy">NN</span>行目。
+  T('fixture は 4 章以上', state.spine.length >= 4, String(state.spine.length));
+  return koTargetFromProgress('/body/DocFragment[3]/body/p[12]/span[1]/text().3');
+})
+.then(function (tgt) {
+  T('要素まで解決できたら anchor 経路に載せる',
+    tgt && tgt.spineIdx === 2 && tgt.target === '#' + KO_TARGET_ID, JSON.stringify(tgt));
+  T('全段解決なら depth=exact', tgt && tgt.depth === 'exact', tgt && tgt.depth);
+  T('ジャンプ用に steps を持ち帰る', tgt && tgt.steps && tgt.steps.length === 3);
+  return koTargetFromProgress('/body/DocFragment[3]/body/div/p[99]/em[2]');
+})
+.then(function (tgt) {
+  // fixture の body 直下に <div> は無い → body までしか辿れない＝章頭へ落ちる
+  T('解決できなければ章頭へ落とす',
+    tgt && tgt.spineIdx === 2 && tgt.target === 'start' && tgt.depth === 'chapter', JSON.stringify(tgt));
+  return koTargetFromProgress('/body/DocFragment[999]/body/p[1]');
+})
+.then(function (tgt) {
+  T('spine の範囲外は採用しない', tgt === null, JSON.stringify(tgt));
+  return koTargetFromProgress('/body/DocFragment[3]/body/p[12]/ruby[1]/rt/text().0');
+})
+.then(function (tgt) {
+  T('ルビの rt まで辿れる', tgt && tgt.target === '#' + KO_TARGET_ID && tgt.depth === 'exact',
+    JSON.stringify(tgt));
+  // buildSrcdoc が着地点に id を打つ
+  _koPendingTarget = { spineIdx: state.currentSpineIdx, steps: tgt.steps };
+  var item = state.spine[state.currentSpineIdx];
+  return state.epub.file(item.absPath).async('text').then(function (txt) {
+    return buildSrcdoc(txt, item.absPath, '#' + KO_TARGET_ID, _renderSeq);
+  });
+})
+.then(function (html) {
+  T('buildSrcdoc が着地点に id を打つ', html.indexOf(KO_TARGET_ID) >= 0);
+  T('id は 1 箇所だけ', html.split(KO_TARGET_ID).length - 1 <= 2, String(html.split(KO_TARGET_ID).length - 1));
+  T('一回限りで消費される（次の章へ漏れない）', _koPendingTarget === null);
+  // spine が違えば消費しない
+  _koPendingTarget = { spineIdx: state.currentSpineIdx + 1, steps: [{ tag: 'body', idx: 1 }, { tag: 'p', idx: 1 }] };
+  var item = state.spine[state.currentSpineIdx];
+  return state.epub.file(item.absPath).async('text').then(function (txt) {
+    return buildSrcdoc(txt, item.absPath, 'start', _renderSeq);
+  });
+})
+.then(function (html) {
+  T('別の章あての着地点は打たない', html.indexOf(KO_TARGET_ID) < 0);
+  T('別の章あての着地点は残す', _koPendingTarget !== null);
+  _koPendingTarget = null;
+  // 設定が無ければ通信せずに終わる
+  koSetServer(''); koSetUsername(''); koSetPassword('');
+  return koPullForCurrentBook({ silent: true });
+})
+.then(function (ok) {
+  T('未設定なら pull は何もしない', ok === false);
 })
 .then(function () {
   // 完全削除で対応表からも消える（論理削除では消さない）
