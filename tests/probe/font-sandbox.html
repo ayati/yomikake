@@ -15,7 +15,7 @@
  .note{font-size:13px;opacity:.75}
 </style>
 <h1>ローカルフォント × iframe sandbox 実測</h1>
-<p class="note">yomikake と同じ条件（https・同一オリジン）で開いてください。ご自分の日本語フォント（.ttf / .otf / .woff2）を選ぶだけです。フォントは<b>どこにも送信されません</b>。</p>
+<p class="note"><b>判定は FontFace の status を正とします。</b>初版は「同じ文字列の描画幅が変わるか」で判定していましたが、日本語のグリフは全角固定で<b>フォントが変わっても幅が 1px も動かない</b>ため、全条件が偽陰性になりました。幅差は参考値として併記します。<br>yomikake と同じ条件（https・同一オリジン）で開いてください。ご自分の日本語フォント（.ttf / .otf / .woff2）を選ぶだけです。フォントは<b>どこにも送信されません</b>。</p>
 
 <p><input type="file" id="pick" accept=".ttf,.otf,.woff,.woff2,font/*"></p>
 <p><button id="run" disabled>測定する（各 10 回）</button>
@@ -24,7 +24,7 @@
 <h2>結果</h2>
 <div id="log">フォントを選んでください。</div>
 <table id="tbl" hidden>
- <tr><th>条件</th><th>srcdoc 長</th><th>最速</th><th>中央値</th><th>最遅</th><th>フォント適用</th></tr>
+ <tr><th>条件</th><th>srcdoc 長</th><th>最速</th><th>中央値</th><th>最遅</th><th>フォント</th><th>内訳</th></tr>
 </table>
 <h2>見た目の確認（最後に描いたもの）</h2>
 <iframe id="view"></iframe>
@@ -63,44 +63,56 @@ function once(useSandbox, src) {
       '<!doctype html><meta charset="utf-8"><style>' +
       '@font-face{font-family:PROBE;src:url(' + src + ');font-display:block;}' +
       'body{margin:4px;font:20px PROBE,serif}</style>' +
-      '<body><span id="p">吾輩は猫である</span><span id="q" style="font:20px serif">吾輩は猫である</span>' +
+      '<body><span id="p">Handgloves 吾輩は猫である</span>' +
+      '<span id="q" style="font:20px serif">Handgloves 吾輩は猫である</span>' +
       '<scr' + 'ipt>' +
-      'function done(){var p=document.getElementById("p").getBoundingClientRect().width,' +
-      'q=document.getElementById("q").getBoundingClientRect().width;' +
-      'parent.postMessage({t:performance.now(),applied:Math.abs(p-q)>0.5},"*");}' +
+      // ⚠ 幅の比較だけで判定してはいけない。日本語のグリフは全角固定なので、
+      //   別のフォントに変わっても文字列の幅が 1px も動かない（初版はこれで全滅した）。
+      //   FontFace の status を正とし、幅は参考値として併記する。
+      'function done(){var st="(なし)";' +
+      ' document.fonts.forEach(function(f){ if(f.family==="PROBE") st=f.status; });' +
+      ' var p=document.getElementById("p").getBoundingClientRect().width,' +
+      '     q=document.getElementById("q").getBoundingClientRect().width;' +
+      ' parent.postMessage({t:performance.now(),status:st,' +
+      '   check:(document.fonts.check?document.fonts.check("20px PROBE"):null),' +
+      '   dw:Math.round(Math.abs(p-q)*10)/10},"*");}' +
       'if(document.fonts&&document.fonts.ready){document.fonts.ready.then(function(){' +
       'requestAnimationFrame(function(){requestAnimationFrame(done)});});}else{setTimeout(done,300);}' +
       CLOSE;
     const onMsg = ev => {
-      if (!ev.data || typeof ev.data.applied === 'undefined') return;
+      if (!ev.data || typeof ev.data.status === 'undefined') return;
       window.removeEventListener('message', onMsg);
-      resolve({ ms: performance.now() - t0, applied: ev.data.applied, len: html.length });
+      resolve({ ms: performance.now() - t0, len: html.length,
+                applied: ev.data.status === 'loaded', status: ev.data.status,
+                check: ev.data.check, dw: ev.data.dw });
     };
     window.addEventListener('message', onMsg);
     const t0 = performance.now();
     fr.srcdoc = html;
     setTimeout(() => { window.removeEventListener('message', onMsg);
-      resolve({ ms: -1, applied: false, len: html.length }); }, 15000);
+      resolve({ ms: -1, applied: false, status: '応答なし', check: null, dw: 0, len: html.length }); }, 15000);
   });
 }
 
 const med = a => { const b = a.slice().sort((x, y) => x - y); return b[b.length >> 1]; };
 
 async function bench(label, useSandbox, src, n) {
-  const ms = [], len0 = [], ok = [];
+  const ms = [], len0 = [], ok = []; let last = null;
   for (let i = 0; i < n; i++) {
     const r = await once(useSandbox, src);
-    ms.push(Math.round(r.ms)); ok.push(r.applied); len0.push(r.len);
+    ms.push(Math.round(r.ms)); ok.push(r.applied); len0.push(r.len); last = r;
     await new Promise(r2 => setTimeout(r2, 60));
   }
   const applied = ok.every(Boolean);
   const row = $('tbl').insertRow();
   const cells = [label, (len0[0] / 1048576).toFixed(2) + ' MB',
                  Math.min(...ms) + ' ms', med(ms) + ' ms', Math.max(...ms) + ' ms',
-                 applied ? '効いた' : (ok.some(Boolean) ? '不安定' : '効かない')];
+                 applied ? '読めた' : (ok.some(Boolean) ? '不安定' : '読めない'),
+                 last.status + ' / check=' + last.check + ' / 幅差' + last.dw + 'px'];
   cells.forEach((c, i) => { const td = row.insertCell(); td.textContent = c;
     if (i === 5) td.className = applied ? 'ok' : 'ng'; });
-  say(label + ' → 中央値 ' + med(ms) + ' ms / フォント' + (applied ? '適用OK' : '適用NG'));
+  say(label + ' → 中央値 ' + med(ms) + ' ms / FontFace=' + last.status +
+      ' / check=' + last.check + ' / 幅差=' + last.dw + 'px');
   return applied;
 }
 
@@ -114,8 +126,8 @@ $('run').addEventListener('click', async () => {
   await bench('③ sandbox なし + blob（現行）',        false, blobUrl, 10);
   await bench('④ sandbox + blob（壊れる想定）',       true,  blobUrl, 10);
   say('---');
-  say(a ? '★ ①が「効いた」なら C+ は成立します（sandbox を保ったままローカルフォントが使える）'
-        : '★ ①が「効かない」なら C+ は成立しません。設計をやり直します');
+  say(a ? '★ ①が「読めた」→ C+ 成立。sandbox を保ったままローカルフォントが使えます'
+        : '★ ①が「読めない」→ C+ 不成立。設計をやり直します');
   say('③と①の差が、保護を得るために払う時間の代償です。');
   $('run').disabled = $('run30').disabled = false;
 });
