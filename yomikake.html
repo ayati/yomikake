@@ -3782,7 +3782,7 @@ async function loadEpub(file, fileHandle = null) {
 
     // KOReader 同期用のドキュメントハッシュを確定させる（design_kosync.md §4-1）。
     // 実体が手元にあるのは開いた瞬間だけなので、キャッシュの有無に関わらずここで記録する。
-    koEnsureDocHashes(state.bookKey, file).catch(() => {});
+    _koHashReady = koEnsureDocHashes(state.bookKey, file).catch(() => null);
     _koPendingTarget = null;   // 前の本の着地点を持ち越さない
     _koPullDone.clear();
 
@@ -9188,6 +9188,10 @@ function _koDocDelete(bookKey) {
   _koDocsSave(all);
 }
 
+// 初回オープンでは自動 pull がハッシュ確定より先に走りうる。その場合 _koDocGet が
+// 空を返して「記録なし」と誤判定するので、完了を待てるように promise を持っておく
+let _koHashReady = null;
+
 // 本を開いたときに 2 方式のハッシュを確定させる。
 // 実体（Blob）が手元にあるのは開いた瞬間だけなので、ここで必ず記録しておく
 // —— 後から「キャッシュを消したのでハッシュが分からない」状態になると push できなくなる。
@@ -9584,6 +9588,7 @@ async function koPullForCurrentBook(opts) {
   if (btn) btn.disabled = true;
   const bookKey = state.bookKey;
   try {
+    try { await _koHashReady; } catch (e) { /* 失敗しても対応表があれば動く */ }
     const got = await koGetRemote(bookKey);
     // 「見に行った」ことは結果に関わらず記録する（Step 5 で push を武装する条件）
     _koPullDone.add(bookKey);
@@ -9740,6 +9745,7 @@ async function koPushForCurrentBook(opts) {
   if (!state.epub || !state.bookKey) { if (!silent) showToast(t('toast.kosyncNoBook'));   return false; }
   if (!koConfigured())               { if (!silent) showToast(t('toast.kosyncNotSetUp')); return false; }
   const bookKey = state.bookKey;
+  try { await _koHashReady; } catch (e) { /* 失敗しても対応表があれば動く */ }
   const hash = koDocHashForPush(bookKey);
   if (!hash) { if (!silent) showToast(t('toast.kosyncNoHash')); return false; }
   const btn = document.getElementById('kosync-push-btn');

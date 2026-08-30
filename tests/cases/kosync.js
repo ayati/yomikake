@@ -395,6 +395,8 @@ fetch('tests/.fixtures/reflow.epub')
   T('filename ハッシュが 32hex',  /^[0-9a-f]{32}$/.test(d.fn || ''), String(d.fn));
   T('filename ハッシュが md5(名前) と一致', d.fn === koFilenameMd5('reflow.epub'));
   T('binary ハッシュが 32hex', /^[0-9a-f]{32}$/.test(d.bin || ''), String(d.bin));
+  // 初回オープンでは自動 pull がハッシュ確定より先に走りうる。待てるようにしてある
+  T('ハッシュ確定を待てる promise がある', !!_koHashReady && typeof _koHashReady.then === 'function');
   T('binary と filename は別値', d.bin !== d.fn);
   return koPartialMd5FromBlob(f).then(function (h) {
     T('binary ハッシュが実体から再計算した値と一致', d.bin === h, String(d.bin) + ' / ' + h);
