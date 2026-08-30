@@ -230,6 +230,22 @@ T('リセット対象に kosync が入っていない',
     }));
 })();
 
+// ヘルプに載っていること（利用者が機能の存在に気づけるか）
+(function () {
+  ['ja', 'en', 'zh-TW', 'zh-CN'].forEach(function (lg) {
+    var b = I18N[lg]['help.body'];
+    T('help.body に KOReader の節がある（' + lg + '）', b.indexOf('KOReader') >= 0);
+    T('取得と送信の両方に触れている（' + lg + '）',
+      b.indexOf('⬇') >= 0 && b.indexOf('⬆') >= 0);
+    // しおりの節のあと・読みかけリストの節の前に置く（設定パネルの並びと揃える）
+    var iMark = b.indexOf('🔖'), iKo = b.indexOf('📖 KO'), iList = b.indexOf('📚 ');
+    T('しおりの節より後ろ（' + lg + '）', iKo > iMark, iMark + ' / ' + iKo);
+    T('読みかけリストの節より前（' + lg + '）', iKo < iList, iKo + ' / ' + iList);
+    // 使う前に知っておくべき制限を落としていないか
+    T('中継が要ることを書いている（' + lg + '）', b.indexOf('README') >= 0);
+  });
+})();
+
 // 設定が無い状態で押しても落ちない（通信は起きない）
 (function () {
   koSetServer(''); koSetUsername(''); koSetPassword('');
