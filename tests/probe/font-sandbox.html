@@ -1,0 +1,133 @@
+<!doctype html><html lang="ja"><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ローカルフォント × sandbox 実測</title>
+<style>
+ body{font:15px/1.7 system-ui,sans-serif;margin:14px;max-width:900px}
+ h1{font-size:19px} h2{font-size:16px;margin-top:22px}
+ button{font:inherit;padding:9px 16px;border:1px solid #888;border-radius:8px;background:#fff}
+ button:disabled{opacity:.45}
+ table{border-collapse:collapse;width:100%;margin-top:8px;font-size:14px}
+ th,td{border:1px solid #ccc;padding:5px 7px;text-align:right}
+ th:first-child,td:first-child{text-align:left}
+ #log{background:#f2f2f2;padding:9px;border-radius:6px;white-space:pre-wrap;font:13px/1.6 ui-monospace,monospace}
+ .ok{color:#0a7a2f;font-weight:700}.ng{color:#c00;font-weight:700}
+ iframe{width:100%;height:70px;border:1px solid #ccc;margin-top:6px}
+ .note{font-size:13px;opacity:.75}
+</style>
+<h1>ローカルフォント × iframe sandbox 実測</h1>
+<p class="note">yomikake と同じ条件（https・同一オリジン）で開いてください。ご自分の日本語フォント（.ttf / .otf / .woff2）を選ぶだけです。フォントは<b>どこにも送信されません</b>。</p>
+
+<p><input type="file" id="pick" accept=".ttf,.otf,.woff,.woff2,font/*"></p>
+<p><button id="run" disabled>測定する（各 10 回）</button>
+   <button id="run30" disabled>連打耐久（data URI × 30 回）</button></p>
+
+<h2>結果</h2>
+<div id="log">フォントを選んでください。</div>
+<table id="tbl" hidden>
+ <tr><th>条件</th><th>srcdoc 長</th><th>最速</th><th>中央値</th><th>最遅</th><th>フォント適用</th></tr>
+</table>
+<h2>見た目の確認（最後に描いたもの）</h2>
+<iframe id="view"></iframe>
+
+<script>
+const $ = id => document.getElementById(id);
+const log = [];
+const say = m => { log.push(m); $('log').textContent = log.join('\n'); };
+const CLOSE = '<' + '/script>';        // このファイル自体を壊さないため直書きしない
+let fontBuf = null, fontName = '', dataUri = '', blobUrl = '';
+
+$('pick').addEventListener('change', async e => {
+  const f = e.target.files[0]; if (!f) return;
+  log.length = 0; $('tbl').hidden = true;
+  fontName = f.name;
+  say('ファイル: ' + f.name + '  ' + (f.size / 1048576).toFixed(2) + ' MB');
+  fontBuf = await f.arrayBuffer();
+  const t0 = performance.now();
+  dataUri = await new Promise((res, rej) => {
+    const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej;
+    r.readAsDataURL(new Blob([fontBuf], { type: f.type || 'font/ttf' }));
+  });
+  say('data URI 生成: ' + Math.round(performance.now() - t0) + ' ms / 長さ ' +
+      (dataUri.length / 1048576).toFixed(2) + ' MB（元の ' + (dataUri.length / f.size).toFixed(2) + ' 倍）');
+  blobUrl = URL.createObjectURL(new Blob([fontBuf], { type: f.type || 'font/ttf' }));
+  $('run').disabled = false; $('run30').disabled = false;
+});
+
+// 1 回の描画を計測する。iframe が「フォント適用済みで描き終えた」と言うまでの時間
+function once(useSandbox, src) {
+  return new Promise(resolve => {
+    const fr = $('view');
+    if (useSandbox) fr.setAttribute('sandbox', 'allow-scripts allow-popups allow-popups-to-escape-sandbox');
+    else fr.removeAttribute('sandbox');
+    const html =
+      '<!doctype html><meta charset="utf-8"><style>' +
+      '@font-face{font-family:PROBE;src:url(' + src + ');font-display:block;}' +
+      'body{margin:4px;font:20px PROBE,serif}</style>' +
+      '<body><span id="p">吾輩は猫である</span><span id="q" style="font:20px serif">吾輩は猫である</span>' +
+      '<scr' + 'ipt>' +
+      'function done(){var p=document.getElementById("p").getBoundingClientRect().width,' +
+      'q=document.getElementById("q").getBoundingClientRect().width;' +
+      'parent.postMessage({t:performance.now(),applied:Math.abs(p-q)>0.5},"*");}' +
+      'if(document.fonts&&document.fonts.ready){document.fonts.ready.then(function(){' +
+      'requestAnimationFrame(function(){requestAnimationFrame(done)});});}else{setTimeout(done,300);}' +
+      CLOSE;
+    const onMsg = ev => {
+      if (!ev.data || typeof ev.data.applied === 'undefined') return;
+      window.removeEventListener('message', onMsg);
+      resolve({ ms: performance.now() - t0, applied: ev.data.applied, len: html.length });
+    };
+    window.addEventListener('message', onMsg);
+    const t0 = performance.now();
+    fr.srcdoc = html;
+    setTimeout(() => { window.removeEventListener('message', onMsg);
+      resolve({ ms: -1, applied: false, len: html.length }); }, 15000);
+  });
+}
+
+const med = a => { const b = a.slice().sort((x, y) => x - y); return b[b.length >> 1]; };
+
+async function bench(label, useSandbox, src, n) {
+  const ms = [], len0 = [], ok = [];
+  for (let i = 0; i < n; i++) {
+    const r = await once(useSandbox, src);
+    ms.push(Math.round(r.ms)); ok.push(r.applied); len0.push(r.len);
+    await new Promise(r2 => setTimeout(r2, 60));
+  }
+  const applied = ok.every(Boolean);
+  const row = $('tbl').insertRow();
+  const cells = [label, (len0[0] / 1048576).toFixed(2) + ' MB',
+                 Math.min(...ms) + ' ms', med(ms) + ' ms', Math.max(...ms) + ' ms',
+                 applied ? '効いた' : (ok.some(Boolean) ? '不安定' : '効かない')];
+  cells.forEach((c, i) => { const td = row.insertCell(); td.textContent = c;
+    if (i === 5) td.className = applied ? 'ok' : 'ng'; });
+  say(label + ' → 中央値 ' + med(ms) + ' ms / フォント' + (applied ? '適用OK' : '適用NG'));
+  return applied;
+}
+
+$('run').addEventListener('click', async () => {
+  $('run').disabled = $('run30').disabled = true;
+  $('tbl').hidden = false;
+  say('--- 測定開始（各 10 回）---');
+  // ★最重要: sandbox の中で data URI フォントが効くか
+  const a = await bench('① sandbox + data URI  ★本命', true,  dataUri, 10);
+  await bench('② sandbox なし + data URI',            false, dataUri, 10);
+  await bench('③ sandbox なし + blob（現行）',        false, blobUrl, 10);
+  await bench('④ sandbox + blob（壊れる想定）',       true,  blobUrl, 10);
+  say('---');
+  say(a ? '★ ①が「効いた」なら C+ は成立します（sandbox を保ったままローカルフォントが使える）'
+        : '★ ①が「効かない」なら C+ は成立しません。設計をやり直します');
+  say('③と①の差が、保護を得るために払う時間の代償です。');
+  $('run').disabled = $('run30').disabled = false;
+});
+
+$('run30').addEventListener('click', async () => {
+  $('run').disabled = $('run30').disabled = true;
+  say('--- 連打耐久: data URI で 30 回連続描画 ---');
+  const t0 = performance.now(); let ng = 0;
+  for (let i = 0; i < 30; i++) { const r = await once(true, dataUri); if (!r.applied) ng++; }
+  say('30 回で ' + Math.round(performance.now() - t0) + ' ms / 失敗 ' + ng + ' 回');
+  say('※ページが再読み込みされたらメモリ不足です（その場合は data URI 案は不可）');
+  $('run').disabled = $('run30').disabled = false;
+});
+</script>
+</html>
