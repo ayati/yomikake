@@ -367,6 +367,14 @@ T('段落つきの形',
   T('外側の div は含めない', blocks.every(function (b) { return b.el.localName !== 'div'; }));
 })();
 
+
+// ══ Step 5: 自動同期の安全弁 ═══════════════════════════
+T('koAutoPullOnOpen が定義',   typeof koAutoPullOnOpen === 'function');
+T('koScheduleAutoPush が定義', typeof koScheduleAutoPush === 'function');
+T('koRunAutoPush が定義',      typeof koRunAutoPush === 'function');
+T('koFlushAutoPush が定義',    typeof koFlushAutoPush === 'function');
+T('Drive 自動保存と同じ間隔を使う', AUTO_SAVE_INTERVAL === 60000, String(AUTO_SAVE_INTERVAL));
+
 // ── 本を開いたら対応表ができる（loadEpub 統合）────
 fetch('tests/.fixtures/reflow.epub')
 .then(function (r) { return r.blob(); })
@@ -513,9 +521,154 @@ fetch('tests/.fixtures/reflow.epub')
     document.getElementById('kosync-push-btn').parentElement);
 })
 .then(function () {
+  // ══ Step 5: 実際に飛ぶリクエストを検査する ═══════════
+  // window.fetch を差し替えて、koFetch が組み立てるヘッダと本文をそのまま覗く。
+  // ここを見ておけば、サーバへ何が届くかは実機を待たずに確かめられる
+  window.__koCalls = [];
+  window.__koRealFetch = window.fetch;
+  window.__koRes = function (status, obj) {
+    return { status: status, ok: status >= 200 && status < 300,
+             json: function () { return Promise.resolve(obj); } };
+  };
+  window.fetch = function (url, init) {
+    window.__koCalls.push({ url: url, init: init });
+    return Promise.resolve(window.__koRes(200, { status: 'success' }));
+  };
+  koSetServer('https://ex.example/kosync'); koSetUsername('u'); koSetPassword('pw');
+  _kosync.method = 'binary';
+  state.currentSpineIdx = 2; _intraChapterRatio = 0.5;
+  return koPushForCurrentBook({});
+})
+.then(function (ok) {
+  var c = window.__koCalls[0];
+  T('push が成功を返す', ok === true);
+  T('PUT /syncs/progress へ送る',
+    !!c && c.init.method === 'PUT' && c.url === 'https://ex.example/kosync/syncs/progress',
+    c && (c.init.method + ' ' + c.url));
+  T('accept ヘッダは KOReader と同じ',
+    c.init.headers['accept'] === 'application/vnd.koreader.v1+json');
+  T('x-auth-user を送る', c.init.headers['x-auth-user'] === 'u');
+  T('x-auth-key は md5（平文ではない）',
+    c.init.headers['x-auth-key'] === koMd5Bytes(new TextEncoder().encode('pw')));
+  var b = JSON.parse(c.init.body);
+  T('document は設定した方式のハッシュ', b.document === _koDocGet(state.bookKey).bin);
+  T('progress は XPointer', /^\/body\/DocFragment\[3\]\/body/.test(b.progress), b.progress);
+  T('percentage は 0〜1', b.percentage >= 0 && b.percentage <= 1, String(b.percentage));
+  T('device / device_id を送る',
+    b.device === _kosync.deviceName && b.device_id === _kosync.deviceId);
+  T('metadata に書名と著者', !!b.metadata && b.metadata.title === state.bookTitle &&
+    b.metadata.authors === state.bookCreator, JSON.stringify(b.metadata));
+  T('平文パスワードは一切送らない', JSON.stringify(c).indexOf('pw"') < 0 && c.init.headers['x-auth-key'] !== 'pw');
+
+  // pull: binary → filename の順に試す
+  window.__koCalls = [];
+  var d = _koDocGet(state.bookKey);
+  window.fetch = function (url, init) {
+    window.__koCalls.push({ url: url, init: init });
+    if (url.indexOf(d.bin) > 0) return Promise.resolve(window.__koRes(404, { status: 'not found' }));
+    return Promise.resolve(window.__koRes(200,
+      { progress: '/body/DocFragment[3]/body/p[5]', percentage: 0.5, device: 'PocketBook', timestamp: 1 }));
+  };
+  return koPullForCurrentBook({});
+})
+.then(function (ok) {
+  var calls = window.__koCalls, d = _koDocGet(state.bookKey);
+  T('pull が提案を出す', ok === true);
+  T('binary を先に試す', calls[0].url.indexOf(d.bin) > 0, calls[0].url);
+  T('空振りしたら filename に落ちる', calls.length === 2 && calls[1].url.indexOf(d.fn) > 0,
+    String(calls.length));
+  T('GET で取りに行く', calls[0].init.method === 'GET');
+  var el = document.getElementById('toast');
+  T('アクショントーストで提案する', el.classList.contains('toast-action'));
+  T('端末名と進捗を見せる',
+    el.textContent.indexOf('PocketBook') >= 0 && el.textContent.indexOf('50') >= 0, el.textContent);
+
+  // 方式を filename にすると順序が入れ替わる
+  _kosync.method = 'filename';
+  window.__koCalls = [];
+  window.fetch = function (url, init) {
+    window.__koCalls.push({ url: url, init: init });
+    return Promise.resolve(window.__koRes(404, { status: 'not found' }));
+  };
+  return koPullForCurrentBook({ silent: true });
+})
+.then(function (ok) {
+  var calls = window.__koCalls, d = _koDocGet(state.bookKey);
+  T('filename 設定なら filename を先に試す', calls[0].url.indexOf(d.fn) > 0, calls[0].url);
+  T('どちらも空振りなら提案しない', ok === false);
+  _kosync.method = 'binary';
+
+  // 記録なしを 200＋空で返す実装もある
+  window.__koCalls = [];
+  window.fetch = function (url) {
+    window.__koCalls.push({ url: url });
+    return Promise.resolve(window.__koRes(200, { document: 'x' }));   // progress が無い
+  };
+  return koPullForCurrentBook({ silent: true });
+})
+.then(function (ok) {
+  T('200＋progress 無しも「記録なし」として扱う', ok === false);
+
+  // 認証エラー
+  window.fetch = function () { return Promise.resolve(window.__koRes(401, { error: 'x' })); };
+  return koPullForCurrentBook({ silent: true });
+})
+.then(function (ok) {
+  T('401 なら提案しない', ok === false);
+  T('401 は認証エラーとして知らせる',
+    document.getElementById('toast').textContent === t('toast.kosyncAuthFail'),
+    document.getElementById('toast').textContent);
+
+  // ── 自動同期の安全弁 ──────────────────
+  window.fetch = function (url, init) {
+    window.__koCalls.push({ url: url, init: init });
+    return Promise.resolve(window.__koRes(200, { status: 'success' }));
+  };
+  _kosync.autoSync = false; window.__koCalls = [];
+  return koRunAutoPush();
+})
+.then(function () {
+  T('自動同期 OFF なら送らない', window.__koCalls.length === 0, String(window.__koCalls.length));
+  // 鉄則: pull が済むまで push を武装しない
+  _kosync.autoSync = true;
+  _koPullDone.delete(state.bookKey);
+  window.__koCalls = [];
+  return koRunAutoPush();
+})
+.then(function () {
+  T('pull が済むまで自動 push は動かない', window.__koCalls.length === 0, String(window.__koCalls.length));
+  _koPullDone.add(state.bookKey);
+  _koLastPushed = null;
+  window.__koCalls = [];
+  return koRunAutoPush();
+})
+.then(function () {
+  T('pull 済みなら自動 push が動く', window.__koCalls.length === 1, String(window.__koCalls.length));
+  window.__koCalls = [];
+  return koRunAutoPush();     // 位置は動いていない
+})
+.then(function () {
+  T('同じ位置は送り直さない', window.__koCalls.length === 0, String(window.__koCalls.length));
+  _intraChapterRatio = 0.05;  // 位置が戻る＝別の位置になった
+  window.__koCalls = [];
+  return koRunAutoPush();
+})
+.then(function () {
+  T('位置が動けば送る', window.__koCalls.length === 1, String(window.__koCalls.length));
+  // 本を開いたときの自動 pull も設定に従う
+  _kosync.autoSync = false; window.__koCalls = [];
+  koAutoPullOnOpen();
+  T('自動同期 OFF なら開いても取りに行かない', window.__koCalls.length === 0);
+  _kosync.autoSync = false;
+  window.fetch = window.__koRealFetch;   // 必ず戻す
+})
+.then(function () {
   // 完全削除で対応表からも消える（論理削除では消さない）
   var k = state.bookKey;
   _rlPurgeLocalData(k);
   T('完全削除で対応表からも消える', _koDocGet(k) === null);
 })
-.catch(function (e) { T('kosync 統合テストが例外なく終わる', false, String(e && e.message || e)); });
+.catch(function (e) {
+  if (window.__koRealFetch) window.fetch = window.__koRealFetch;
+  T('kosync 統合テストが例外なく終わる', false, String(e && e.message || e));
+});

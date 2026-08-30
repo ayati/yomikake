@@ -4077,6 +4077,7 @@ async function loadEpub(file) {
     }
     // 本ごとの表示設定を最初の描画より前に当てる（開いてから切り替わるチラつきを避ける）
     applyBookPrefs(state.bookKey);
+    koAutoPullOnOpen();   // 自動同期が ON のときだけ。無断ではジャンプしない
 
     // 表紙サムネイル抽出（非同期、失敗しても続行）
     state.bookCoverDataUri = '';
@@ -5941,6 +5942,7 @@ window.addEventListener('message', e => {
       _rdRecordActivity();
       _intraChapterRatio = e.data.ratio;
       if (!_tts.active) savePos(e.data.ratio);   // TTS中は文単位しおりを無意識スクロールで上書きさせない
+      koScheduleAutoPush();
       updatePageInfo();
     }
   }
@@ -9552,6 +9554,60 @@ async function koPushForCurrentBook(opts) {
   }
 }
 
+// ══════════════════════════════════════════
+//  KOReader 同期 — 自動同期（design_kosync.md §S3 / §S5）
+// ══════════════════════════════════════════
+// 既定は OFF。KOReader 側にも自動/手動の設定があり、両方が勝手に動くと
+// 「どちらが位置を書いたか」を追えなくなるので、まず手動で挙動を掴んでから ON にできる形にする。
+//
+// ⚠ 鉄則: pull が済むまで push を武装しない。
+// 先行事例（Readest）は XPointer の解決に黙って失敗したあと、5 秒後の自動保存が
+// 自分のローカル位置をリモートへ上書きし、正しい位置を破壊した。
+// yomikake では _koPullDone に載るまで自動 push が動かない。
+let _koAutoPushTimer = null;
+let _koAutoPushBusy  = false;
+let _koLastAutoPushAt = 0;
+
+// 本を開いた直後。ローカルより先へ進んでいるときだけ黙って提案する
+function koAutoPullOnOpen() {
+  if (!_kosync.autoSync || !koConfigured()) return;
+  koPullForCurrentBook({ silent: true, onlyAhead: true }).catch(() => {});
+}
+
+// 読書位置が動いたとき。Drive 自動保存と同じ 60 秒デバウンス
+function koScheduleAutoPush() {
+  if (!_kosync.autoSync || !koConfigured()) return;
+  if (!state.bookKey || !_koPullDone.has(state.bookKey)) return;   // 鉄則
+  if (_koAutoPushBusy) return;
+  clearTimeout(_koAutoPushTimer);
+  const delay = Math.max(0, AUTO_SAVE_INTERVAL - (Date.now() - _koLastAutoPushAt));
+  _koAutoPushTimer = setTimeout(koRunAutoPush, delay);
+}
+
+async function koRunAutoPush() {
+  if (!_kosync.autoSync || _koAutoPushBusy) return;
+  if (!state.bookKey || !_koPullDone.has(state.bookKey)) return;
+  _koAutoPushBusy = true;
+  try {
+    // ifChanged: 位置が動いていなければ送らない。KOReader 側の timestamp を
+    // 無意味に更新すると、あちらの正しい位置を「古い」と誤判定させてしまう
+    await koPushForCurrentBook({ silent: true, ifChanged: true });
+  } catch (e) { /* 自動なので黙って諦める */ }
+  finally {
+    _koLastAutoPushAt = Date.now();
+    _koAutoPushBusy = false;
+  }
+}
+
+// 本を閉じる・別の本へ移るときに、デバウンス待ちを確定させる
+function koFlushAutoPush() {
+  clearTimeout(_koAutoPushTimer);
+  _koAutoPushTimer = null;
+  if (!_kosync.autoSync || !koConfigured()) return;
+  if (!state.bookKey || !_koPullDone.has(state.bookKey)) return;
+  koRunAutoPush();
+}
+
 
 // ══════════════════════════════════════════
 //  本ごとの表示設定（B-7）
@@ -9811,6 +9867,7 @@ function finalizeCurrentBook() {
   if (!state.epub) return;
   savePos(_bookFinished ? 1.0 : _intraChapterRatio);
   driveSaveNow(); // 保留中の Drive 自動保存を即時確定（結果はトースト表示・ページ生存中なので確実）
+  koFlushAutoPush(); // 保留中の KOReader 自動送信も確定させる
 }
 
 function closeBook() {
