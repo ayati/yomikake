@@ -35,6 +35,36 @@ data URI 11.52 MB）。各 10 回の中央値。
 
 連打耐久: **data URI で 30 回連続描画 → 3592 ms・失敗 0 回・ページ再読み込みなし**。
 
+### 2-0. Chromium でも同じ（2026-08-30）
+
+Blink（PC Chrome / Android Chrome と同じエンジン）でも確認した。
+Chromium 145 headless・同一オリジンの HTTP サーバ・同じフォント:
+
+| 条件 | FontFace | check | 幅差 |
+|---|---|---|---|
+| ① sandbox + data URI | **`loaded`** | **true** | 19.7px |
+| ② sandbox なし + data URI | `loaded` | true | 19.7px |
+| ③ sandbox なし + blob | `loaded` | true | 19.7px |
+| ④ sandbox + blob | **`error`** | false | 0px |
+
+**WebKit と完全に同じパターン。** ④で Safari は `unloaded`、Blink は `error` を返す点だけが違う
+（どちらも読めていない）。したがって **PC Chrome / Android Chrome でも設計は成立する**。
+
+⚠ ここで測った所要時間は当てにならない（ポーリング間隔 50ms ＋ `font-display:block` の
+ブロック期間が混ざるため、全条件が約 1000ms で並ぶ）。**速度の根拠は §2 の iPad 実測のほう**。
+
+⚠ **Android 実機は未確認。** Blink なので挙動は同じはずだが、**メモリは iPad より厳しいことがある**。
+11.5 MB の data URI を章ごとに扱う連打耐久は Android 実機で見ておきたい（§4-1）。
+
+### 2-0-1. headless で測るときの罠
+
+- `--virtual-time-budget` を使うと **srcdoc iframe の中のスクリプトが動かない**ことがある
+  （`postMessage` が 1 通も来ない）。`FileReader` も発火しない
+- 対策: virtual time を使わず、**ページ側から結果を HTTP で送り返させる**
+  （`fetch('/report?d=...')` をローカルサーバで受ける）。`tests/probe/` と同じ検査を
+  実時間で回せる
+- ⚠ `pkill -f <パターン>` は**自分のシェルのコマンドラインにも一致して自死する**。PID で止める
+
 別の検査（`temp_sample/sandbox probe.png`）で sandbox 内の環境も確認済み:
 `origin = null` / `localStorage: SecurityError` / `postMessage`・`getComputedStyle`・
 `PointerEvent`・`ontouchstart` すべて生存 / クロスオリジン fetch は CORS で弾かれない。
@@ -108,7 +138,7 @@ data URI 経路に一本化する。`file://` 用に既にある実装をその�
 | 1 | `cfGetFontSrc()` を data URI 一本化（blob 経路と `_cfBlobUrlCache` を削除） |
 | 2 | `<iframe>` に `sandbox` 属性を付ける（両ファイル） |
 | 3 | テスト: sandbox 属性が焼き込まれていること・blob 経路が消えたこと |
-| 4 | **4 環境の実機確認**（PC / Android / iPhone / iPad） |
+| 4 | **4 環境の実機確認**（PC / Android / iPhone / iPad）。**Android は特にメモリ**（data URI の連打耐久） |
 
 ⚠ Step 4 が本体。**自動テストでは担保できない** —— headless は rAF を差し替えており、
 sandbox 起因のタイミング差は隠れる（`tests/README.md` の「担保できないこと」と同じ理由）。
