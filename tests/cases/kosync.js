@@ -99,6 +99,150 @@ Object.keys(_WANT).forEach(function (n) {
   _koDocDelete('epub_pos_混入検査__著者');
 })();
 
+
+// ══ Step 2: 設定・接続 ═══════════════════════════════════
+T('koBaseUrl が定義',      typeof koBaseUrl === 'function');
+T('koFetch が定義',        typeof koFetch === 'function');
+T('koTestConnection が定義', typeof koTestConnection === 'function');
+T('koRegister が定義',     typeof koRegister === 'function');
+T('updateKosyncUI が定義', typeof updateKosyncUI === 'function');
+T('_kosync が存在',        _kosync && typeof _kosync === 'object');
+
+// 既定値
+T('同期方法の既定は binary（KOReader と同じ）', _kosync.method === 'binary');
+T('自動同期の既定は OFF', _kosync.autoSync === false);
+T('端末 ID が 32hex で生成される', /^[0-9a-f]{32}$/.test(_kosync.deviceId), String(_kosync.deviceId));
+T('端末名の既定は yomikake', _kosync.deviceName === 'yomikake');
+
+// URL の正規化（末尾スラッシュを残すと //users/auth になって 404 になる）
+(function () {
+  var keep = _kosync.server;
+  koSetServer('https://www.ayati.com/kosync/');
+  T('末尾スラッシュを落とす', koBaseUrl() === 'https://www.ayati.com/kosync');
+  koSetServer('https://www.ayati.com/kosync///');
+  T('末尾スラッシュが複数でも落とす', koBaseUrl() === 'https://www.ayati.com/kosync');
+  koSetServer('www.ayati.com/kosync');
+  T('スキームが無ければ https を補う', koBaseUrl() === 'https://www.ayati.com/kosync');
+  koSetServer('  https://x.example/k  ');
+  T('前後の空白を落とす', koBaseUrl() === 'https://x.example/k');
+  koSetServer('');
+  T('空なら空文字', koBaseUrl() === '');
+  koSetServer(keep || '');
+})();
+
+// パスワードは平文で持たない（md5 だけを保存する）
+(function () {
+  koSetUsername('tester');
+  koSetPassword('p@ssw0rd-平文');
+  T('userkey は md5', _kosync.userkey === koMd5Bytes(new TextEncoder().encode('p@ssw0rd-平文')));
+  T('userkey は 32hex', /^[0-9a-f]{32}$/.test(_kosync.userkey));
+  var raw = localStorage.getItem(KOSYNC_CONF_KEY) || '';
+  T('平文パスワードを保存しない', raw.indexOf('p@ssw0rd') < 0, raw.slice(0, 80));
+  T('_kosync に password フィールドを作らない', _kosync.password === undefined);
+  koSetPassword('');
+  T('空入力で userkey を消せる', _kosync.userkey === '');
+})();
+
+// 揃っているかの判定
+(function () {
+  koSetServer(''); koSetUsername(''); koSetPassword('');
+  T('未設定なら koConfigured は false', koConfigured() === false);
+  koSetServer('https://x.example/k');
+  T('サーバだけでは false', koConfigured() === false);
+  koSetUsername('u'); koSetPassword('pw');
+  T('サーバ＋資格情報で true', koConfigured() === true);
+})();
+
+// 保存形式の検証（壊れた値・不正な方式を拾わない）
+(function () {
+  var keep = localStorage.getItem(KOSYNC_CONF_KEY);
+  localStorage.setItem(KOSYNC_CONF_KEY, '{壊れた JSON');
+  T('壊れた設定は既定値に戻る', _koConfLoad().method === 'binary');
+  localStorage.setItem(KOSYNC_CONF_KEY, JSON.stringify({ method: 'evil', userkey: 'ダメ', deviceId: '!!' }));
+  var c = _koConfLoad();
+  T('不正な同期方法は採用しない', c.method === 'binary');
+  T('32hex でない userkey は採用しない', c.userkey === '');
+  T('不正な端末 ID は作り直す', /^[0-9a-f]{32}$/.test(c.deviceId));
+  if (keep === null) localStorage.removeItem(KOSYNC_CONF_KEY); else localStorage.setItem(KOSYNC_CONF_KEY, keep);
+  _kosync = _koConfLoad();
+})();
+
+// UI
+T('設定に KOReader 同期グループがある', !!document.getElementById('kosync-group'));
+T('Drive グループの直後に置く',
+  (document.getElementById('drive-auto-group').nextElementSibling || {}).id === 'kosync-group');
+T('サーバ URL 欄がある',   !!document.getElementById('kosync-server'));
+T('パスワード欄は type=password',
+  (document.getElementById('kosync-pass') || {}).type === 'password');
+T('同期方法のセレクトがある', !!document.getElementById('kosync-method'));
+T('自動同期トグルがある',   !!document.getElementById('kosync-auto-toggle'));
+(function () {
+  koSetServer('https://x.example/k'); koSetUsername('u'); koSetPassword('pw');
+  _kosync.autoSync = false; updateKosyncUI();
+  T('トグルが OFF を表示', document.getElementById('kosync-auto-toggle').textContent === 'OFF');
+  toggleKosyncAutoSync();
+  T('押すと ON になる', _kosync.autoSync === true &&
+    document.getElementById('kosync-auto-toggle').textContent === 'ON');
+  toggleKosyncAutoSync();
+  T('もう一度押すと OFF に戻る', _kosync.autoSync === false);
+  T('設定が揃えば接続テストが押せる', document.getElementById('kosync-test-btn').disabled === false);
+  koSetUsername('');
+  T('資格情報が欠けたら押せない', document.getElementById('kosync-test-btn').disabled === true);
+  koSetUsername('u');
+  T('入力欄に保存値が入る', document.getElementById('kosync-server').value === 'https://x.example/k');
+  T('パスワード欄は保存済みを示すだけ',
+    document.getElementById('kosync-pass').value === '' &&
+    document.getElementById('kosync-pass').placeholder === t('kosync.passwordSaved'));
+})();
+
+// 認証情報が同期・書き出しに載らないこと（設計 S6・最重要）
+(function () {
+  koSetServer('https://x.example/k'); koSetUsername('himitsu-user'); koSetPassword('himitsu-pass');
+  var json = JSON.stringify(collectBookmarks());
+  T('collectBookmarks に epub_kosync が載らない', json.indexOf('epub_kosync') < 0);
+  T('collectBookmarks にユーザー名が載らない',   json.indexOf('himitsu-user') < 0);
+  T('collectBookmarks に userkey が載らない',    json.indexOf(_kosync.userkey) < 0);
+  var settings = localStorage.getItem('epub_settings') || '';
+  T('epub_settings にも混ざらない', settings.indexOf('himitsu-user') < 0 && settings.indexOf('userkey') < 0);
+})();
+
+// 表示設定リセットは認証情報を消さない（DISPLAY_DEFAULTS の範囲外）
+T('リセット対象に kosync が入っていない',
+  DISPLAY_DEFAULTS.kosync === undefined && DISPLAY_DEFAULTS.autoSync === undefined);
+
+// i18n 4 言語
+(function () {
+  var keys = Object.keys(I18N.ja).filter(function (k) {
+    return k.indexOf('kosync.') === 0 || k.indexOf('toast.kosync') === 0 || k === 'settings.kosyncGroup';
+  });
+  T('kosync の i18n キーがある', keys.length >= 25, String(keys.length));
+  ['en', 'zh-TW', 'zh-CN'].forEach(function (lg) {
+    var missing = keys.filter(function (k) { return !I18N[lg][k]; });
+    T('i18n ' + lg + ' に欠けが無い', missing.length === 0, missing.join(','));
+  });
+  T('{user} プレースホルダが 4 言語に残っている',
+    ['ja', 'en', 'zh-TW', 'zh-CN'].every(function (lg) {
+      return I18N[lg]['kosync.registerConfirm'].indexOf('{user}') >= 0;
+    }));
+  T('{msg} プレースホルダが 4 言語に残っている',
+    ['ja', 'en', 'zh-TW', 'zh-CN'].every(function (lg) {
+      return I18N[lg]['toast.kosyncNetFail'].indexOf('{msg}') >= 0;
+    }));
+})();
+
+// 設定が無い状態で押しても落ちない（通信は起きない）
+(function () {
+  koSetServer(''); koSetUsername(''); koSetPassword('');
+  var threw = false;
+  try { koTestConnection(); koRegister(); } catch (e) { threw = true; }
+  T('未設定で押しても例外にならない', !threw);
+  // async 関数なので同期例外にはならず Promise が reject される。必ず受け止めること
+  koFetch('GET', '/users/auth').then(
+    function () { T('サーバ未設定なら koFetch は reject する', false, 'resolve してしまった'); },
+    function (e) { T('サーバ未設定なら koFetch は reject する', String(e.message) === 'no-server', String(e.message)); }
+  );
+})();
+
 // ── 本を開いたら対応表ができる（loadEpub 統合）────
 fetch('tests/.fixtures/reflow.epub')
 .then(function (r) { return r.blob(); })

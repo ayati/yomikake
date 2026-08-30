@@ -5,7 +5,7 @@
 関連: `design_finished_sync.md`（読了と同期の合流則）・`design_reading_list_v2.md`（墓標・bookKey）・
 `design_tts_background.md` Phase F（「連携先ごとの分岐を書かない」設計判断の前例）
 
-**実装状況: Step 0（転送層）・Step 1（ドキュメントハッシュ）まで完了。** 次は Step 2（設定 UI）。
+**実装状況: Step 0〜2 完了（転送層・ドキュメントハッシュ・設定 UI）。** 次は Step 3（pull）。
 テストは `tests/cases/kosync.js`（両ファイル各 53 assertion）。
 
 調査日: 2026-08-30。外部サーバの実測値は同日 UTC 03:36 のもの。
@@ -613,7 +613,7 @@ KOReader 実機でしか確かめられない**。そこで §4-3 のとおり
 |---|---|---|
 | **0** | ~~C1 プロキシ ＋ KOReader 側 URL 設定~~ **✅ 完了（2026-08-30）** / 残: `sw.js` に除外 1 行（Step 1 と同時に入れる） | **Android・PocketBook の両実機で同期成功**。`https://www.ayati.com/kosync/users/auth` が上流の 401 を返すことも確認済み |
 | **1** | MD5 インライン ＋ `koPartialMd5` / `koFilenameMd5` ＋ `epub_kosync_docs` ＋ `sw.js` 除外 | **✅ 完了（2026-08-30）** — 実蔵書 2 冊で KOReader 実機のサイドカーと一致。`tests/cases/kosync.js`（両ファイル各 53 assertion）|
-| **2** | 設定 UI・認証・接続テスト・登録。i18n 4 言語 | 手動 |
+| **2** | 設定 UI・認証・接続テスト・登録。i18n 4 言語 | **✅ 完了（2026-08-30）** — 接続テストの実通信は **ayati.com にデプロイしないと試せない**（localhost には `/kosync/` が無く、直接 send2ereader を指すと CORS で弾かれる）。Step 5 まで通してから 1 度デプロイして確認する |
 | **3** | **pull**（U1・U3）: 手動ボタン → §4-2 の 3 段解決でジャンプ・S4 のトースト | 実測 XPointer をテストベクタに入れる（`tests/cases/kosync.js`）＋ 実機 |
 | **4** | **push**（U2）: §4-3 の生成＋自己検算＋章頭フォールバック | **KOReader 実機で送った位置が開くこと**（ここだけは実機でしか確かめられない） |
 | **5** | 自動同期（S5 の安全弁込み） | 実機・2 端末 |

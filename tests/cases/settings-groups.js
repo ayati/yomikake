@@ -1,6 +1,6 @@
 // B-5 設定グループの折りたたみ
 var IDS = Object.keys(SET_GROUP_DEFAULT_OPEN);
-T('折りたたみ対象は9グループ', IDS.length === 9, String(IDS.length));
+T('折りたたみ対象は10グループ', IDS.length === 10, String(IDS.length));
 T('全て <details> になっている',
   IDS.every(function (id) { var e = document.getElementById(id); return e && e.tagName === 'DETAILS'; }),
   IDS.filter(function (id) {
@@ -20,10 +20,11 @@ T('既定でカラー/タイポグラフィ/レイアウトが開く',
   document.getElementById('color-group').open &&
   document.getElementById('typography-group').open &&
   document.getElementById('layout-group').open);
-T('既定でツールバー/読み上げ/Drive/しおり/キャッシュ/言語が閉じる',
+T('既定でツールバー/読み上げ/Drive/KOReader/しおり/キャッシュ/言語が閉じる',
   !document.getElementById('toolbar-settings-group').open &&
   !document.getElementById('tts-settings-group').open &&
   !document.getElementById('drive-auto-group').open &&
+  !document.getElementById('kosync-group').open &&
   !document.getElementById('bookmark-io-group').open &&
   !document.getElementById('cache-group').open &&
   !document.getElementById('lang-group').open);

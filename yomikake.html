@@ -365,6 +365,12 @@
   .set-io-btn { flex:1; font-size:13px; font-weight:600; color:var(--ui-text); background:var(--ui-bg); border:1px solid var(--ui-border); border-radius:8px; padding:7px 14px; cursor:pointer; transition:all .15s; white-space:nowrap; }
   .set-io-btn:hover { border-color:var(--accent); color:var(--accent); }
 
+  /* ── 設定ポップオーバー内のテキスト入力（KOReader 同期） ── */
+  .set-field { flex-direction:column; align-items:stretch; gap:5px; }
+  .set-input { width:100%; box-sizing:border-box; font-family:inherit; font-size:13px; color:var(--ui-text); background:var(--ui-bg); border:1px solid var(--ui-border); border-radius:8px; padding:7px 10px; transition:border-color .15s; }
+  .set-input:focus { outline:none; border-color:var(--accent); }
+  .set-hint { font-size:11px; opacity:.6; line-height:1.5; }
+
   #page-container { width:100%; height:100%; display:none; align-items:stretch; justify-content:center; position:relative; }
   #page-container.visible { display:flex; }
   /* reclaimKeyFocus() が tabindex="-1" を付けて programmatic focus するので枠線を出さない */
@@ -1146,6 +1152,49 @@
                 style="border:1px solid var(--ui-border);border-radius:8px;padding:6px 16px;min-width:60px;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;">OFF</button>
       </div>
     </details>
+    <details class="set-group" id="kosync-group">
+      <summary><h4 data-i18n="settings.kosyncGroup">📖 KOReader 同期</h4></summary>
+      <div class="set-row set-field">
+        <span class="set-label" data-i18n="kosync.server">同期サーバー</span>
+        <input class="set-input" id="kosync-server" type="url" inputmode="url" autocomplete="off"
+               spellcheck="false" placeholder="https://example.com/kosync" onchange="koSetServer(this.value)">
+        <span class="set-hint" data-i18n="kosync.serverHelp">KOReader の「カスタム同期サーバー」と同じ URL を入れます</span>
+      </div>
+      <div class="set-row set-field">
+        <span class="set-label" data-i18n="kosync.username">ユーザー名</span>
+        <input class="set-input" id="kosync-user" type="text" autocomplete="off" spellcheck="false"
+               onchange="koSetUsername(this.value)">
+      </div>
+      <div class="set-row set-field">
+        <span class="set-label" data-i18n="kosync.password">パスワード</span>
+        <input class="set-input" id="kosync-pass" type="password" autocomplete="new-password"
+               onchange="koSetPassword(this.value)">
+      </div>
+      <div class="set-row">
+        <span class="set-label" data-i18n="kosync.method">同期方法</span>
+        <select class="modern-select" id="kosync-method" onchange="koSetMethod(this.value)">
+          <option value="binary"   data-i18n="kosync.methodBinary">Binary（ファイルの中身）</option>
+          <option value="filename" data-i18n="kosync.methodFilename">Filename（ファイル名）</option>
+        </select>
+      </div>
+      <span class="set-hint" style="padding:0 8px;display:block;" data-i18n="kosync.methodHelp">KOReader 側の設定に合わせます</span>
+      <div class="set-row">
+        <span class="set-label" data-i18n="kosync.autoSync">自動同期</span>
+        <button id="kosync-auto-toggle" onclick="toggleKosyncAutoSync()" style="border:1px solid var(--ui-border);border-radius:8px;padding:6px 16px;min-width:60px;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;">OFF</button>
+      </div>
+      <div class="set-row set-field">
+        <span class="set-label" data-i18n="kosync.deviceName">この端末の名前</span>
+        <input class="set-input" id="kosync-device" type="text" autocomplete="off" onchange="koSetDeviceName(this.value)">
+      </div>
+      <div class="set-row" style="gap:8px;">
+        <button class="set-io-btn" id="kosync-test-btn" onclick="koTestConnection()" data-i18n="kosync.test">接続テスト</button>
+        <button class="set-io-btn" id="kosync-register-btn" onclick="koRegister()" data-i18n="kosync.register">新規登録</button>
+      </div>
+      <div class="set-row">
+        <button class="set-io-btn" id="kosync-clear-btn" onclick="koClearConf()" data-i18n="kosync.clear">設定を消す</button>
+      </div>
+      <span class="set-hint" style="padding:0 8px;display:block;" data-i18n="kosync.note">ユーザー名とパスワードはこの端末にだけ保存されます</span>
+    </details>
     <details class="set-group" id="bookmark-io-group">
       <summary><h4 data-i18n="settings.bookmarkGroup">🔖 しおりデータ（JSON）</h4></summary>
       <div class="set-row" style="gap:8px;">
@@ -1709,6 +1758,33 @@ const I18N = {
     'btn.fullscreen':            'フルスクリーン',
     'btn.fullscreen.exit':       '読書モード終了',
     'settings.driveGroup':       'Google Drive',
+    'settings.kosyncGroup':   '📖 KOReader 同期',
+    'kosync.server':          '同期サーバー',
+    'kosync.serverHelp':      'KOReader の「カスタム同期サーバー」と同じ URL を入れます',
+    'kosync.username':        'ユーザー名',
+    'kosync.password':        'パスワード',
+    'kosync.passwordSaved':   '保存済み（変更するときだけ入力）',
+    'kosync.method':          '同期方法',
+    'kosync.methodBinary':    'Binary（ファイルの中身）',
+    'kosync.methodFilename':  'Filename（ファイル名）',
+    'kosync.methodHelp':      'KOReader 側の設定に合わせます。取得のときは両方試すので、送信先の指定だと思ってください',
+    'kosync.autoSync':        '自動同期',
+    'kosync.deviceName':      'この端末の名前',
+    'kosync.test':            '接続テスト',
+    'kosync.register':        '新規登録',
+    'kosync.clear':           '設定を消す',
+    'kosync.clearConfirm':    'KOReader 同期の設定（サーバー・ユーザー名・パスワード）をこの端末から消します。よろしいですか？',
+    'kosync.registerConfirm': '同期サーバーに「{user}」というアカウントを新しく作ります。すでにお持ちなら登録は不要です。よろしいですか？',
+    'kosync.note':            'ユーザー名とパスワードはこの端末にだけ保存されます（しおりの書き出しにも Drive 同期にも含まれません）。同期専用のアカウントを作ることをおすすめします。',
+    'toast.kosyncOk':         'KOReader 同期サーバーに接続できました',
+    'toast.kosyncAuthFail':   'ユーザー名かパスワードが違います',
+    'toast.kosyncNoServer':   '同期サーバーの URL を入れてください',
+    'toast.kosyncNoCred':     'ユーザー名とパスワードを入れてください',
+    'toast.kosyncNetFail':    '同期サーバーに接続できません（{msg}）',
+    'toast.kosyncTimeout':    '同期サーバーの応答がありません',
+    'toast.kosyncRegistered': 'アカウントを作成しました',
+    'toast.kosyncTaken':      'そのユーザー名はすでに使われています',
+    'toast.kosyncCleared':    'KOReader 同期の設定を消しました',
     'settings.fsHud':              '全画面の隅表示',
     'settings.orientationLock':    '画面の向き（全画面時）',
     'settings.bookPrefs':          '本ごとに表示設定を覚える',
@@ -2112,6 +2188,33 @@ const I18N = {
     'btn.fullscreen':            'Fullscreen',
     'btn.fullscreen.exit':       'Exit reader',
     'settings.driveGroup':       'Google Drive',
+    'settings.kosyncGroup':   '📖 KOReader sync',
+    'kosync.server':          'Sync server',
+    'kosync.serverHelp':      'The same URL as KOReader’s “Custom sync server”',
+    'kosync.username':        'Username',
+    'kosync.password':        'Password',
+    'kosync.passwordSaved':   'Saved — type only to change it',
+    'kosync.method':          'Sync method',
+    'kosync.methodBinary':    'Binary (file contents)',
+    'kosync.methodFilename':  'Filename',
+    'kosync.methodHelp':      'Match KOReader’s setting. Pulling tries both, so this really chooses where to push.',
+    'kosync.autoSync':        'Auto sync',
+    'kosync.deviceName':      'Name of this device',
+    'kosync.test':            'Test connection',
+    'kosync.register':        'Register',
+    'kosync.clear':           'Clear settings',
+    'kosync.clearConfirm':    'Remove the KOReader sync settings (server, username, password) from this device?',
+    'kosync.registerConfirm': 'Create a new account “{user}” on the sync server? Skip this if you already have one.',
+    'kosync.note':            'Your username and password stay on this device — they are never included in bookmark exports or Drive sync. A dedicated account is recommended.',
+    'toast.kosyncOk':         'Connected to the KOReader sync server',
+    'toast.kosyncAuthFail':   'Wrong username or password',
+    'toast.kosyncNoServer':   'Enter the sync server URL',
+    'toast.kosyncNoCred':     'Enter your username and password',
+    'toast.kosyncNetFail':    'Cannot reach the sync server ({msg})',
+    'toast.kosyncTimeout':    'The sync server did not respond',
+    'toast.kosyncRegistered': 'Account created',
+    'toast.kosyncTaken':      'That username is already taken',
+    'toast.kosyncCleared':    'KOReader sync settings cleared',
     'settings.fsHud':              'Fullscreen corner',
     'settings.orientationLock':    'Orientation (fullscreen)',
     'settings.bookPrefs':          'Remember settings per book',
@@ -2515,6 +2618,33 @@ const I18N = {
     'btn.fullscreen':            '全螢幕',
     'btn.fullscreen.exit':       '結束閱讀模式',
     'settings.driveGroup':       'Google Drive',
+    'settings.kosyncGroup':   '📖 KOReader 同步',
+    'kosync.server':          '同步伺服器',
+    'kosync.serverHelp':      '與 KOReader 的「自訂同步伺服器」使用相同網址',
+    'kosync.username':        '使用者名稱',
+    'kosync.password':        '密碼',
+    'kosync.passwordSaved':   '已儲存（要更改時才輸入）',
+    'kosync.method':          '同步方式',
+    'kosync.methodBinary':    'Binary（檔案內容）',
+    'kosync.methodFilename':  'Filename（檔案名稱）',
+    'kosync.methodHelp':      '請與 KOReader 的設定一致。讀取時兩種都會嘗試，因此這裡等於指定上傳的方式。',
+    'kosync.autoSync':        '自動同步',
+    'kosync.deviceName':      '本裝置名稱',
+    'kosync.test':            '測試連線',
+    'kosync.register':        '註冊新帳號',
+    'kosync.clear':           '清除設定',
+    'kosync.clearConfirm':    '要從本裝置移除 KOReader 同步設定（伺服器、使用者名稱、密碼）嗎？',
+    'kosync.registerConfirm': '要在同步伺服器上建立新帳號「{user}」嗎？若已有帳號則不需要。',
+    'kosync.note':            '使用者名稱與密碼只會儲存在本裝置，不會包含在書籤匯出或 Drive 同步中。建議另外建立專用帳號。',
+    'toast.kosyncOk':         '已連線到 KOReader 同步伺服器',
+    'toast.kosyncAuthFail':   '使用者名稱或密碼錯誤',
+    'toast.kosyncNoServer':   '請輸入同步伺服器網址',
+    'toast.kosyncNoCred':     '請輸入使用者名稱與密碼',
+    'toast.kosyncNetFail':    '無法連線到同步伺服器（{msg}）',
+    'toast.kosyncTimeout':    '同步伺服器沒有回應',
+    'toast.kosyncRegistered': '已建立帳號',
+    'toast.kosyncTaken':      '該使用者名稱已被使用',
+    'toast.kosyncCleared':    '已清除 KOReader 同步設定',
     'settings.fsHud':              '全螢幕角落顯示',
     'settings.orientationLock':    '畫面方向（全螢幕時）',
     'settings.bookPrefs':          '為每本書記住顯示設定',
@@ -2918,6 +3048,33 @@ const I18N = {
     'btn.fullscreen':            '全屏',
     'btn.fullscreen.exit':       '退出阅读模式',
     'settings.driveGroup':       'Google Drive',
+    'settings.kosyncGroup':   '📖 KOReader 同步',
+    'kosync.server':          '同步服务器',
+    'kosync.serverHelp':      '与 KOReader 的“自定义同步服务器”使用相同网址',
+    'kosync.username':        '用户名',
+    'kosync.password':        '密码',
+    'kosync.passwordSaved':   '已保存（需要更改时才输入）',
+    'kosync.method':          '同步方式',
+    'kosync.methodBinary':    'Binary（文件内容）',
+    'kosync.methodFilename':  'Filename（文件名）',
+    'kosync.methodHelp':      '请与 KOReader 的设置保持一致。读取时两种都会尝试，因此这里相当于指定上传方式。',
+    'kosync.autoSync':        '自动同步',
+    'kosync.deviceName':      '本设备名称',
+    'kosync.test':            '测试连接',
+    'kosync.register':        '注册新账号',
+    'kosync.clear':           '清除设置',
+    'kosync.clearConfirm':    '要从本设备移除 KOReader 同步设置（服务器、用户名、密码）吗？',
+    'kosync.registerConfirm': '要在同步服务器上创建新账号“{user}”吗？若已有账号则不需要。',
+    'kosync.note':            '用户名与密码只保存在本设备，不会包含在书签导出或 Drive 同步中。建议另外创建专用账号。',
+    'toast.kosyncOk':         '已连接到 KOReader 同步服务器',
+    'toast.kosyncAuthFail':   '用户名或密码错误',
+    'toast.kosyncNoServer':   '请输入同步服务器网址',
+    'toast.kosyncNoCred':     '请输入用户名与密码',
+    'toast.kosyncNetFail':    '无法连接到同步服务器（{msg}）',
+    'toast.kosyncTimeout':    '同步服务器没有响应',
+    'toast.kosyncRegistered': '已创建账号',
+    'toast.kosyncTaken':      '该用户名已被使用',
+    'toast.kosyncCleared':    '已清除 KOReader 同步设置',
     'settings.fsHud':              '全屏角落显示',
     'settings.orientationLock':    '画面方向（全屏时）',
     'settings.bookPrefs':          '为每本书记住显示设置',
@@ -3125,6 +3282,7 @@ function applyI18n() {
   if (document.getElementById('font-picker-list').classList.contains('open')) {
     buildFontPickerList();
   }
+  updateKosyncUI();    // パスワード欄のプレースホルダは翻訳対象（data-i18n では届かない）
   updateToolbarFade(); // ラベル翻訳でツールバー幅が変わるため再判定
 }
 
@@ -8989,6 +9147,205 @@ async function koEnsureDocHashes(bookKey, file) {
   return _koDocSet(bookKey, patch);
 }
 
+// ══════════════════════════════════════════
+//  KOReader 同期 — 設定と接続（design_kosync.md §S1）
+// ══════════════════════════════════════════
+// 認証情報は epub_kosync に置く。epub_settings にも epub_pos_* にも入れない
+// ——  x-auth-key に入る userkey は「md5 したパスワード」であって、これ自体が
+// API に対するパスワードと等価。しおりの書き出しや Drive 同期に載せてはいけない。
+// 別キーにしておけば collectBookmarks() の走査対象から構造的に外れる。
+//
+// 平文パスワードは保存しない。API が要求するのは md5 なので、入力を受けた時点で
+// 変換して捨てる（サーバへ送られるのも md5 のほう）。
+const KOSYNC_CONF_KEY   = 'epub_kosync';
+const KOSYNC_TIMEOUT_MS = 20000;   // モバイル回線で無反応にならないよう必ず打ち切る
+
+function _koNewDeviceId() {
+  const a = new Uint8Array(16);
+  if (window.crypto && crypto.getRandomValues) crypto.getRandomValues(a);
+  else for (let i = 0; i < a.length; i++) a[i] = Math.floor(Math.random() * 256);
+  let s = '';
+  for (let i = 0; i < a.length; i++) s += a[i].toString(16).padStart(2, '0');
+  return s;
+}
+
+function _koConfLoad() {
+  const d = { server: '', username: '', userkey: '', method: 'binary',
+              autoSync: false, deviceId: '', deviceName: '' };
+  try {
+    const o = JSON.parse(localStorage.getItem(KOSYNC_CONF_KEY));
+    if (o && typeof o === 'object') {
+      if (typeof o.server   === 'string') d.server   = o.server;
+      if (typeof o.username === 'string') d.username = o.username;
+      if (typeof o.userkey  === 'string' && /^[0-9a-f]{32}$/.test(o.userkey)) d.userkey = o.userkey;
+      if (o.method === 'binary' || o.method === 'filename') d.method = o.method;
+      d.autoSync = !!o.autoSync;
+      if (typeof o.deviceId   === 'string' && /^[0-9a-f]{8,64}$/.test(o.deviceId)) d.deviceId = o.deviceId;
+      if (typeof o.deviceName === 'string') d.deviceName = o.deviceName;
+    }
+  } catch (e) { /* 破損時は既定値で作り直す */ }
+  // 端末 ID は KOReader 側のものと必ず別にする（同じだと自分の書き込みと区別できなくなる）
+  if (!d.deviceId)   d.deviceId   = _koNewDeviceId();
+  if (!d.deviceName) d.deviceName = 'yomikake';
+  return d;
+}
+
+let _kosync = _koConfLoad();
+
+function _koConfSave() {
+  try { localStorage.setItem(KOSYNC_CONF_KEY, JSON.stringify(_kosync)); }
+  catch (e) { notifyStorageError(); }
+}
+
+// 末尾スラッシュを落として path 側の先頭 / と二重にしない（//users/auth は 404 になる）
+function koBaseUrl() {
+  let s = String(_kosync.server || '').trim();
+  if (!s) return '';
+  if (!/^https?:\/\//i.test(s)) s = 'https://' + s;
+  return s.replace(/\/+$/, '');
+}
+function koHasCreds()  { return !!(_kosync.username && _kosync.userkey); }
+function koConfigured() { return !!(koBaseUrl() && koHasCreds()); }
+
+// kosync API の共通ラッパ。ヘッダは KOReader のクライアントと同じものを送る
+async function koFetch(method, path, body, opts) {
+  const base = koBaseUrl();
+  if (!base) throw new Error('no-server');
+  const h = { 'accept': 'application/vnd.koreader.v1+json' };
+  if (!(opts && opts.noAuth)) {
+    h['x-auth-user'] = _kosync.username;
+    h['x-auth-key']  = _kosync.userkey;
+  }
+  const init = { method: method, headers: h, cache: 'no-store' };
+  if (body !== undefined && body !== null) {
+    h['content-type'] = 'application/json';
+    init.body = JSON.stringify(body);
+  }
+  let timer = null;
+  if (window.AbortController) {
+    const ac = new AbortController();
+    init.signal = ac.signal;
+    timer = setTimeout(() => ac.abort(), KOSYNC_TIMEOUT_MS);
+  }
+  try {
+    const res = await fetch(base + path, init);
+    let data = null;
+    try { data = await res.json(); } catch (e) { /* 空ボディ・非 JSON は null のまま */ }
+    return { status: res.status, ok: res.ok, data: data };
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+// 通信できなかった理由を利用者に見せる文言へ落とす。
+// CORS で弾かれた場合もここに来る（fetch は理由を教えてくれないので一般の失敗と同じ扱い）
+function _koNetMsg(e) {
+  if (e && e.name === 'AbortError') return t('toast.kosyncTimeout');
+  return t('toast.kosyncNetFail', { msg: (e && e.message) || 'network error' });
+}
+
+function koSetServer(v)   { _kosync.server   = String(v || '').trim(); _koConfSave(); updateKosyncUI(); }
+function koSetUsername(v) { _kosync.username = String(v || '').trim(); _koConfSave(); updateKosyncUI(); }
+
+function koSetPassword(v) {
+  const p = String(v || '');
+  _kosync.userkey = p ? koMd5Bytes(new TextEncoder().encode(p)) : '';
+  _koConfSave();
+  const el = document.getElementById('kosync-pass');
+  if (el) el.value = '';          // 平文を DOM に残さない
+  updateKosyncUI();
+}
+
+function koSetMethod(v) {
+  if (v !== 'binary' && v !== 'filename') return;
+  _kosync.method = v; _koConfSave(); updateKosyncUI();
+}
+
+function koSetDeviceName(v) {
+  _kosync.deviceName = String(v || '').trim() || 'yomikake';
+  _koConfSave(); updateKosyncUI();
+}
+
+function toggleKosyncAutoSync() {
+  _kosync.autoSync = !_kosync.autoSync;
+  _koConfSave(); updateKosyncUI();
+}
+
+function koClearConf() {
+  if (!confirm(t('kosync.clearConfirm'))) return;
+  try { localStorage.removeItem(KOSYNC_CONF_KEY); } catch (e) {}
+  _kosync = _koConfLoad();        // 端末 ID も作り直す（別端末として登録し直す意味になる）
+  _koConfSave();
+  updateKosyncUI();
+  showToast(t('toast.kosyncCleared'));
+}
+
+async function koTestConnection() {
+  if (!koBaseUrl())  { showToast(t('toast.kosyncNoServer')); return; }
+  if (!koHasCreds()) { showToast(t('toast.kosyncNoCred'));   return; }
+  const btn = document.getElementById('kosync-test-btn');
+  if (btn) btn.disabled = true;
+  try {
+    const r = await koFetch('GET', '/users/auth');
+    if (r.status === 401)   showToast(t('toast.kosyncAuthFail'));
+    else if (r.ok)          showToast(t('toast.kosyncOk'));
+    else                    showToast(t('toast.kosyncNetFail', { msg: 'HTTP ' + r.status }));
+  } catch (e) {
+    showToast(_koNetMsg(e));
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+async function koRegister() {
+  if (!koBaseUrl())  { showToast(t('toast.kosyncNoServer')); return; }
+  if (!koHasCreds()) { showToast(t('toast.kosyncNoCred'));   return; }
+  if (!confirm(t('kosync.registerConfirm', { user: _kosync.username }))) return;
+  const btn = document.getElementById('kosync-register-btn');
+  if (btn) btn.disabled = true;
+  try {
+    // 送るのは平文ではなく userkey（＝md5）。KOReader の register と同じ
+    const r = await koFetch('POST', '/users/create',
+                            { username: _kosync.username, password: _kosync.userkey },
+                            { noAuth: true });
+    // 実装差: api.json は 201/402、サーバによっては既存ユーザーに 409 を返す
+    if (r.status === 201)                        showToast(t('toast.kosyncRegistered'));
+    else if (r.status === 402 || r.status === 409) showToast(t('toast.kosyncTaken'));
+    else                                         showToast(t('toast.kosyncNetFail', { msg: 'HTTP ' + r.status }));
+  } catch (e) {
+    showToast(_koNetMsg(e));
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+function updateKosyncUI() {
+  const srv = document.getElementById('kosync-server');
+  if (!srv) return;                       // 設定パネルを持たない環境向けの保険
+  if (document.activeElement !== srv) srv.value = _kosync.server || '';
+  const user = document.getElementById('kosync-user');
+  if (user && document.activeElement !== user) user.value = _kosync.username || '';
+  const pass = document.getElementById('kosync-pass');
+  // パスワードは保存済みかどうかだけを見せる（平文は持っていないので復元できない）
+  if (pass) pass.placeholder = _kosync.userkey ? t('kosync.passwordSaved') : '';
+  const dev = document.getElementById('kosync-device');
+  if (dev && document.activeElement !== dev) dev.value = _kosync.deviceName || '';
+  const meth = document.getElementById('kosync-method');
+  if (meth) meth.value = _kosync.method;
+  const tog = document.getElementById('kosync-auto-toggle');
+  if (tog) {
+    tog.textContent = _kosync.autoSync ? 'ON' : 'OFF';
+    tog.style.background = _kosync.autoSync ? 'var(--accent)' : '';
+    tog.style.color      = _kosync.autoSync ? '#fff' : '';
+  }
+  // サーバ・資格情報が揃うまで押しても意味がないボタンは落としておく
+  const ready = koConfigured();
+  ['kosync-test-btn', 'kosync-register-btn'].forEach(id => {
+    const b = document.getElementById(id);
+    if (b) b.disabled = !ready;
+  });
+}
+
 
 // ══════════════════════════════════════════
 //  本ごとの表示設定（B-7）
@@ -9154,7 +9511,7 @@ function updateOrientationLockUI() {
 const SET_GROUP_DEFAULT_OPEN = {
   'color-group': true, 'typography-group': true, 'layout-group': true,
   'toolbar-settings-group': false, 'tts-settings-group': false,
-  'drive-auto-group': false, 'bookmark-io-group': false,
+  'drive-auto-group': false, 'kosync-group': false, 'bookmark-io-group': false,
   'cache-group': false, 'lang-group': false,
 };
 
@@ -11661,6 +12018,7 @@ applyScreenFilter();
 syncFsHud();
 updateOrientationLockUI();
 updateBookPrefsToggleUI();
+updateKosyncUI();
 ttsInit();
 updateTapZoneBodyClass();
 updateFontBoldToggleUI();
@@ -11713,6 +12071,10 @@ if (location.protocol !== 'http:' && location.protocol !== 'https:') {
   const _tbDriveRow = document.getElementById('tbitem-drive');
   if (_tbDriveRow) _tbDriveRow.style.display = 'none';  // 効果が無い設定行は出さない
   state.driveAutoSave = false;  // file:// 環境では強制 OFF
+  // KOReader 同期も同じ理由で無効（file:// からは同期サーバへ到達できない）
+  const _koGroup = document.getElementById('kosync-group');
+  if (_koGroup) _koGroup.style.display = 'none';
+  _kosync.autoSync = false;
 }
 
 // 起動時: 自動保存ON なら Drive の最新しおりをサイレント取り込み（本を開く前に最新化）
