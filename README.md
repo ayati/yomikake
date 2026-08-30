@@ -671,7 +671,7 @@ iOS Safari の iframe 内では `scrollLeft` 代入・`window.scrollTo` が正�
 | 対策 | 実装箇所 | 内容 |
 |------|---------|------|
 | JSZip 改ざん検知 | `<script>` タグ | JSZip 3.10.1 を SRI ハッシュで検証のうえ HTML にインライン同梱（実行時のCDN取得なし）。GIS のみ CDN 読み込み |
-| ePub XSS 防止 | `buildSrcdoc()` | ePub 内 `<script>` 要素を描画前に除去 |
+| ePub XSS 防止 | `buildSrcdoc()` | ePub 内の `<script>` 要素・インライン `on*` イベントハンドラ・入れ子の `<iframe>`/`<object>`/`<embed>`・`javascript:` スキームの属性を描画前に除去（v2.22.1 で `<script>` 以外も対象に拡大） |
 | file:// URL 漏洩防止 | `buildSrcdoc()` | `<base href="about:blank">` で相対URL解決先を無害化 |
 | 不正 ePub の明示エラー | `loadEpub()` | `container.xml` / `rootfile` / OPF の存在を検証し、欠落時は具体的なエラーメッセージで通知 |
 | Drive OAuth トークン管理 | `driveAuth()` / `scheduleTokenRefresh()` | アクセストークンはメモリのみ保持（localStorage 非使用）。`TokenClient` を再利用し `prompt:''` でポップアップなしのサイレントリフレッシュを実施。有効期限5分前に自動更新をスケジュール |
@@ -680,7 +680,7 @@ iOS Safari の iframe 内では `scrollLeft` 代入・`window.scrollTo` が正�
 | 外部アプリへの受け渡し（v2.19.0） | `showTtsHandoff()` / `ttsHandoffRun()` | 本文の書き出しはダイアログのボタン操作でのみ実行（自動送信の経路なし）。**送信先はアプリ側で指定せず端末の共有メニューに委ねる**ため、どのアプリに渡すかは常に利用者が選ぶ。ダイアログのテキストは `esc()` で HTML エスケープし、ファイル名はパス区切り等を除去 |
 
 **既知の制限：**
-- ePub 内のインライン `on*` イベントハンドラは除去しない（対応コストに対しリスクが低いため）
+- 本文を描画する `<iframe>` に `sandbox` 属性は付けていない（`srcdoc` で注入した自前のスクロール制御コードが動作しなくなるため）。代わりに ePub 由来の実行経路を `buildSrcdoc()` で除去している
 - `postMessage` の送信先 origin は `file://` 制約により `"*"` を使用（受信側で `e.source === iframe.contentWindow` を検証して対応）
 - GIS（Google Identity Services）スクリプトは SRI 非対応（Google 提供 CDN のため同等の信頼レベル）
 

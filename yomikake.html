@@ -4044,6 +4044,28 @@ async function buildSrcdoc(xhtmlText, xhtmlAbsPath, scrollTarget, readySeq) {
   //    localStorage 等にアクセスできてしまう
   doc.querySelectorAll('script').forEach(s => s.remove());
 
+  // ── インライン on* ハンドラ・入れ子の実行コンテナ・javascript: スキームを除去（XSS 対策）
+  //    srcdoc の iframe は親と同一オリジンで sandbox も無いため、ePub 由来のコードが
+  //    動くと親オリジンの localStorage（KOReader 同期の資格情報・しおり）まで読めてしまう。
+  //    <script> の除去だけでは以下の経路が残っていた:
+  //      (1) <img onerror="..."> 等のインラインハンドラ
+  //      (2) 入れ子の <iframe srcdoc> / <object> / <embed>（同じくオリジンを継承する）
+  //      (3) SVG の <a xlink:href="javascript:..."> —— CLICK_HANDLER は href 属性しか
+  //          見ないため xlink:href だけの場合 preventDefault されず既定の遷移が起きる
+  //    ⚠ <script> を先に消してあるので、残った onload 等は参照先を失った死にコード。
+  //      除去して壊れる正当な ePub は無い。
+  doc.querySelectorAll('iframe, object, embed').forEach(el => el.remove());
+  doc.querySelectorAll('*').forEach(el => {
+    if (!el.getAttributeNames) return;
+    const names = el.getAttributeNames();
+    for (let i = 0; i < names.length; i++) {
+      const n = names[i];
+      if (/^on/i.test(n)) { el.removeAttribute(n); continue; }
+      // 先頭の空白・制御文字はブラウザが無視するので、判定前に読み飛ばす
+      if (/^[\s\x00-\x1F]*javascript:/i.test(el.getAttribute(n) || '')) el.removeAttribute(n);
+    }
+  });
+
   // ── <base href="about:blank"> を先頭に挿入
   //    srcdoc の base URL は親ページ(file://)を継承するため、
   //    ePub内の未解決の相対URLが file://yomikake.html に解決されないよう上書きする

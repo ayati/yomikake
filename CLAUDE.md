@@ -595,7 +595,11 @@ Both files support syncing `epub_pos_*` / `epub_last_book` keys to/from Google D
 - JSZip: **both files** inline a SRI-verified copy of `jszip.min.js` (no network fetch, so no runtime SRI; integrity is checked once at update time against the hash recorded in the inline-block comment).
 - `postMessage` origin is `"*"` (required for `file://`); receiver validates `e.source === iframe.contentWindow` to reject messages from other windows/extensions, plus `e.data.type`.
 - All `<a>` clicks inside the iframe are intercepted: external URLs → `window.open(_blank, noopener)`, internal epub links → `EPUB_LINK` postMessage to parent (prevents X-Frame-Options errors). `javascript:` scheme URIs are rejected in `handleIframeLink()`.
-- Inline `on*` event handlers in ePub content are **not** stripped — intentional trade-off (low risk, high removal cost).
+- ePub 由来の**インライン `on*` ハンドラ・入れ子の `<iframe>`/`<object>`/`<embed>`・`javascript:` スキーム**も `buildSrcdoc()` で除去する（v2.22.1）。**v2.22.0 までは「リスクが低く除去コストが高い」として意図的に残していたが、KOReader 同期で localStorage に長期の資格情報（`userkey` はパスワードと等価）が載ったので方針を改めた。** srcdoc の iframe は親と同一オリジンで `sandbox` も無いため、ePub でコードが動くと `localStorage` を丸ごと読める。`<script>` を先に消してあるので、残っていた `onload` 等は参照先を失った死にコードであり、除去して壊れる正当な ePub は無い。
+  - 入れ子の `<iframe srcdoc>` / `<object>` / `<embed>` も**オリジンを継承する**ので同時に落とす。
+  - `javascript:` は `<a href>` なら `CLICK_HANDLER` → `handleIframeLink()` が既に拒否していたが、**SVG の `<a xlink:href>` は `getAttribute('href')` が null になり `preventDefault` されず素通りしていた**。属性値そのものを見て落とす。
+  - ⚠ **これは数え上げ型の防御**。本命は `<iframe sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox">`（**`allow-same-origin` は与えない**）で、調査の結果 **親は `contentDocument` を一切触らず、注入コードも `localStorage`/`cookie` を使わないので同一オリジンである必要が無い**ことは確認済み。ただし描画の中核に触る変更で 4 環境の実機確認が要るため別リリースとする。
+  - テストは `tests/cases/epub-sanitize.js`（両ファイル各 21 assertion）。⚠ **テストファイルに `</script>` を直書きしないこと** —— ケースは HTML へ差し込まれるので、文字列中の閉じタグがその場でスクリプトブロックを終わらせ、**テストが 1 件も走らない**（結果が空になる）。
 - Drive API file IDs validated against `/^[a-zA-Z0-9_-]{10,200}$/` in `driveFindFile()` before use in fetch URLs (prevents URL injection via malicious API responses).
 - `resolveCssText()` uses regex with escaped pattern (not `split().join()`) to replace `url()` references, avoiding mismatches with special characters in URL strings.
 - `_driveToken` stored in memory only (not localStorage) to limit XSS token theft surface.

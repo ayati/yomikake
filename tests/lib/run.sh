@@ -25,6 +25,7 @@ declare -A CASE_ENV=(
   [keyboard]="RAF_SHIM=1 VTB=40000"
   [cover-thumb]="RAF_SHIM=1 VTB=30000"
   [kosync]="RAF_SHIM=1 VTB=30000"
+  [epub-sanitize]="RAF_SHIM=1 VTB=30000"
 )
 declare -A CASE_FLAGS=(
   [e2e-reflow]="--allow-file-access-from-files"
@@ -37,6 +38,7 @@ declare -A CASE_FLAGS=(
   [keyboard]="--allow-file-access-from-files"
   [cover-thumb]="--allow-file-access-from-files"
   [kosync]="--allow-file-access-from-files"
+  [epub-sanitize]="--allow-file-access-from-files"
 )
 
 pass=0; fail=0; failed_lines=()
