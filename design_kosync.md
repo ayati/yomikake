@@ -723,3 +723,151 @@ Apache/2.4.58 (Ubuntu) で設定変更が可能。**§3-5 の案 C（`/kosync/` 
 3. **リリース単位** → **Step 1〜5 をまとめて 1 リリース**。マスト要件 U1/U2 が揃って初めて
    実機テストが意味を持つため、途中で出すと検証の手間が増えるだけになりやすい
 4. ~~Phase 1 の push が「章頭まで」で許容できるか~~ → §2-5 の実測で不要になった
+
+---
+
+## 付録 A. C2 への移行手順（自前の kosync サーバを立てる）
+
+C1（send2ereader を中継）から C2（同じ箱で kosync 本体を動かす）へ移す手順。
+**yomikake も KOReader も設定は一切変えなくてよい** —— 入口の URL
+`https://www.ayati.com/kosync` は同じままで、Apache の転送先だけが変わる（§3-4）。
+
+対象実装は `nperez0111/koreader-sync`（Bun + Hono + SQLite。send2ereader と同じもの）。
+DB は `/app/data/koreader-sync.db` の 1 ファイル。
+
+### A-1. 先に決めること — `PASSWORD_SALT`（後から変えられない）
+
+サーバは `Bun.password.verify(md5パスワード + PASSWORD_SALT, 保存ハッシュ)` で認証する。
+**salt を後から変えると既存アカウントが全部ログイン不能になる。** 最初に決めて二度と触らない。
+
+```sh
+openssl rand -hex 32     # これを控えておく
+```
+
+### A-2. 既存の読書位置を書き出す（切り替え前でも後でもよい）
+
+send2ereader も同じ実装なので `GET /syncs/documents` が使える
+（**curl は CORS の制約を受けない**ので、中継を通さず直接叩いてよい）。
+まず 1 行で疎通を確かめる:
+
+```sh
+curl -s -o /dev/null -w '%{http_code}\n' https://sync.send2ereader.net/syncs/documents \
+  -H 'x-auth-user: x' -H 'x-auth-key: y'      # 401 が返れば経路は生きている
+```
+
+書き出し（パスワードを履歴に残さないよう `read -rs` で受ける）:
+
+```sh
+U='あなたのユーザー名'
+read -rsp 'パスワード: ' PW; echo
+K=$(printf %s "$PW" | md5sum | cut -d' ' -f1); unset PW
+
+curl -s https://sync.send2ereader.net/syncs/documents \
+  -H "x-auth-user: $U" -H "x-auth-key: $K" \
+  -H 'accept: application/vnd.koreader.v1+json' > /tmp/kosync-old.json
+
+jq '.documents | length' /tmp/kosync-old.json    # 冊数を確認
+```
+
+### A-3. 新しいサーバを起動する
+
+**`127.0.0.1` に bind する**（外へ直接晒さない。入口は Apache だけにする）。
+名前付きボリュームにしておくとバックアップが楽で、bind mount のパーミッション事故も避けられる
+（コンテナは `bun` ユーザーで動く）。
+
+```sh
+docker run -d --name kosync --restart unless-stopped \
+  -p 127.0.0.1:3000:3000 \
+  -v koreader-sync-data:/app/data \
+  -e PASSWORD_SALT='A-1 で作った文字列' \
+  ghcr.io/nperez0111/koreader-sync:latest
+
+curl -s http://127.0.0.1:3000/health     # {"status":"ok"}
+```
+
+### A-4. アカウントを作る
+
+`password` に入れるのは **md5 のほう**（KOReader / yomikake が送るのと同じ形）。
+
+```sh
+curl -s -i -X POST http://127.0.0.1:3000/users/create \
+  -H 'content-type: application/json' \
+  -H 'accept: application/vnd.koreader.v1+json' \
+  -d "{\"username\":\"$U\",\"password\":\"$K\"}"     # 201 Created
+```
+
+send2ereader と**同じユーザー名・パスワード**にしておけば、yomikake も KOReader も
+設定を触らずに済む。
+
+### A-5. 読書位置を流し込む
+
+```sh
+jq -c '.documents[] | {document, progress, percentage, device, device_id,
+                       metadata: {filename, title, authors}}' /tmp/kosync-old.json |
+while read -r row; do
+  curl -s -o /dev/null -w '%{http_code} ' -X PUT http://127.0.0.1:3000/syncs/progress \
+    -H "x-auth-user: $U" -H "x-auth-key: $K" \
+    -H 'content-type: application/json' \
+    -H 'accept: application/vnd.koreader.v1+json' -d "$row"
+done; echo
+
+rm -f /tmp/kosync-old.json
+```
+
+すべて `200` が並べば移行完了。**この工程を飛ばしても壊れはしない** —— 各端末が次に同期した
+ときにその本の位置を書き込むので、読んでいる本から順に自然に埋まっていく。
+
+### A-6. Apache の転送先を差し替える
+
+```apache
+# SSLProxyEngine On は不要になる（上流が http の localhost になるため。残っていても害はない）
+ProxyPass        /kosync/ http://127.0.0.1:3000/
+ProxyPassReverse /kosync/ http://127.0.0.1:3000/
+```
+
+```sh
+sudo apache2ctl configtest && sudo systemctl reload apache2
+curl -i https://www.ayati.com/kosync/users/auth -H 'x-auth-user: x' -H 'x-auth-key: y'
+# → 401 が返れば成功（Apache の HTML エラーページなら中継に届いていない）
+```
+
+### A-7. 登録を閉じる
+
+自分のアカウントを作ったあとに閉じる。**A-4 より先にやってはいけない。**
+
+```sh
+docker rm -f kosync
+docker run -d --name kosync --restart unless-stopped \
+  -p 127.0.0.1:3000:3000 \
+  -v koreader-sync-data:/app/data \
+  -e PASSWORD_SALT='A-1 と同じ文字列' \
+  -e DISABLE_USER_REGISTRATION=true \
+  ghcr.io/nperez0111/koreader-sync:latest
+```
+
+⚠ 作り直すたびに `PASSWORD_SALT` を渡し忘れないこと（A-1）。忘れると既定値の salt が
+使われ、既存アカウントで**ログインできなくなる**。`docker compose` に書いておくほうが安全。
+
+### A-8. バックアップ
+
+DB は SQLite 1 ファイル。名前付きボリュームごと固める:
+
+```sh
+docker run --rm -v koreader-sync-data:/data -v "$PWD":/backup alpine \
+  tar czf /backup/kosync-$(date +%F).tgz -C /data .
+```
+
+### A-9. 切り戻し
+
+`ProxyPass` を send2ereader へ戻して `reload` するだけ。C2 の間に進んだ位置は
+send2ereader 側には無いので、A-2〜A-5 と逆向きの手順で戻すか、各端末の次の同期に任せる。
+
+### A-10. 環境変数の一覧（実装から確認）
+
+| 変数 | 既定 | 備考 |
+|---|---|---|
+| `PASSWORD_SALT` | `default_salt_change_in_production` | **後から変えない**（A-1） |
+| `DISABLE_USER_REGISTRATION` | `false` | `true` で `/users/create` を閉じる |
+| `PORT` | `3000` | |
+| `HOST` | `0.0.0.0` | コンテナ内。外への露出は `-p` 側で絞る |
+| `LOG_LEVEL` | `info` | |
