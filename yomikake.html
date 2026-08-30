@@ -1348,7 +1348,11 @@
     <div id="page-container">
       <div id="epub-frame">
         <div id="page-overlay"></div>
-        <iframe id="content-iframe" src="about:blank"></iframe>
+        <!-- sandbox: allow-same-origin は与えない。ePub 由来のコードが動いても親オリジンの
+     localStorage（同期の資格情報・しおり）へ到達させないため。allow-popups は
+     CLICK_HANDLER の window.open（外部リンク）に要る。design_iframe_sandbox.md -->
+        <iframe id="content-iframe" src="about:blank"
+                sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"></iframe>
       </div>
       <div id="fxl-container">
         <div id="fxl-spread">
@@ -7805,8 +7809,7 @@ const CF_DB_NAME    = 'epub_viewer_fonts';
 const CF_STORE_NAME = 'fonts';
 const CF_MAX_COUNT  = 5;                 // 保持できる件数上限
 const CF_MAX_SIZE   = 20 * 1024 * 1024;  // 1ファイルあたりの上限（20MB）
-let _cfBlobUrlCache = new Map();          // id → blob: URL（http(s) 用・タブ寿命）
-let _cfDataUriCache = new Map();          // id → data URI（file:// フォールバック・直近1件のみ）
+let _cfDataUriCache = new Map();          // id → data URI（直近1件のみ・27MB級文字列の多重保持を避ける）
 let _cfPreviewRegistered = new Set();     // FontFace 登録済み id（プレビュー用・二重登録防止）
 let _cfIdbAvailable = true;               // false なら全操作 no-op（Private Browsing 等）
 
@@ -7876,16 +7879,12 @@ async function cfSniffFormat(file) {
   return null;   // 'ttcf'(.ttc) 等の未対応形式を含む
 }
 
-// @font-face src:url() に入れる文字列を返す。http(s)=Blob URL、file://=data URI。
+// @font-face src:url() に入れる文字列を返す。常に data URI。
+// blob: URL は生成元オリジンに紐づくため、sandbox 付き iframe（不透明オリジン）からは
+// 読めない —— iPad Safari は FontFace が unloaded、Chromium は error になる（実測）。
+// data URI ならどちらでも読める。代償は章あたり約 +100ms で、章内のページ送りは
+// iframe を作り直さないので影響しない。詳細は design_iframe_sandbox.md §2。
 async function cfGetFontSrc(id) {
-  if (location.protocol !== 'file:') {
-    if (_cfBlobUrlCache.has(id)) return _cfBlobUrlCache.get(id);
-    const rec = await _cfIdbGet(id);
-    if (!rec || !rec.buf) return null;
-    const url = URL.createObjectURL(new Blob([rec.buf], {type: rec.mime || 'font/ttf'}));
-    _cfBlobUrlCache.set(id, url);
-    return url;
-  }
   if (_cfDataUriCache.has(id)) return _cfDataUriCache.get(id);
   const rec = await _cfIdbGet(id);
   if (!rec || !rec.buf) return null;
@@ -7896,7 +7895,7 @@ async function cfGetFontSrc(id) {
     r.onerror = rej;
     r.readAsDataURL(blob);
   });
-  _cfDataUriCache.clear();          // 27MB級文字列の多重保持を避ける：直近1件のみ
+  _cfDataUriCache.clear();          // 直近1件のみ保持する（27MB 級になりうるため）
   _cfDataUriCache.set(id, dataUri);
   return dataUri;
 }
@@ -7905,10 +7904,12 @@ async function cfGetFontSrc(id) {
 async function cfRegisterPreviewFace(id) {
   if (_cfPreviewRegistered.has(id)) return;
   try {
-    const src = await cfGetFontSrc(id);
-    if (!src) return;
+    // ピッカーのプレビューは親ドキュメントなので URL を介さず ArrayBuffer から直接作る。
+    // data URI 経路を通すと 11MB 級の文字列が直近1件キャッシュを押し出してしまう
+    const rec = await _cfIdbGet(id);
+    if (!rec || !rec.buf) return;
     const fam = 'CustomFont_' + id;
-    const face = new FontFace(fam, 'url(' + src + ')');
+    const face = new FontFace(fam, rec.buf);
     await face.load();
     document.fonts.add(face);
     _cfPreviewRegistered.add(id);
@@ -7951,8 +7952,6 @@ async function cfDeleteFont(id) {
   await _cfIdbDelete(id);
   state.customFonts = state.customFonts.filter(f => f.id !== id);
   cfSaveMeta();
-  const bu = _cfBlobUrlCache.get(id);
-  if (bu) { URL.revokeObjectURL(bu); _cfBlobUrlCache.delete(id); }
   _cfDataUriCache.delete(id);
   _cfPreviewRegistered.delete(id);
   if (state.fontMode === 'custom:' + id) {

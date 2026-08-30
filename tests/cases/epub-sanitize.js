@@ -1,4 +1,4 @@
-// ePub 由来コードの除去（buildSrcdoc の XSS 対策）
+// ePub 由来コードの隔離（iframe の sandbox ＋ buildSrcdoc の除去）
 //
 // srcdoc の iframe は親と同一オリジンで sandbox も無いため、ePub の中でコードが動くと
 // 親オリジンの localStorage（KOReader 同期の資格情報・しおり・読書データ）まで読めてしまう。
@@ -7,6 +7,40 @@
 // それまでは「インライン on* は残す」が意図的なトレードオフだったが、守る資産が増えたので改めた。
 
 T('buildSrcdoc が定義', typeof buildSrcdoc === 'function');
+
+// ══ iframe の sandbox（design_iframe_sandbox.md）════════
+// 本命の防御。ePub でコードが動いても不透明オリジンなので親の localStorage に届かない。
+(function () {
+  var fr = document.getElementById('content-iframe');
+  T('本文 iframe がある', !!fr);
+  var sb = fr.getAttribute('sandbox');
+  T('sandbox 属性が付いている', typeof sb === 'string' && sb.length > 0, String(sb));
+  var tok = String(sb || '').split(/\s+/);
+  // ★ここが要。allow-same-origin を与えると sandbox は自分で自分を外せるので無意味になる
+  T('allow-same-origin を与えていない', tok.indexOf('allow-same-origin') < 0, String(sb));
+  T('allow-scripts がある（注入したスクロール制御に要る）', tok.indexOf('allow-scripts') >= 0);
+  T('allow-popups がある（外部リンクの window.open に要る）', tok.indexOf('allow-popups') >= 0);
+  T('allow-popups-to-escape-sandbox がある（開いた先まで sandbox にしない）',
+    tok.indexOf('allow-popups-to-escape-sandbox') >= 0);
+  // 隔離が実際に効いていることの直接確認: 親から中身を覗けない
+  var reachable;
+  try { reachable = fr.contentDocument !== null && fr.contentDocument !== undefined; }
+  catch (e) { reachable = false; }
+  T('親から iframe の中を覗けない', reachable === false);
+})();
+
+// ローカルフォントは blob: を使わない（不透明オリジンから読めないため）
+(function () {
+  T('cfGetFontSrc がある', typeof cfGetFontSrc === 'function');
+  var src = cfGetFontSrc.toString();
+  T('blob URL を作らない', src.indexOf('createObjectURL') < 0);
+  T('プロトコルで分岐しない', src.indexOf("'file:'") < 0);
+  T('data URI 経路である', src.indexOf('readAsDataURL') >= 0);
+  var gone = false;
+  try { _cfBlobUrlCache; } catch (e) { gone = true; }
+  T('_cfBlobUrlCache を撤去した', gone);
+})();
+
 
 // 細工した章。実 ePub と同じ経路（DOMParser → 加工 → srcdoc 文字列）を通す
 var EVIL = '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE html>\n' +
