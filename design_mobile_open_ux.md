@@ -369,3 +369,23 @@ Chrome がファイルを落とす既知の道筋は「共有された MIME が 
 - **⚠ manifest の変更は WebAPK に焼かれているので、もう一度入れ直さないと反映されない。**
 - `tests/cases/share-receive.js` が accept にワイルドカードが入っていることを検査する
   （外すと実機の壊れ方に戻るため）。
+
+### 4 回目: accept 説も否定（2026-09-19 12:57）
+
+`chrome://webapks` で **Package name が `accb96ecb7b4e245d_v2` → `adb1dc797383a88e6_v2`** に
+変わった＝ワイルドカード入りの manifest で WebAPK が焼き直されたことを確認したうえで共有。
+
+**結果は同じ**（`keys=none/len=75/ct=mp/body=------MultipartBoundary--…------<CR><LF>`）。
+
+- 旧 accept（具体型＋拡張子）でも、新 accept（`*/*` 込み）でも空の multipart
+- → **accept は無関係**。広げるだけ共有シートが賑やかになるので**元に戻した**
+
+**決着**: Chrome 153 が共有ターゲットへ POST する際、**ファイルをパートにする前に落としている**。
+共有元 3 種・端末 2 台・PWA 入れ直し・accept 変更のいずれでも変わらないので、
+WebAPK → Chrome の `content://` の受け渡しが壊れていると見るのが自然
+（URI 権限の移譲まわりは Android のバージョンで挙動が変わる）。
+
+**Web 側に回避手段は無い。** Android Chrome には File Handling API も無く、
+共有ターゲット以外に「他アプリからファイルを渡す」経路が存在しない。
+→ **失敗時の動線を実用品質に保つ**のが唯一の対策。現状「トースト → タップ → ピッカー」で
+開けることは実機で確認済み（12:12 の報告）。

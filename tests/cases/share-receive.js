@@ -130,9 +130,9 @@ fetch('sw.js').then(function (r) { return r.text(); }).then(function (src) {
 });
 
 // ── manifest の share_target ─────────────────────────────
-// 実機では「共有シートには出るのに body が空の multipart（75 バイト＝終端行だけ）」
-// という形で届いた。Chrome は accept に当たらないファイルをパートごと落とすので、
-// ワイルドカードを外すと同じ壊れ方に戻る。
+// 形が壊れていないことだけを見る。**accept を広げても実機は直らなかった**
+// （2026-09-19・`*/*` を焼いた WebAPK でも body は空の multipart のまま）ので、
+// ワイルドカードは入れない＝共有シートを無駄に賑やかにしない。
 fetch('manifest.webmanifest').then(function (r) { return r.json(); }).then(function (m) {
   var st = m.share_target || {};
   T('manifest: share_target がある', !!st.action);
@@ -142,8 +142,9 @@ fetch('manifest.webmanifest').then(function (r) { return r.json(); }).then(funct
   T('manifest: ファイルパート名は epub', files.length === 1 && files[0].name === 'epub');
   var acc = (files[0] && files[0].accept) || [];
   T('manifest: ePub の MIME を受ける', acc.indexOf('application/epub+zip') >= 0);
-  T('manifest: ワイルドカードを含む（Chrome が型で落とすのを防ぐ）',
-    acc.indexOf('*/*') >= 0 && acc.indexOf('application/*') >= 0, acc.join(','));
+  T('manifest: ZIP 系の別名も受ける',
+    acc.indexOf('application/zip') >= 0 && acc.indexOf('application/octet-stream') >= 0);
+  T('manifest: 拡張子も並べる', acc.indexOf('.epub') >= 0 && acc.indexOf('.kepub') >= 0);
 }).catch(function (e) {
   T('manifest を読める', false, String(e));
 });

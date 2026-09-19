@@ -21,8 +21,7 @@
         {
           "name": "epub",
           "accept": ["application/epub+zip", "application/zip", "application/octet-stream",
-                     "application/x-zip-compressed", "application/vnd.amazon.ebook",
-                     ".epub", ".kepub", "application/*", "*/*"]
+                     "application/x-zip-compressed", ".epub", ".kepub"]
         }
       ]
     }
