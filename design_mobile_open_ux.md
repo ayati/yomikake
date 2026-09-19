@@ -306,3 +306,22 @@ const SHELL = ['./yomikake.html', './yomikake_ios.html',
 **残っている確認**: 実機で 1 回共有して、トーストに出る理由コードを見る。
 `form:` 系なら Chrome の `formData()`、`idb:`/`cache:` なら容量、`nofile:` なら
 Chrome がそもそもファイルを渡していない（＝ファイラー側か share_target の accept）。
+
+### 実機での結果（2026-09-19・Chrome 153）
+
+理由コードは **`nofile:absent/raw:nopart`** だった。
+
+- `formData()` は**成功**している（`form:` 系の例外ではない）のに `epub` パートが無い
+- 生 body を自前で解析しても `filename` 付きのパートが無い
+- → **Chrome は POST しているが、ePub の実体を載せていない**
+
+yomikake 側の経路は生きている（失敗トーストをタップ → ピッカー → 同じ本が開けた）。
+残る分岐は「body ごと空」か「空のパートだけ来ている」かで、次の 1 回で
+`keys=` / `len=` / `ct=` を見れば決まる。
+
+- `keys=none` / `len=0` … Chrome が body を載せていない（共有ターゲットの配線の問題）
+- `keys=epub:f0` … ファイルパートはあるが 0 バイト（content:// を読めていない）
+- `keys=title:sN,text:sN` … ファイルではなくテキストとして共有されている（共有元の問題）
+
+あわせて、理由コードのような長い文が**トーストの左右で切れて読めなかった**ので
+`#toast` の `white-space:nowrap` をやめた（両ファイル）。

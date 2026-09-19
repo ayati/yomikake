@@ -110,14 +110,18 @@ function shareRedirect(path) {
 
 // 共有された File を取り出す。標準の formData() が使えない環境のために
 // multipart/form-data を自前で解析する経路も持つ（body は clone しておく）。
+// 取れなかったときは「何が届いていたか」（パート一覧・生の長さ）まで理由に載せる。
+// 実機では POST は届くのにファイルパートだけ無い状態が起きていて、それが
+// 「Chrome が実体を読めていない」のか「body ごと空」なのかを区別する必要がある。
 async function shareExtractFile(req) {
   let clone = null;
   try { clone = req.clone(); } catch (e) {}
-  let why = '';
+  let why = '', note = '';
   try {
     const form = await shareTimeout(req.formData(), 20000, 'formData');
     const f = form.get('epub') || shareFirstFile(form);
     if (f && typeof f !== 'string' && f.size) return { file: f, reason: '' };
+    note = '/' + shareFormNote(form);
     why = f ? 'nofile:empty' : 'nofile:absent';
   } catch (e) {
     why = 'form:' + errName(e);
@@ -125,14 +129,32 @@ async function shareExtractFile(req) {
   // フォールバック: 生の body から epub パートを切り出す
   if (clone) {
     try {
-      const f = await shareTimeout(shareParseMultipart(clone), 20000, 'parse');
+      const ct = (clone.headers.get('content-type') || '');
+      const buf = await shareTimeout(clone.arrayBuffer(), 20000, 'raw');
+      note += '/len=' + buf.byteLength +
+              '/ct=' + (/multipart/i.test(ct) ? 'mp' : ((ct.split(';')[0] || 'none').slice(0, 24)));
+      const f = shareParseMultipartBytes(new Uint8Array(buf), ct);
       if (f) return { file: f, reason: '' };
       why += '/raw:nopart';
     } catch (e) {
       why += '/raw:' + errName(e);
     }
   }
-  return { file: null, reason: why || 'nofile' };
+  return { file: null, reason: (why || 'nofile') + note };
+}
+
+// 届いたフォームの中身の要約（名前:s=文字列長 / f=ファイルの長さ）。
+// 'keys=none' なら body にパートが 1 つも無い＝Chrome が何も載せていない。
+function shareFormNote(form) {
+  const out = [];
+  try {
+    for (const e of form.entries()) {
+      const v = e[1];
+      out.push(e[0] + ':' + (typeof v === 'string' ? 's' + v.length : 'f' + v.size));
+      if (out.length >= 4) break;
+    }
+  } catch (e) { return 'keys=?'; }
+  return 'keys=' + (out.length ? out.join(',') : 'none');
 }
 
 // 名前が 'epub' でなくても、File らしきものが1つだけ来ていれば拾う
@@ -157,11 +179,14 @@ function shareBytesIndexOf(hay, needle, from) {
 // 汎用実装ではない（quoted-printable も base64 も来ない前提＝共有ターゲットの仕様）。
 async function shareParseMultipart(req) {
   const ct = (req.headers && req.headers.get('content-type')) || '';
-  const bm = /boundary=(?:"([^"]+)"|([^;]+))/i.exec(ct);
+  return shareParseMultipartBytes(new Uint8Array(await req.arrayBuffer()), ct);
+}
+
+function shareParseMultipartBytes(buf, ct) {
+  const bm = /boundary=(?:"([^"]+)"|([^;]+))/i.exec(ct || '');
   if (!bm) return null;
   const boundary = (bm[1] || bm[2]).trim();
   const enc = new TextEncoder(), dec = new TextDecoder();
-  const buf = new Uint8Array(await req.arrayBuffer());
   const delim = enc.encode('\r\n--' + boundary);
   let pos = shareBytesIndexOf(buf, enc.encode('--' + boundary), 0);
   if (pos < 0) return null;

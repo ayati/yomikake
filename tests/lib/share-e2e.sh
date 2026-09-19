@@ -129,5 +129,8 @@ run_case() {  # $1=見出し $2=ドライバ $3=期待の正規表現
 
 # 1) 正常系: 共有 → 本が開く（ここが実機で壊れている経路そのもの）
 run_case '共有した ePub が開く' drv_ok.html '^OPENED テスト用リフロー'
-# 2) 実体が空: 黙って失敗せず、理由コード付きのトーストを出す
-run_case '空ファイルは理由コードを出す' drv_empty.html '^TOAST .*nofile'
+# 2) 実体が空: 黙って失敗せず、理由コードと「何が届いていたか」を出す
+#    （実機では POST は届くのにファイルパートだけ無い状態が起きている。
+#      keys= と len= がその切り分けの材料なので、消えたらここで落とす）
+run_case '空ファイルは理由コードを出す'   drv_empty.html '^TOAST .*nofile:empty'
+run_case '届いた中身の要約を出す'         drv_empty.html '^TOAST .*keys=epub:f0.*len=[0-9]+.*ct=mp'

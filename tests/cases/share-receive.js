@@ -41,12 +41,21 @@ fetch('sw.js').then(function (r) { return r.text(); }).then(function (src) {
   var sw;
   try {
     sw = new Function(src + '\n; return {p: shareParseMultipart, idx: shareBytesIndexOf,' +
+                            ' note: shareFormNote,' +
                             ' C: SHARE_CACHE, P: SHARE_STASH_PATH, V: VERSION};')();
   } catch (e) { sw = null; }
   T('sw.js をページ内で評価できる', !!sw, sw ? '' : '評価に失敗');
   if (!sw) return;
 
   T('sw: 退避キャッシュ名が VERSION と別',  sw.C !== sw.V && sw.C.length > 0);
+
+  // 「何が届いていたか」の要約。実機では POST は届くのにファイルパートだけ
+  // 無い状態が起きていて、keys= が空か否かがその切り分けの材料になる
+  var fd = new FormData();
+  T('note: 空のフォームは keys=none', sw.note(fd) === 'keys=none', sw.note(fd));
+  fd.append('title', 'abc');
+  fd.append('epub', new File([new Uint8Array(5)], 'x.epub'));
+  T('note: 文字列とファイルを区別する', sw.note(fd) === 'keys=title:s3,epub:f5', sw.note(fd));
 
   // ページ側との定数一致。ここがずれると受け渡しが黙って壊れる
   if (!IS_IOS) {

@@ -653,7 +653,7 @@
   #welcome-rd-btn { background:var(--ui-bg); border:1px solid var(--ui-border); color:var(--ui-text); padding:8px 16px; border-radius:8px; cursor:pointer; font-size:13px; font-weight:500; transition:filter .15s; }
   #welcome-rd-btn:hover { filter:brightness(1.05); }
   #file-input { display:none; }
-  #toast { position:fixed; top:72px; left:50%; transform:translateX(-50%) translateY(-10px); background:var(--text); color:var(--bg); padding:10px 24px; border-radius:24px; font-size:13px; font-weight:500; z-index:300; opacity:0; visibility:hidden; transition:all .3s cubic-bezier(0.16,1,0.3,1); pointer-events:none; white-space:nowrap; box-shadow:0 8px 24px rgba(0,0,0,0.15); }
+  #toast { position:fixed; top:72px; left:50%; transform:translateX(-50%) translateY(-10px); background:var(--text); color:var(--bg); padding:10px 24px; border-radius:24px; font-size:13px; font-weight:500; z-index:300; opacity:0; visibility:hidden; transition:all .3s cubic-bezier(0.16,1,0.3,1); pointer-events:none; max-width:min(560px, calc(100vw - 32px)); white-space:normal; overflow-wrap:anywhere; text-align:center; box-shadow:0 8px 24px rgba(0,0,0,0.15); }
   #toast.show { opacity:1; visibility:visible; transform:translateX(-50%) translateY(0); }
   #toast.toast-action { pointer-events:auto; cursor:pointer; box-shadow:0 0 0 2px var(--accent), 0 8px 24px rgba(0,0,0,0.25); }
 
