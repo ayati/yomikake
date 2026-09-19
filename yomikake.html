@@ -241,6 +241,24 @@
 
   /* ── 読みかけリスト ── */
   #reading-list { display:none; width:100%; max-width:580px; flex-direction:column; gap:0; }
+  /* 共有からファイルを受け取れなかったときの案内。トーストは 8 秒で消えてしまい
+     一発勝負になるので、操作できる導線を画面に残す（Android Chrome 153 の不具合） */
+  #share-fail { position:relative; display:flex; gap:14px; align-items:center; background:var(--ui-bg); border:1px solid var(--accent); border-left:4px solid var(--accent); border-radius:12px; padding:14px 16px; margin-bottom:16px; }
+  #share-fail.hidden { display:none; }
+  #share-fail .sf-main { flex:1 1 auto; min-width:0; padding-right:24px; }
+  #share-fail .sf-title { font-size:14px; font-weight:700; color:var(--ui-text); margin-bottom:4px; }
+  #share-fail .sf-body { font-size:12.5px; line-height:1.6; color:var(--ui-text); opacity:.75; }
+  /* 理由コードは診断用。読み飛ばせるよう小さく淡く置く（B: 文面は平易に、情報は残す） */
+  #share-fail .sf-why { font-size:10px; line-height:1.4; color:var(--ui-text); opacity:.4; margin-top:6px; word-break:break-all; font-family:ui-monospace,monospace; }
+  #share-fail .sf-actions { flex:0 0 auto; }
+  #share-fail-btn { background:var(--accent); color:#fff; border:none; border-radius:8px; padding:10px 16px; font-size:13px; font-weight:600; cursor:pointer; white-space:nowrap; }
+  /* ✕ は右上に逃がす。ボタンの下に並べると押しどころの分からない横長の箱になる */
+  #share-fail-close { position:absolute; top:6px; right:8px; width:26px; height:26px; line-height:1; background:none; border:none; color:var(--ui-text); border-radius:6px; font-size:13px; cursor:pointer; opacity:.45; }
+  #share-fail-close:hover { opacity:.9; background:var(--hover-bg); }
+  @media (max-width:640px) {
+    #share-fail { flex-direction:column; align-items:stretch; gap:10px; }
+    #share-fail-btn { width:100%; }
+  }
   #reading-list-header { display:flex; align-items:baseline; gap:8px; margin-bottom:16px; }
   #reading-list-header h2 { font-size:17px; font-weight:700; margin:0; }
   #reading-list-count { font-size:12px; opacity:.55; }
@@ -1294,6 +1312,18 @@
   </div>
   <div id="reading-area">
     <div id="welcome">
+      <!-- 共有でファイルが届かなかったときの案内。消えるトーストだけだと一発勝負になる -->
+      <div id="share-fail" class="hidden">
+        <div class="sf-main">
+          <div class="sf-title" data-i18n="share.failTitle">共有されたファイルを受け取れませんでした</div>
+          <div class="sf-body" data-i18n="share.failBody">ブラウザから中身が渡ってきませんでした。ファイルを選び直すと同じ本を開けます。</div>
+          <div class="sf-why" id="share-fail-why"></div>
+        </div>
+        <div class="sf-actions">
+          <button id="share-fail-btn" onclick="shareFailAction()" data-i18n="share.pick">📂 ファイルを選ぶ</button>
+          <button id="share-fail-close" onclick="hideShareFailBanner()" data-i18n-title="share.dismiss" title="閉じる">✕</button>
+        </div>
+      </div>
       <div id="reading-list">
         <div id="reading-list-header">
           <h2 data-i18n="readingList.title">読みかけの本</h2>
@@ -1884,9 +1914,14 @@ const I18N = {
     'cache.cleared':        '🗑 キャッシュを削除しました',
     'toast.cacheLoadFailed':'キャッシュの読み込みに失敗しました。ファイルを選択してください',
     'toast.sharedNotEpub':  'ePub ファイルではないようです',
-    'toast.shareFailed':    '共有されたファイルを開けませんでした（{reason}）',
-    'toast.shareFailedPick':  '共有されたファイルを開けませんでした（{reason}）／タップしてファイルを選ぶ',
-    'toast.shareFailedRetry': '共有されたファイルを開けませんでした（{reason}）／タップでもう一度',
+    'toast.shareFailed':    '共有されたファイルを開けませんでした',
+    'toast.shareFailedPick':  '共有されたファイルを開けませんでした／タップしてファイルを選ぶ',
+    'toast.shareFailedRetry': '共有されたファイルを開けませんでした／タップでもう一度',
+    'share.failTitle':      '共有されたファイルを受け取れませんでした',
+    'share.failBody':       'ブラウザから中身が渡ってきませんでした。ファイルを選び直すと同じ本を開けます。',
+    'share.pick':           '📂 ファイルを選ぶ',
+    'share.retry':          '↻ もう一度開く',
+    'share.dismiss':        '閉じる',
     'readingList.openNew':  '別の ePub を開く',
     'readingList.today':    '今日',
     'readingList.yesterday':'昨日',
@@ -2328,9 +2363,14 @@ const I18N = {
     'cache.cleared':        '🗑 Cache cleared',
     'toast.cacheLoadFailed':'Cache load failed. Please pick the file.',
     'toast.sharedNotEpub':  'This does not look like an ePub file',
-    'toast.shareFailed':    'Could not open the shared file ({reason})',
-    'toast.shareFailedPick':  'Could not open the shared file ({reason}) — tap to choose a file',
-    'toast.shareFailedRetry': 'Could not open the shared file ({reason}) — tap to retry',
+    'toast.shareFailed':    'Could not open the shared file',
+    'toast.shareFailedPick':  'Could not open the shared file — tap to choose a file',
+    'toast.shareFailedRetry': 'Could not open the shared file — tap to retry',
+    'share.failTitle':      'The shared file did not arrive',
+    'share.failBody':       'Your browser did not pass the file contents along. Choose the file again to open the same book.',
+    'share.pick':           '📂 Choose a file',
+    'share.retry':          '↻ Try again',
+    'share.dismiss':        'Dismiss',
     'readingList.openNew':  'Open another ePub',
     'readingList.today':    'Today',
     'readingList.yesterday':'Yesterday',
@@ -2772,9 +2812,14 @@ const I18N = {
     'cache.cleared':        '🗑 已清除快取',
     'toast.cacheLoadFailed':'快取讀取失敗，請選擇檔案',
     'toast.sharedNotEpub':  '這似乎不是 ePub 檔案',
-    'toast.shareFailed':    '無法開啟共享的檔案（{reason}）',
-    'toast.shareFailedPick':  '無法開啟共享的檔案（{reason}）／點一下選擇檔案',
-    'toast.shareFailedRetry': '無法開啟共享的檔案（{reason}）／點一下重試',
+    'toast.shareFailed':    '無法開啟共享的檔案',
+    'toast.shareFailedPick':  '無法開啟共享的檔案／點一下選擇檔案',
+    'toast.shareFailedRetry': '無法開啟共享的檔案／點一下重試',
+    'share.failTitle':      '沒有收到共享的檔案',
+    'share.failBody':       '瀏覽器沒有把檔案內容傳過來。重新選擇檔案就能開啟同一本書。',
+    'share.pick':           '📂 選擇檔案',
+    'share.retry':          '↻ 再試一次',
+    'share.dismiss':        '關閉',
     'readingList.openNew':  '開啟其他 ePub',
     'readingList.today':    '今天',
     'readingList.yesterday':'昨天',
@@ -3216,9 +3261,14 @@ const I18N = {
     'cache.cleared':        '🗑 已清除缓存',
     'toast.cacheLoadFailed':'缓存读取失败，请选择文件',
     'toast.sharedNotEpub':  '这似乎不是 ePub 文件',
-    'toast.shareFailed':    '无法打开共享的文件（{reason}）',
-    'toast.shareFailedPick':  '无法打开共享的文件（{reason}）／点击选择文件',
-    'toast.shareFailedRetry': '无法打开共享的文件（{reason}）／点击重试',
+    'toast.shareFailed':    '无法打开共享的文件',
+    'toast.shareFailedPick':  '无法打开共享的文件／点击选择文件',
+    'toast.shareFailedRetry': '无法打开共享的文件／点击重试',
+    'share.failTitle':      '没有收到共享的文件',
+    'share.failBody':       '浏览器没有把文件内容传过来。重新选择文件就能打开同一本书。',
+    'share.pick':           '📂 选择文件',
+    'share.retry':          '↻ 再试一次',
+    'share.dismiss':        '关闭',
     'readingList.openNew':  '打开其他 ePub',
     'readingList.today':    '今天',
     'readingList.yesterday':'昨天',
@@ -3798,6 +3848,7 @@ async function loadEpub(file, fileHandle = null) {
     _koPendingTarget = null;   // 前の本の着地点を持ち越さない
     _koPullDone.clear();
 
+    hideShareFailBanner();   // 本が開けたら案内は用済み
     document.getElementById('welcome').style.display = 'none';
     document.getElementById('page-container').classList.add('visible');
     updateCloseBookBtnVisibility();
@@ -12705,15 +12756,50 @@ function _shareClear() {
   } catch (e) {}
 }
 
-// 失敗の告知。理由コードを必ず添える（実機で「どこで切れたか」を持ち帰るため）。
-// 実体が手元にあるなら「タップでもう一度」、無いなら「タップしてファイルを選ぶ」。
-// トーストだけで終わらせると利用者が手詰まりになるので、必ず次の一手を用意する。
+// 失敗の告知。読書中でなければ画面にバナーを残し、読書中はトーストで知らせる。
+// ⚠ Android Chrome 153 は共有ターゲットへ空の multipart を送ってくる（＝ファイルが
+//   永久に届かない）。8 秒で消えるトーストだけでは一発勝負になるので、操作できる
+//   導線を画面に残すのが本命。理由コードはバナーの小さい行に置く（診断は残す）。
+function reportShareFailure(reason) {
+  try { console.warn('[yomikake] share failed:', reason); } catch (e) {}
+  if (state.epub) showShareFailToast(reason);   // 読書中はバナーを出す場所が無い
+  else showShareFailBanner(reason);
+}
+
+// 読みかけリストの先頭に出す案内（消えない・タップで次の一手）
+function showShareFailBanner(reason) {
+  const el = document.getElementById('share-fail');
+  if (!el) { showShareFailToast(reason); return; }
+  const why = document.getElementById('share-fail-why');
+  if (why) why.textContent = String(reason || '').slice(0, 400);
+  const btn = document.getElementById('share-fail-btn');
+  if (btn) {
+    // 実体が手元にあるなら開き直せる。無ければピッカーへ
+    const key = _sharedPendingFile ? 'share.retry' : 'share.pick';
+    btn.setAttribute('data-i18n', key);   // 言語切替にも追従させる
+    btn.textContent = t(key);
+  }
+  el.classList.remove('hidden');
+}
+
+function hideShareFailBanner() {
+  const el = document.getElementById('share-fail');
+  if (el) el.classList.add('hidden');
+}
+
+// バナーのボタン。クリック由来なのでピッカーを開けるユーザージェスチャがある
+function shareFailAction() {
+  hideShareFailBanner();
+  if (_sharedPendingFile) _shareOpen(_sharedPendingFile);
+  else openFilePicker();
+}
+
+// 読書中の告知。バナーを出す場所が無いときだけ使う（理由コードは console に残す）
 function showShareFailToast(reason) {
   const el = document.getElementById('toast');
   const retry = !!_sharedPendingFile;
   _clearToastAction(el);
-  el.textContent = t(retry ? 'toast.shareFailedRetry' : 'toast.shareFailedPick',
-                     { reason: String(reason || '?').slice(0, 400) });
+  el.textContent = t(retry ? 'toast.shareFailedRetry' : 'toast.shareFailedPick');
   el.classList.add('show', 'toast-action');
   el.style.cursor = 'pointer';
   clearTimeout(el._timer);
@@ -12736,7 +12822,7 @@ async function _shareOpen(file) {
     await loadEpub(file);
   } catch (e) {
     hideLoading();
-    showShareFailToast('load:' + ((e && e.name) || e));
+    reportShareFailure('load:' + ((e && e.name) || e));
     return;
   }
   _sharedPendingFile = null;
@@ -12760,9 +12846,9 @@ async function _shareOpen(file) {
   // shared=err でも退避は覗く。sw.js 側がタイムアウトで err を返したあとに
   // 書き込みが完走しているかもしれないので、拾えるなら拾う。
   try { got = await _shareTake(); } catch (e) {}
-  if (!got) { hideLoading(); showShareFailToast(shared === '1' ? 'empty' : (why || 'err')); return; }
+  if (!got) { hideLoading(); reportShareFailure(shared === '1' ? 'empty' : (why || 'err')); return; }
   if (Date.now() - (got.savedAt || 0) > _SHARE_FRESH_MS) {
-    hideLoading(); _shareClear(); showShareFailToast('stale'); return;
+    hideLoading(); _shareClear(); reportShareFailure('stale'); return;
   }
   await _shareOpen(got.file);
 })();

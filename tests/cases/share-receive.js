@@ -12,17 +12,24 @@ var IS_IOS = (typeof _handleKeys === 'undefined');
 
 // ── i18n（4 言語・両ファイル） ───────────────────────────────
 ['ja', 'en', 'zh-TW', 'zh-CN'].forEach(function (lg) {
-  ['toast.shareFailed', 'toast.shareFailedPick', 'toast.shareFailedRetry'].forEach(function (k) {
+  ['toast.shareFailed', 'toast.shareFailedPick', 'toast.shareFailedRetry',
+   'share.failTitle', 'share.failBody', 'share.pick', 'share.retry', 'share.dismiss'
+  ].forEach(function (k) {
     var v = I18N[lg] && I18N[lg][k];
     T(lg + ': ' + k + ' がある', typeof v === 'string' && v.length > 0);
-    T(lg + ': ' + k + ' が理由を差し込める', typeof v === 'string' && v.indexOf('{reason}') >= 0);
   });
+  // 理由コードは画面の小さい行と console に置く。本文には混ぜない（B: 文面は平易に）
+  T(lg + ': 告知の本文に理由コードを混ぜない',
+    (I18N[lg]['share.failBody'] || '').indexOf('{reason}') < 0 &&
+    (I18N[lg]['toast.shareFailedPick'] || '').indexOf('{reason}') < 0);
 });
 
 // ── iOS 版には受信コードを入れない（design_mobile_open_ux.md §Phase 2） ──
 if (IS_IOS) {
   T('iOS 版は共有受信コードを持たない',
-    typeof _shareTake === 'undefined' && typeof showShareFailToast === 'undefined');
+    typeof _shareTake === 'undefined' && typeof showShareFailToast === 'undefined' &&
+    typeof showShareFailBanner === 'undefined');
+  T('iOS 版は案内バナーの markup も持たない', !document.getElementById('share-fail'));
 }
 
 // ── sw.js を読み込んで中身を検査する ────────────────────────
@@ -159,19 +166,50 @@ if (!IS_IOS) {
   T('_shareIdbPeek は readonly で読む', /readonly/.test(String(_shareIdbPeek)));
   T('_shareIdbPeek は delete しない',  !/delete\(/.test(String(_shareIdbPeek)));
 
-  var el = document.getElementById('toast');
-  _sharedPendingFile = null;
-  showShareFailToast('form:TypeError');
-  T('失敗トーストが出る', el.classList.contains('show'));
-  T('理由コードが文面に出る', el.textContent.indexOf('form:TypeError') >= 0, el.textContent);
-  T('実体が無いときはファイル選択を促す',
-    el.textContent === t('toast.shareFailedPick', { reason: 'form:TypeError' }), el.textContent);
-  T('タップできる', el.classList.contains('toast-action') && !!el._actionHandler);
+  T('reportShareFailure がある',   typeof reportShareFailure === 'function');
+  T('showShareFailBanner がある',  typeof showShareFailBanner === 'function');
+  T('shareFailAction がある',      typeof shareFailAction === 'function');
 
-  _sharedPendingFile = new File([new Uint8Array([0x50, 0x4b])], 'x.epub');
-  showShareFailToast('load:Error');
-  T('実体があるときは再試行を促す',
-    el.textContent === t('toast.shareFailedRetry', { reason: 'load:Error' }), el.textContent);
+  // ── 消えない案内バナー（本命の動線） ──
+  var bn = document.getElementById('share-fail');
+  var why = document.getElementById('share-fail-why');
+  var bbtn = document.getElementById('share-fail-btn');
+  T('バナーの markup がある', !!bn && !!why && !!bbtn);
+  T('初期状態では隠れている', bn.classList.contains('hidden'));
+
   _sharedPendingFile = null;
+  reportShareFailure('nofile:absent/keys=none');
+  T('本を開いていなければバナーを出す', !bn.classList.contains('hidden'));
+  T('本文は平易な文（理由コードを混ぜない）',
+    bn.querySelector('.sf-body').textContent === t('share.failBody'));
+  T('理由コードは小さい行に残る',
+    why.textContent === 'nofile:absent/keys=none', why.textContent);
+  T('実体が無いときはファイル選択を促す',
+    bbtn.textContent === t('share.pick') && bbtn.getAttribute('data-i18n') === 'share.pick');
+
+  // 実体が手元にある（loadEpub が落ちた）ときは開き直しを促す
+  _sharedPendingFile = new File([new Uint8Array([0x50, 0x4b])], 'x.epub');
+  reportShareFailure('load:Error');
+  T('実体があるときは再試行を促す',
+    bbtn.textContent === t('share.retry') && bbtn.getAttribute('data-i18n') === 'share.retry');
+  // 言語を切り替えてもラベルが追従する（data-i18n を書き換えているか）
+  var _lang0 = _lang;
+  setLang('en'); applyI18n();
+  T('言語切替にラベルが追従する', bbtn.textContent === I18N.en['share.retry'], bbtn.textContent);
+  setLang(_lang0); applyI18n();
+
+  hideShareFailBanner();
+  T('閉じられる', bn.classList.contains('hidden'));
+
+  // ── 読書中はバナーを出す場所が無いのでトースト ──
+  var el = document.getElementById('toast');
+  var _epub0 = state.epub; state.epub = {};
+  _sharedPendingFile = null;
+  reportShareFailure('empty');
+  T('読書中はトーストで知らせる', el.classList.contains('show'));
+  T('トーストの文面も平易', el.textContent === t('toast.shareFailedPick'), el.textContent);
+  T('トーストはタップできる', el.classList.contains('toast-action') && !!el._actionHandler);
+  T('読書中はバナーを出さない', bn.classList.contains('hidden'));
+  state.epub = _epub0;
   _clearToastAction(el); el.classList.remove('show');
 }

@@ -47,7 +47,13 @@ probe = '''<script>
   var iv = setInterval(function(){
     n++;
     var toast = document.getElementById('toast');
+    var bn = document.getElementById('share-fail');
     if (typeof state !== 'undefined' && state.epub) { clearInterval(iv); send('OPENED ' + (state.bookTitle || '')); }
+    else if (bn && !bn.classList.contains('hidden')) {
+      clearInterval(iv);
+      send('BANNER ' + document.getElementById('share-fail-why').textContent +
+           ' |btn=' + document.getElementById('share-fail-btn').textContent);
+    }
     else if (toast && toast.classList.contains('show') && toast.textContent) { clearInterval(iv); send('TOAST ' + toast.textContent); }
     else if (n > 75) { clearInterval(iv); send('TIMEOUT'); }
   }, 200);
@@ -117,7 +123,7 @@ run_case() {  # $1=見出し $2=ドライバ $3=期待の正規表現
   local cpid=$! i line=""
   for i in $(seq 1 400); do
     line="$(tail -c "+$((off + 1))" "$WORK/report.log" 2>/dev/null |
-            grep -a -m1 -E '^(OPENED|TOAST|TIMEOUT|DRIVER)' || true)"
+            grep -a -m1 -E '^(OPENED|BANNER|TOAST|TIMEOUT|DRIVER)' || true)"
     [ -n "$line" ] && break
     sleep 0.1
   done
@@ -132,5 +138,8 @@ run_case '共有した ePub が開く' drv_ok.html '^OPENED テスト用リフ�
 # 2) 実体が空: 黙って失敗せず、理由コードと「何が届いていたか」を出す
 #    （実機では POST は届くのにファイルパートだけ無い状態が起きている。
 #      keys= と len= がその切り分けの材料なので、消えたらここで落とす）
-run_case '空ファイルは理由コードを出す'   drv_empty.html '^TOAST .*nofile:empty'
-run_case '届いた中身の要約を出す'         drv_empty.html '^TOAST .*keys=epub:f0.*len=[0-9]+.*ct=mp'
+#    案内は消えるトーストではなく、操作できるバナーで出す（Chrome 153 では共有が
+#    永久に届かないため、一発勝負の告知だと利用者が手詰まりになる）
+run_case '失敗は消えないバナーで知らせる' drv_empty.html '^BANNER .*nofile:empty'
+run_case '届いた中身の要約を出す'         drv_empty.html '^BANNER .*keys=epub:f0.*len=[0-9]+.*ct=mp'
+run_case 'ファイルを選ぶ導線を出す'       drv_empty.html '^BANNER .*\|btn=.*(選ぶ|Choose)'

@@ -37,7 +37,8 @@ Two-file ePub 3 vertical-text viewer for reading Japanese publications. No build
 - **`req.formData()` が駄目なら生の body を自前で解析する**（`shareParseMultipart`）。`req.clone()` を**先に**取っておくこと（`formData()` が body を消費した後では読めない）。パーサは「epub パートの実体を取り出す」だけの最小実装で、汎用ではない。
 - **退避は覗くだけで消さない**（`_shareIdbPeek` は `readonly`）。消すのは `loadEpub` が通ってから（`_shareClear`）。取った瞬間に消していた頃は、開くのに失敗した共有を**二度と再試行できなかった**。
 - **`shared=err` でも退避を覗く**。`sw.js` がタイムアウトで err を返した後に書き込みが完走していることがあるため。
-- **失敗告知は必ず次の一手を持たせる**（`showShareFailToast`）。実体が手元にあれば「タップでもう一度」、無ければ「タップしてファイルを選ぶ」（`openFilePicker()`）。トーストだけで終わると利用者は手詰まりになる。
+- **失敗告知は消えないバナーが本命**（`reportShareFailure` → `showShareFailBanner` / `hideShareFailBanner` / `shareFailAction`、markup は `#share-fail`＝`#welcome` の先頭）。**Chrome 153 では共有が永久に届かない**ので、8 秒で消えるトーストだけだと一発勝負になる。実体が手元にあれば「もう一度開く」、無ければ「ファイルを選ぶ」（`openFilePicker()`＝クリック由来なのでユーザージェスチャがある）。**読書中は `#welcome` が隠れていてバナーを出せないのでトーストに落とす**（`reportShareFailure` が `state.epub` で振り分ける）。ボタンのラベルは `data-i18n` 属性ごと書き換える（言語切替に追従させるため）。本が開けたら `loadEpub` が `hideShareFailBanner()` する。
+- **文面は平易に、理由コードは小さく残す。** 告知の本文に `{reason}` を混ぜない（原因が分かった今、普段使いで暗号を読ませない）。理由はバナーの `.sf-why`（10px・淡色・等幅）と `console.warn` に置く。**消してはいけない** —— 次に別の壊れ方をしたとき、実機から持ち帰れる唯一の手段になる。
 - **i18n キーは両ファイルに置くが、受信コードは `yomikake.html` にだけ置く**（iOS Safari に Web Share Target が無い。`tests/cases/share-receive.js` が iOS 側に紛れ込んでいないことを検査する）。
 - テストは `tests/cases/share-receive.js`（両ファイル・定数一致／multipart パーサ／失敗告知）と **`tests/lib/share-e2e.sh`**（localhost に立てて**実 SW を通した往復**）。**SW と Cache Storage はセキュアコンテキスト限定で `file://` では動かない**ため、後者だけ別ハーネスになっている。
 
