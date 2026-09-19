@@ -41,7 +41,7 @@ fetch('sw.js').then(function (r) { return r.text(); }).then(function (src) {
   var sw;
   try {
     sw = new Function(src + '\n; return {p: shareParseMultipart, idx: shareBytesIndexOf,' +
-                            ' note: shareFormNote,' +
+                            ' note: shareFormNote, peek: shareBodyPeek,' +
                             ' C: SHARE_CACHE, P: SHARE_STASH_PATH, V: VERSION};')();
   } catch (e) { sw = null; }
   T('sw.js をページ内で評価できる', !!sw, sw ? '' : '評価に失敗');
@@ -56,6 +56,11 @@ fetch('sw.js').then(function (r) { return r.text(); }).then(function (src) {
   fd.append('title', 'abc');
   fd.append('epub', new File([new Uint8Array(5)], 'x.epub'));
   T('note: 文字列とファイルを区別する', sw.note(fd) === 'keys=title:s3,epub:f5', sw.note(fd));
+
+  // 解釈できなかった body の見た目。改行が記号になり、制御文字が落ちること
+  var peek = sw.peek(new TextEncoder().encode('--abc\r\n--abc--\r\n'));
+  T('peek: 改行を記号にする', peek === 'body=--abc<CR><LF>--abc--<CR><LF>', peek);
+  T('peek: 長さを抑える', sw.peek(new TextEncoder().encode(new Array(600).join('x'))).length <= 205);
 
   // ページ側との定数一致。ここがずれると受け渡しが黙って壊れる
   if (!IS_IOS) {

@@ -136,11 +136,25 @@ async function shareExtractFile(req) {
       const f = shareParseMultipartBytes(new Uint8Array(buf), ct);
       if (f) return { file: f, reason: '' };
       why += '/raw:nopart';
+      // 実機では「本文 75 バイト・パート 0 個」という形で届いた。枠だけ送られているのか、
+      // 名前の無いパートを取り落としているのかは中身を見るしかない。
+      // ⚠ 何も解釈できなかった小さい body のときだけ出す（利用者の共有内容を晒さない）。
+      if (buf.byteLength <= 512 && /keys=none/.test(note))
+        note += '/' + shareBodyPeek(new Uint8Array(buf));
     } catch (e) {
       why += '/raw:' + errName(e);
     }
   }
   return { file: null, reason: (why || 'nofile') + note };
+}
+
+// 解釈できなかった body の見た目（制御文字は記号に置き換える）。診断専用。
+function shareBodyPeek(bytes) {
+  try {
+    return 'body=' + new TextDecoder().decode(bytes.subarray(0, 512))
+      .replace(/\r/g, '<CR>').replace(/\n/g, '<LF>')
+      .replace(/[^\x20-\x7e<>]/g, '.').slice(0, 200);
+  } catch (e) { return 'body=?'; }
 }
 
 // 届いたフォームの中身の要約（名前:s=文字列長 / f=ファイルの長さ）。

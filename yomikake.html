@@ -12713,7 +12713,7 @@ function showShareFailToast(reason) {
   const retry = !!_sharedPendingFile;
   _clearToastAction(el);
   el.textContent = t(retry ? 'toast.shareFailedRetry' : 'toast.shareFailedPick',
-                     { reason: String(reason || '?').slice(0, 200) });
+                     { reason: String(reason || '?').slice(0, 400) });
   el.classList.add('show', 'toast-action');
   el.style.cursor = 'pointer';
   clearTimeout(el._timer);
@@ -12749,7 +12749,7 @@ async function _shareOpen(file) {
   try { params = new URLSearchParams(location.search); } catch (e) { return; }
   const shared = params.get('shared');
   if (!shared) return;
-  const why = (params.get('r') || '').slice(0, 200);  // sw.js が付けた失敗理由（診断情報つき）
+  const why = (params.get('r') || '').slice(0, 400);  // sw.js が付けた失敗理由（診断情報つき）
   // 起動時の自動オープン（autoOpenLastBook）と競合させない。
   // ※ 直下の replaceState でクエリが消えるため、後から location.search を見る方式は不可。
   _sharedFlowActive = true;
