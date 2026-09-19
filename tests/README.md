@@ -53,9 +53,15 @@ tests/
   lib/syntax-check.js   inline <script> を vm.Script でパースするだけ
   lib/make-fixtures.py  テスト用の小さな ePub を生成（tests/.fixtures/・gitignore）
   lib/pixel-test.sh     スクリーンショットを撮って画素を読む（Pillow が要る。無ければ SKIP）
+  lib/share-e2e.sh      localhost に立てて実 Service Worker で共有の往復を通す
   cases/*.js            DOM テストのケース本体
   pixel/*.sh            画素テストのケース本体（PASS/FAIL 行を print する）
 ```
+
+**共有 E2E**（`lib/share-e2e.sh`）だけ別ハーネスなのは、**Service Worker も Cache Storage も
+セキュアコンテキスト限定**で `file://` の dom-test.sh では一切動かないため。実機と同じ
+**ナビゲーション POST**（`<form>` の submit）で `sw.js` を叩き、本が開くところまで見る。
+`fetch()` の POST では `request.mode` が `navigate` にならず経路が変わるので使わない。
 
 **画素テスト**は「CSS 変数は入っているのに実際には見えていない」類の事故を拾うためにある。
 たとえば明るさフィルタは、重ね順を1つ間違えると本文の下に潜って何も起きない／

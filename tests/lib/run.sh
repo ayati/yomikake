@@ -39,6 +39,8 @@ declare -A CASE_FLAGS=(
   [cover-thumb]="--allow-file-access-from-files"
   [kosync]="--allow-file-access-from-files"
   [epub-sanitize]="--allow-file-access-from-files"
+  # sw.js を fetch して中身（multipart パーサ）を直接叩く
+  [share-receive]="--allow-file-access-from-files"
 )
 
 pass=0; fail=0; failed_lines=()
@@ -73,6 +75,30 @@ for c in tests/cases/*.js; do
     fi
   done
 done
+
+# 共有ターゲットは SW と Cache Storage を使うため file:// では一切動かない。
+# localhost に立てて実 SW を通す（tests/lib/share-e2e.sh・yomikake.html のみ）
+echo
+echo "══ 共有 E2E ══"
+if [ -z "$FILTER" ] || [[ "share-e2e" == *"$FILTER"* ]]; then
+  E2E=tests/lib/share-e2e.sh
+  chmod +x "$E2E" 2>/dev/null || true
+  out="$("$E2E")"
+  p=$(echo "$out" | grep -c '^PASS' || true)
+  f=$(echo "$out" | grep -c '^FAIL' || true)
+  s=$(echo "$out" | grep -c '^SKIP' || true)
+  if [ "$s" -gt 0 ]; then
+    printf "  %-18s %-16s SKIP\n" "yomikake.html" "share-e2e"
+    echo "$out" | sed 's/^/      /'
+  else
+    printf "  %-18s %-16s PASS=%-3s FAIL=%s\n" "yomikake.html" "share-e2e" "$p" "$f"
+    pass=$((pass+p)); fail=$((fail+f))
+    if [ "$f" -gt 0 ]; then
+      echo "$out" | grep '^FAIL' | sed 's/^/      /'
+      failed_lines+=("yomikake.html / share-e2e")
+    fi
+  fi
+fi
 
 echo
 echo "══ 画素テスト ══"

@@ -1884,7 +1884,9 @@ const I18N = {
     'cache.cleared':        '🗑 キャッシュを削除しました',
     'toast.cacheLoadFailed':'キャッシュの読み込みに失敗しました。ファイルを選択してください',
     'toast.sharedNotEpub':  'ePub ファイルではないようです',
-    'toast.shareFailed':    '共有されたファイルを開けませんでした',
+    'toast.shareFailed':    '共有されたファイルを開けませんでした（{reason}）',
+    'toast.shareFailedPick':  '共有されたファイルを開けませんでした（{reason}）／タップしてファイルを選ぶ',
+    'toast.shareFailedRetry': '共有されたファイルを開けませんでした（{reason}）／タップでもう一度',
     'readingList.openNew':  '別の ePub を開く',
     'readingList.today':    '今日',
     'readingList.yesterday':'昨日',
@@ -2326,7 +2328,9 @@ const I18N = {
     'cache.cleared':        '🗑 Cache cleared',
     'toast.cacheLoadFailed':'Cache load failed. Please pick the file.',
     'toast.sharedNotEpub':  'This does not look like an ePub file',
-    'toast.shareFailed':    'Could not open the shared file',
+    'toast.shareFailed':    'Could not open the shared file ({reason})',
+    'toast.shareFailedPick':  'Could not open the shared file ({reason}) — tap to choose a file',
+    'toast.shareFailedRetry': 'Could not open the shared file ({reason}) — tap to retry',
     'readingList.openNew':  'Open another ePub',
     'readingList.today':    'Today',
     'readingList.yesterday':'Yesterday',
@@ -2768,7 +2772,9 @@ const I18N = {
     'cache.cleared':        '🗑 已清除快取',
     'toast.cacheLoadFailed':'快取讀取失敗，請選擇檔案',
     'toast.sharedNotEpub':  '這似乎不是 ePub 檔案',
-    'toast.shareFailed':    '無法開啟共享的檔案',
+    'toast.shareFailed':    '無法開啟共享的檔案（{reason}）',
+    'toast.shareFailedPick':  '無法開啟共享的檔案（{reason}）／點一下選擇檔案',
+    'toast.shareFailedRetry': '無法開啟共享的檔案（{reason}）／點一下重試',
     'readingList.openNew':  '開啟其他 ePub',
     'readingList.today':    '今天',
     'readingList.yesterday':'昨天',
@@ -3210,7 +3216,9 @@ const I18N = {
     'cache.cleared':        '🗑 已清除缓存',
     'toast.cacheLoadFailed':'缓存读取失败，请选择文件',
     'toast.sharedNotEpub':  '这似乎不是 ePub 文件',
-    'toast.shareFailed':    '无法打开共享的文件',
+    'toast.shareFailed':    '无法打开共享的文件（{reason}）',
+    'toast.shareFailedPick':  '无法打开共享的文件（{reason}）／点击选择文件',
+    'toast.shareFailedRetry': '无法打开共享的文件（{reason}）／点击重试',
     'readingList.openNew':  '打开其他 ePub',
     'readingList.today':    '今天',
     'readingList.yesterday':'昨天',
@@ -12611,8 +12619,19 @@ try {
   if (_prevVer !== APP_VERSION) localStorage.setItem('epub_app_version', APP_VERSION);
 } catch (e) {}
 
-// 共有受信用 IDB（sw.js が put、ここで get+delete する）。ePub キャッシュとは別 DB。
-function _shareIdbTake() {
+// ══════════════════════════════════════════
+//  Web Share Target の受け取り（Android・sw.js からの引き継ぎ）
+//  退避先は sw.js と共有する。定数がずれると受け渡しが黙って壊れるので必ず対で直すこと。
+// ══════════════════════════════════════════
+const _SHARE_CACHE = 'yomikake-share-stash';      // sw.js の SHARE_CACHE と同値
+const _SHARE_STASH_PATH = '__yomikake_share_stash'; // sw.js の SHARE_STASH_PATH と同値
+const _SHARE_FRESH_MS = 600000;                   // 10 分より古い受信は古いタブの誤発火とみなす
+let _sharedPendingFile = null;                    // 開くのに失敗した共有ファイル（再試行用）
+
+// 共有受信用 IDB（sw.js が put、ここで読む）。ePub キャッシュの epub_viewer_files とは別 DB。
+// ⚠ 読むだけで消さない。消すのは loadEpub が通ってから（_shareClear）。取った瞬間に
+//   消していた頃は、開くのに失敗した共有を二度と再試行できなかった。
+function _shareIdbPeek() {
   return new Promise(resolve => {
     let req;
     try { req = indexedDB.open('epub_viewer_share', 1); }
@@ -12622,43 +12641,130 @@ function _shareIdbTake() {
       if (!db.objectStoreNames.contains('pending')) db.createObjectStore('pending');
     };
     req.onerror = () => resolve(null);
+    req.onblocked = () => resolve(null);
     req.onsuccess = () => {
       try {
         const db = req.result;
-        const tx = db.transaction('pending', 'readwrite');
-        const st = tx.objectStore('pending');
-        const g = st.get('file');
-        g.onsuccess = () => { const val = g.result; try { st.delete('file'); } catch (e) {} resolve(val || null); };
-        g.onerror = () => resolve(null);
+        const g = db.transaction('pending', 'readonly').objectStore('pending').get('file');
+        g.onsuccess = () => { const v = g.result; try { db.close(); } catch (e) {} resolve(v || null); };
+        g.onerror   = () => { try { db.close(); } catch (e) {} resolve(null); };
       } catch (e) { resolve(null); }
     };
   });
 }
 
+// sw.js が IDB に入れられなかったときの退避先（Cache Storage）。実装が別なので、
+// 片方が容量やプライベートモードで死んでも、もう片方で受け渡しが成立することがある。
+async function _shareCachePeek() {
+  try {
+    if (typeof caches === 'undefined') return null;   // file:// など非セキュアコンテキスト
+    const c = await caches.open(_SHARE_CACHE);
+    const res = await c.match(new URL(_SHARE_STASH_PATH, location.href).href);
+    if (!res) return null;
+    const blob = await res.blob();
+    let name = '';
+    try { name = decodeURIComponent(res.headers.get('x-yomikake-name') || ''); } catch (e) {}
+    return {
+      file: new File([blob], name || 'shared.epub', { type: blob.type || 'application/epub+zip' }),
+      savedAt: +(res.headers.get('x-yomikake-saved') || 0)
+    };
+  } catch (e) { return null; }
+}
+
+// 退避先を IDB → Cache の順に覗く（消さない）
+async function _shareTake() {
+  const rec = await _shareIdbPeek();
+  if (rec && rec.file) return { file: rec.file, savedAt: rec.savedAt || 0, via: 'idb' };
+  const c = await _shareCachePeek();
+  if (c && c.file) return { file: c.file, savedAt: c.savedAt || 0, via: 'cache' };
+  return null;
+}
+
+// 受け渡しが済んだ（または捨てると決めた）ら両方を掃除する
+function _shareClear() {
+  try {
+    const req = indexedDB.open('epub_viewer_share', 1);
+    req.onupgradeneeded = ev => {
+      const db = ev.target.result;
+      if (!db.objectStoreNames.contains('pending')) db.createObjectStore('pending');
+    };
+    req.onsuccess = () => {
+      try {
+        const db = req.result;
+        const tx = db.transaction('pending', 'readwrite');
+        tx.objectStore('pending').delete('file');
+        tx.oncomplete = () => { try { db.close(); } catch (e) {} };
+      } catch (e) {}
+    };
+  } catch (e) {}
+  try {
+    if (typeof caches !== 'undefined')
+      caches.open(_SHARE_CACHE)
+        .then(c => c.delete(new URL(_SHARE_STASH_PATH, location.href).href))
+        .catch(() => {});
+  } catch (e) {}
+}
+
+// 失敗の告知。理由コードを必ず添える（実機で「どこで切れたか」を持ち帰るため）。
+// 実体が手元にあるなら「タップでもう一度」、無いなら「タップしてファイルを選ぶ」。
+// トーストだけで終わらせると利用者が手詰まりになるので、必ず次の一手を用意する。
+function showShareFailToast(reason) {
+  const el = document.getElementById('toast');
+  const retry = !!_sharedPendingFile;
+  _clearToastAction(el);
+  el.textContent = t(retry ? 'toast.shareFailedRetry' : 'toast.shareFailedPick',
+                     { reason: String(reason || '?').slice(0, 80) });
+  el.classList.add('show', 'toast-action');
+  el.style.cursor = 'pointer';
+  clearTimeout(el._timer);
+  const handler = () => {
+    _clearToastAction(el);
+    el.classList.remove('show');
+    if (retry && _sharedPendingFile) _shareOpen(_sharedPendingFile);
+    else openFilePicker();
+  };
+  el._actionHandler = handler;
+  el.addEventListener('click', handler);
+  el._timer = setTimeout(() => { _clearToastAction(el); el.classList.remove('show'); }, 8000);
+}
+
+// 共有ファイルを開く。loadEpub が例外で落ちたときだけ退避を残して再試行できるようにする
+// （PK 検証で弾かれた場合は loadEpub 自身が toast.sharedNotEpub を出すので二重に出さない）。
+async function _shareOpen(file) {
+  _sharedPendingFile = file;
+  try {
+    await loadEpub(file);
+  } catch (e) {
+    hideLoading();
+    showShareFailToast('load:' + ((e && e.name) || e));
+    return;
+  }
+  _sharedPendingFile = null;
+  _shareClear();
+}
+
 // Android のファイラー等から共有された ePub を受け取って開く（sw.js が ?shared=1 でリダイレクトしてくる）
 (async function handleSharedFile() {
-  let shared;
-  try { shared = new URLSearchParams(location.search).get('shared'); } catch (e) { return; }
+  let params;
+  try { params = new URLSearchParams(location.search); } catch (e) { return; }
+  const shared = params.get('shared');
   if (!shared) return;
+  const why = (params.get('r') || '').slice(0, 80);   // sw.js が付けた失敗理由
   // 起動時の自動オープン（autoOpenLastBook）と競合させない。
   // ※ 直下の replaceState でクエリが消えるため、後から location.search を見る方式は不可。
   _sharedFlowActive = true;
   // クエリを URL から除去（リロードで二重に開かないように）
   try { history.replaceState(null, '', location.pathname + location.hash); } catch (e) {}
-  if (shared === 'err') { showToast(t('toast.shareFailed')); return; }
-  if (shared !== '1') return;
-  showLoadingPreSelect();  // IDB 読み出し中の空白を即カバー
-  try {
-    const rec = await _shareIdbTake();
-    // 鮮度ガード: 10 分以上前の受信は古いタブの誤発火とみなして破棄
-    if (!rec || !rec.file || (Date.now() - (rec.savedAt || 0) > 600000)) {
-      hideLoading(); showToast(t('toast.shareFailed')); return;
-    }
-    await loadEpub(rec.file);  // 以降は通常オープンと同一（しおり復元・Phase1 キャッシュにも入る）
-  } catch (e) {
-    hideLoading();
-    try { showToast(t('toast.shareFailed')); } catch (e2) {}
+  showLoadingPreSelect();  // 退避の読み出し中の空白を即カバー
+  let got = null;
+  // shared=err でも退避は覗く。sw.js 側がタイムアウトで err を返したあとに
+  // 書き込みが完走しているかもしれないので、拾えるなら拾う。
+  try { got = await _shareTake(); } catch (e) {}
+  if (!got) { hideLoading(); showShareFailToast(shared === '1' ? 'empty' : (why || 'err')); return; }
+  if (Date.now() - (got.savedAt || 0) > _SHARE_FRESH_MS) {
+    hideLoading(); _shareClear(); showShareFailToast('stale'); return;
   }
+  await _shareOpen(got.file);
 })();
 
 </script>
