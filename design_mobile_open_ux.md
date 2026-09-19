@@ -346,3 +346,26 @@ content:// を読めずに空の multipart を送ったか、のどちらか。
 **現在の manifest** をもとに Chrome が組み立てる。この 2 つがずれると
 「共有シートには出るのにファイルが載らない」が起きうる。
 → **PWA を入れ直すのが最も安いテスト**（コード変更ゼロ）。
+
+### 3 回目: 入れ直しても直らない（2026-09-19 12:23 / 12:32・2 台）
+
+PWA を入れ直しても **`nofile:absent/raw:nopart/keys=none/len=75/ct=mp`** のまま。
+**別の Android 端末でも同一**。WebAPK の登録ずれ説は否定された。
+
+**`len=75` の意味が確定した。** Chromium の multipart 境界
+（`net::GenerateMimeMultipartBoundary()`）は **70 文字**で、パートが 1 つも無い body は
+`--<70文字>--` ＋ 改行 ＝ **ちょうど 75 バイト**。つまり Chrome は
+**終端行だけの空の multipart** を送っている＝**パートを作る前にファイルを落としている**。
+
+Chrome がファイルを落とす既知の道筋は「共有された MIME が `share_target` の `accept` の
+どれにも当たらない」。Android のファイラーは `.epub` を `*/*` で投げることが多く、
+こちらの accept は具体型と拡張子しか並べていなかった。
+
+→ **`accept` に `application/*` と `*/*` を追加**（`application/x-zip-compressed` /
+`application/vnd.amazon.ebook` も。Kindle 系のアプリが付ける型）。
+
+- **代償**: 共有シートに yomikake が出る場面が増える（画像や PDF でも出る）。
+  直ったあとに `*/*` だけ外して様子を見る余地はある。
+- **⚠ manifest の変更は WebAPK に焼かれているので、もう一度入れ直さないと反映されない。**
+- `tests/cases/share-receive.js` が accept にワイルドカードが入っていることを検査する
+  （外すと実機の壊れ方に戻るため）。

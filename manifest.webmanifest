@@ -20,7 +20,9 @@
       "files": [
         {
           "name": "epub",
-          "accept": ["application/epub+zip", "application/zip", "application/octet-stream", ".epub", ".kepub"]
+          "accept": ["application/epub+zip", "application/zip", "application/octet-stream",
+                     "application/x-zip-compressed", "application/vnd.amazon.ebook",
+                     ".epub", ".kepub", "application/*", "*/*"]
         }
       ]
     }
