@@ -390,6 +390,24 @@ WebAPK → Chrome の `content://` の受け渡しが壊れていると見るの
 → **失敗時の動線を実用品質に保つ**のが唯一の対策。現状「トースト → タップ → ピッカー」で
 開けることは実機で確認済み（12:12 の報告）。
 
+### 上流の報告（crbug）
+
+**https://issues.chromium.org/issues/561685220**
+「Web Share Target on Android drops shared files from installed PWAs; text still arrives」
+（component `Blink>WebShare` / 2026-09-15 登録 / 2026-09-19 更新 /
+`chromium/src` の `refs/branch-heads/8010` ＝ **M153 のブランチ**を参照）
+
+表題がこちらの実測そのもの。`153.0.**8010**.52` で再現し 152 で正常、という結果とも符合する。
+
+**表題の「text still arrives」との差**: こちらは `keys=none` でテキストも来ていないが、
+yomikake の `share_target` は `files` しか宣言していないので、Chrome がテキストを送る
+余地がそもそも無い。落ちているのがファイルだけ、という点は一致している。
+
+**Chrome 側が直れば、こちらのコードは 1 行も変えずに共有が動く。** そのとき畳めるのは
+診断コード（`keys=` / `len=` / `ct=` / `body=`）だけで、**バナー自体は残す** ——
+共有が届かない原因は Chrome の不具合に限らないし、失敗時に手詰まりにしない動線は
+それ自体が正しい（`empty` / `stale` / `load:` の経路は今後もありうる）。
+
 ### 決着と対応（2026-09-19）
 
 **Chrome 152.0.7977.75 の端末では正常に開ける**ことを確認。**153 の退行**と特定できた。
