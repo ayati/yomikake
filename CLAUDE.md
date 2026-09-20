@@ -616,7 +616,7 @@ Both files support syncing `epub_pos_*` / `epub_last_book` keys to/from Google D
 
 ### Security
 
-- ePub `<script>` tags stripped in `buildSrcdoc()` (XSS — iframe has no `sandbox` attribute).
+- ePub `<script>` tags stripped in `buildSrcdoc()` (XSS). 実行経路の本命の防御は下の **CSP**。
 - ePub `<base>` replaced with `<base href="about:blank">` to prevent `file://` URL leakage.
 - JSZip: **both files** inline a SRI-verified copy of `jszip.min.js` (no network fetch, so no runtime SRI; integrity is checked once at update time against the hash recorded in the inline-block comment).
 - `postMessage` origin is `"*"` (required for `file://`); receiver validates `e.source === iframe.contentWindow` to reject messages from other windows/extensions, plus `e.data.type`.
@@ -624,16 +624,23 @@ Both files support syncing `epub_pos_*` / `epub_last_book` keys to/from Google D
 - ePub 由来の**インライン `on*` ハンドラ・入れ子の `<iframe>`/`<object>`/`<embed>`・`javascript:` スキーム**も `buildSrcdoc()` で除去する（v2.22.1）。**v2.22.0 までは「リスクが低く除去コストが高い」として意図的に残していたが、KOReader 同期で localStorage に長期の資格情報（`userkey` はパスワードと等価）が載ったので方針を改めた。** srcdoc の iframe は親と同一オリジンで `sandbox` も無いため、ePub でコードが動くと `localStorage` を丸ごと読める。`<script>` を先に消してあるので、残っていた `onload` 等は参照先を失った死にコードであり、除去して壊れる正当な ePub は無い。
   - 入れ子の `<iframe srcdoc>` / `<object>` / `<embed>` も**オリジンを継承する**ので同時に落とす。
   - `javascript:` は `<a href>` なら `CLICK_HANDLER` → `handleIframeLink()` が既に拒否していたが、**SVG の `<a xlink:href>` は `getAttribute('href')` が null になり `preventDefault` されず素通りしていた**。属性値そのものを見て落とす。
-  - ⚠ **これは数え上げ型の防御**。ブラウザに新しい実行経路が増えたら追随が要る。**本命は次項の iframe sandbox**（v2.23.0）で、両方を残すのは多層防御。
+  - ⚠ **これは数え上げ型の防御**。ブラウザに新しい実行経路が増えたら追随が要る。**本命は次項の CSP**（v2.24.0。v2.23.0 では iframe sandbox がその役だった）で、両方を残すのは多層防御。
   - テストは `tests/cases/epub-sanitize.js`（両ファイル各 33 assertion）。⚠ **テストファイルに `</script>` を直書きしないこと** —— ケースは HTML へ差し込まれるので、文字列中の閉じタグがその場でスクリプトブロックを終わらせ、**テストが 1 件も走らない**（結果が空になる）。
-- **本文 iframe の sandbox（v2.23.0・本命の防御）** —— `<iframe id="content-iframe" sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox">`。設計書 `design_iframe_sandbox.md`。
-  - **`allow-same-origin` は絶対に与えない。** 与えると sandbox は自分で自分を外せるので無意味になる。これで ePub 由来のコードが動いても**不透明オリジン**になり、親の `localStorage`（KOReader 同期の資格情報・しおり・読書データ）へ到達できない。
+- **本文 iframe の隔離（v2.24.0 で作り替え）** —— `<iframe id="content-iframe" sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox">` ＋ `buildSrcdoc()` が入れる **nonce つき CSP**。設計書 `design_browser_translation.md`（経緯は `design_iframe_sandbox.md`）。
+  - **⚠ `allow-same-origin` を外してはいけない（v2.23.0 の形に戻さない）。** 不透明オリジンのフレームには **Chrome / Edge のページ翻訳が届かず、ツールバーだけ訳されて本文が原文のまま残る**（実測）。**想定利用者は日本語学習中の英語・中国語話者**なので、これは機能欠落に等しい。Firefox と Safari の翻訳はブラウザ内部でフレームごとに走るため元から影響を受けない。検査ページ `tests/probe/translate-frames.html`（2026-09-20・Chrome PC 実測: 同一オリジンの iframe は中まで訳される／不透明オリジンだけ訳されない／**nonce CSP を足しても翻訳は妨げられない**）。
+  - **守りは 3 層。** (1) サニタイザ（v2.22.1・列挙型） (2) **nonce つき CSP（種類ごと止まる・sandbox の不透明オリジンが担っていた役目の引き継ぎ先）** (3) sandbox に残る制限（`allow-forms` / `allow-modals` / `allow-top-navigation` を与えていないので、万一コードが動いてもフォーム送信やトップ遷移での持ち出しは塞がっている）。
+  - **CSP は `makeCspNonce()` ＋ `buildSrcdoc()` が `<head>` の先頭に `<meta http-equiv>` で入れ、注入する `<script>` にだけ同じ nonce を付ける。**
+    - **⚠ `script-src` に `'unsafe-inline'` を足すと層 (2) が丸ごと無意味になる**（ePub のインラインスクリプトまで動く）。
+    - **⚠ `base-uri` を入れてはいけない** —— 直後の `<base href="about:blank">` が無効になり、ePub の未解決の相対 URL が親ページに解決されるようになる。
+    - **meta は `<head>` の先頭**（後ろに置くと、それより前の内容が保護されない）。**nonce は 1 描画ごとに作り直す**（固定値は ePub 側に書けてしまう）。`outerHTML` の直列化で nonce 属性が消えないことは実測で確認済み。
+    - `style-src` は ePub のインライン style と `FONT_URLS` の `@import`（fonts.googleapis.com）、`font-src` は data URI と fonts.gstatic.com、`img-src` は `data:`/`blob:`/`https:`、`connect-src` と `form-action` は `'none'`。
   - **`allow-popups` が要る** —— `CLICK_HANDLER` の `window.open`（外部リンク）に必要。`allow-popups-to-escape-sandbox` が無いと開いた先まで sandbox が伝播する。
-  - **同一オリジンである必要が無いことは確認済み**: 親は `contentDocument` を一切触らず（0 件）、注入コードも `localStorage`/`cookie` を使わない。本文画像は `toDataUri()` で `data:` 化済み。FXL は iframe を使わない。
-  - **⚠ ローカルフォントは必ず data URI で渡す。`blob:` は使えない。** blob URL は生成元オリジンに紐づくので不透明オリジンからは読めない（**iPad Safari は `FontFace.status = unloaded`、Chromium は `error`**。両方とも実測）。`cfGetFontSrc()` から blob 経路を削除して data URI に一本化した。**代償は章あたり約 +100ms**（8.64MB のフォントで実測。内訳は data URI の再デコードが +82ms、sandbox 自体は +16ms）。**章が変わるときだけ**の負担で、章内のページ送りは `scrollPage()` なので iframe を作り直さない。30 回連続描画でメモリも持った。
+  - **ローカルフォントは data URI のまま**（`cfGetFontSrc()`）。同一オリジンに戻ったので `blob:` も原理的には使えるが（v2.23.0 で失った章あたり約 +100ms が戻る）、**戻すなら `font-src` に `blob:` を足すこと**。速度が問題になってから判断する。
   - **ピッカーのプレビューは `new FontFace(fam, arrayBuffer)`** で作る（親ドキュメントなので URL を介す必要が無い）。data URI 経路を通すと 11MB 級の文字列が直近1件キャッシュを押し出す。
-  - **試してはいけない案**: Service Worker でフォントを配る —— **不透明オリジンの iframe は SW に制御されない**ので、そのサブリソース要求は `fetch` ハンドラに届かない。
-  - 検査は `tests/cases/epub-sanitize.js`（`allow-same-origin` が無いこと・親から `contentDocument` を覗けないこと・`createObjectURL` が消えたこと）。**⚠ タイミング由来の退行は自動テストで担保できない**（headless は rAF を差し替えている）ので実機確認が要る。
+  - **⚠ Edge は章送りに追従しない（既知・対処しない）** —— 章ごとに `srcdoc` を入れ替える＝フレーム内で別の文書へ移動するため、Edge の翻訳は最初の章しか訳さない（トップバーは親ドキュメントなので訳されたまま）。Chrome は追従する。**同じ Document を保って DOM を書き換えれば Edge も追従することは実測済み**（`design_browser_translation.md` §2-2 の H・I）だが、本文描画の中核の作り替えになるので見送っている。`document.open()/write()` では駄目（同 J）。
+  - **ルビがあると翻訳は壊れる（既知・対処しない）** —— `<ruby>` でテキストノードが分断されるため訳文がつながらない。ルビの無い本は問題なく訳せる。ブラウザ側で原文へ戻せるので、凝った仕組み（ルビを開く設定・章単位の対訳ビュー）は**大きな破綻が出るまで作らない**。
+  - **ヘルプ（`help.body`）に「🌐 ブラウザの翻訳で読む」の節を置いてある**（4 言語・読み上げの節の直後）。Edge の制限とルビの崩れはここにしか書いていないので消さないこと。
+  - 検査は `tests/cases/epub-sanitize.js`（両ファイル各 67 assertion。`allow-same-origin` が**ある**こと・CSP の各ディレクティブ・nonce が描画ごとに変わること・**CSP 下でも注入スクリプトが動く**こと＝`EPUB_READY` が届き `_isRendering` が降りること）。**⚠ タイミング由来の退行と、実ブラウザの翻訳が実際に効くかは自動テストで担保できない**ので実機確認が要る。
 - Drive API file IDs validated against `/^[a-zA-Z0-9_-]{10,200}$/` in `driveFindFile()` before use in fetch URLs (prevents URL injection via malicious API responses).
 - `resolveCssText()` uses regex with escaped pattern (not `split().join()`) to replace `url()` references, avoiding mismatches with special characters in URL strings.
 - `_driveToken` stored in memory only (not localStorage) to limit XSS token theft surface.

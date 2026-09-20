@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ブラウザ翻訳がどこまで届くかの検査</title>
+<style>
+  body { font:16px/1.7 system-ui,-apple-system,"Hiragino Kaku Gothic ProN",sans-serif;
+         margin:0; padding:16px; background:#FDF8F0; color:#222; }
+  h1 { font-size:18px; margin:0 0 8px; }
+  .note { font-size:13px; color:#555; background:#fff; border:1px solid #ddd;
+          border-radius:6px; padding:10px 12px; margin:0 0 16px; }
+  .panel { background:#fff; border:1px solid #ccc; border-radius:6px; margin:0 0 14px; overflow:hidden; }
+  .panel > h2 { font-size:13px; margin:0; padding:6px 10px; background:#efe9df;
+                border-bottom:1px solid #ddd; font-weight:600; }
+  .panel > .cond { font-size:11px; color:#666; padding:4px 10px; font-family:ui-monospace,monospace;
+                   border-bottom:1px dashed #ddd; }
+  .panel > .body { padding:8px 10px; }
+  iframe { width:100%; height:150px; border:0; display:block; background:#fff; }
+  iframe.tall { height:260px; }
+  code { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:12px; }
+  #tr-out { white-space:pre-wrap; font-size:14px; }
+  button { font:14px system-ui; padding:6px 12px; border-radius:6px; border:1px solid #999;
+           background:#fff; cursor:pointer; }
+  .tag { font-family:ui-monospace,monospace; }
+</style>
+</head>
+<body>
+
+<h1>ブラウザ翻訳がどこまで届くかの検査</h1>
+
+<div class="note">
+  <b>手順</b><br>
+  1. <code>python3 -m http.server 8080</code> で配信して <code>/tests/probe/translate-frames.html</code> を開く。<br>
+  2. 右クリック →「翻訳」→ 簡体字中国語。<br>
+  3. <span class="tag">[A]〜[F]</span> のどれが中国語になり、どれが日本語のまま残ったかを記録する。<br>
+  4. 各パネルの <b>自前スクリプト</b> / <b>ePub 由来</b> の行も記録する（CSP がどこまで効くかの確認）。<br>
+  5. いちばん下の「Translator API」欄も記録する。<br>
+  6. <b>翻訳した状態のまま</b> G / H / I のボタンを押し、
+     <span class="tag">[G2] [H2] [I2]</span> が訳された状態で出るか、日本語のまま出るかを見る
+     （Edge で章送りのあと本文が原文に戻る件の切り分け）。J は
+     <span class="tag">[J2]</span> と「書き直し後のスクリプト」の行も見る。
+</div>
+
+<div class="panel">
+  <h2>A ─ 親ドキュメント（yomikake のツールバーと同じ立場）</h2>
+  <div class="cond">top-level document</div>
+  <div class="body">
+    <p>[A] これは親ドキュメントに直接書かれた日本語の本文です。吾輩は猫である。名前はまだ無い。</p>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>B ─ srcdoc の iframe・sandbox なし（v2.22.1 までの yomikake 本文）</h2>
+  <div class="cond">&lt;iframe srcdoc&gt; / 同一オリジン / sandbox 無し / CSP 無し</div>
+  <div class="body"><iframe id="f-b"></iframe></div>
+</div>
+
+<div class="panel">
+  <h2>C ─ srcdoc の iframe・sandbox あり（現行 v2.23.x の yomikake 本文）</h2>
+  <div class="cond">sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"（不透明オリジン）</div>
+  <div class="body"><iframe id="f-c" sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"></iframe></div>
+</div>
+
+<div class="panel">
+  <h2>C2 ─ sandbox に allow-same-origin を足した場合（CSP なし）</h2>
+  <div class="cond">sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"</div>
+  <div class="body"><iframe id="f-c2" sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"></iframe></div>
+</div>
+
+<div class="panel">
+  <h2>C3 ─ sandbox なし ＋ nonce の CSP（提案する形の下限）</h2>
+  <div class="cond">&lt;meta http-equiv="Content-Security-Policy" content="script-src 'nonce-…'"&gt;</div>
+  <div class="body"><iframe id="f-c3"></iframe></div>
+</div>
+
+<div class="panel">
+  <h2>C4 ─ sandbox（allow-same-origin つき）＋ nonce の CSP（提案する形）</h2>
+  <div class="cond">sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox" + CSP</div>
+  <div class="body"><iframe id="f-c4" sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"></iframe></div>
+</div>
+
+<div class="panel">
+  <h2>D ─ 同一オリジンの別ファイルを src= で読む iframe</h2>
+  <div class="cond">&lt;iframe src="translate-frames-child.html"&gt;</div>
+  <div class="body"><iframe id="f-d" src="translate-frames-child.html"></iframe></div>
+</div>
+
+<div class="panel">
+  <h2>E ─ 親ドキュメント内の Shadow DOM</h2>
+  <div class="cond">attachShadow({mode:'open'}) の中のテキスト</div>
+  <div class="body"><div id="host-e"></div></div>
+</div>
+
+<div class="panel">
+  <h2>F ─ C4 と同じ条件で、縦書き＋ルビの本文（実際の見え方）</h2>
+  <div class="cond">writing-mode:vertical-rl / &lt;ruby&gt; / 縦中横 — 翻訳後にどう崩れるかを見る</div>
+  <div class="body"><iframe id="f-f" class="tall" sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"></iframe></div>
+</div>
+
+<div class="panel">
+  <h2>G ─ 章送りの模倣：srcdoc を入れ替える（いまの yomikake の章送り）</h2>
+  <div class="cond">fr.srcdoc = 新しい文書 ＝ フレーム内で新しい文書へ「移動」する</div>
+  <div class="body">
+    <p><button id="btn-g">次の章へ（srcdoc を入れ替える）</button></p>
+    <iframe id="f-g" sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"></iframe>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>H ─ 章送りの模倣：同じ文書のまま中身だけ差し替える</h2>
+  <div class="cond">fr.contentDocument.body.innerHTML = 新しい本文 ＝ 文書は移動しない</div>
+  <div class="body">
+    <p><button id="btn-h">次の章へ（中身だけ差し替える）</button></p>
+    <iframe id="f-h" sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"></iframe>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>I ─ 同じ文書に段落を足すだけ</h2>
+  <div class="cond">fr.contentDocument.body.insertAdjacentHTML('beforeend', …)</div>
+  <div class="body">
+    <p><button id="btn-i">段落を足す</button></p>
+    <iframe id="f-i" sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"></iframe>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>J ─ 章送りの模倣：document.open() / write() / close()</h2>
+  <div class="cond">文書オブジェクトは同じまま中身を書き直す（スクリプトも実行される）</div>
+  <div class="body">
+    <p><button id="btn-j">次の章へ（document.write で書き直す）</button></p>
+    <iframe id="f-j" sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"></iframe>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>集計 ─ 各フレームの中でスクリプトがどう扱われたか</h2>
+  <div class="cond">iframe から postMessage で報告させた結果（翻訳の可否は上の本文で見る）</div>
+  <div class="body"><pre id="summary" style="font-size:12px;white-space:pre-wrap">応答待ち…</pre></div>
+</div>
+
+<div class="panel">
+  <h2>Translator API（Chrome/Edge の端末内翻訳・ページ側から呼べる翻訳）</h2>
+  <div class="cond">'Translator' in self / Translator.availability({ja → zh-Hans})</div>
+  <div class="body">
+    <p id="tr-status">判定中…</p>
+    <p><button id="tr-run">ja → zh-Hans を実際に翻訳してみる</button></p>
+    <p id="tr-out"></p>
+  </div>
+</div>
+
+<script>
+(function () {
+  var NONCE = 'n' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+
+  // 提案する CSP。script は nonce のみ許可＝ePub 由来のインラインスクリプトも
+  // on* ハンドラも javascript: も実行されない（列挙ではなく種類ごと止まる）
+  var CSP = "default-src 'none'; " +
+            "script-src 'nonce-" + NONCE + "'; " +
+            "style-src 'unsafe-inline' data: https:; " +
+            "img-src data: blob: https:; font-src data: https:; media-src data: blob: https:; " +
+            "connect-src 'none'; form-action 'none'; base-uri 'none'; " +
+            "frame-src 'none'; object-src 'none'";
+
+  function docFor(opts) {
+    var csp = opts.csp
+      ? '<meta http-equiv="Content-Security-Policy" content="' + CSP + '">'
+      : '';
+    var style = opts.vertical
+      ? 'html,body{height:100%}body{font:17px/1.9 "Hiragino Mincho ProN",serif;margin:8px;' +
+        'background:#fff;writing-mode:vertical-rl}'
+      : 'body{font:16px/1.8 system-ui,sans-serif;margin:8px;background:#fff}';
+    var text = opts.vertical
+      ? '<p>[F] これは<ruby>縦書<rt>たてが</rt></ruby>きで<ruby>表示<rt>ひょうじ</rt></ruby>した' +
+        '<ruby>本文<rt>ほんぶん</rt></ruby>です。吾輩は猫である。名前はまだ無い。' +
+        '<span style="text-combine-upright:all">2026</span>年に読んだ。</p>'
+      : '<p>[' + opts.tag + '] ' + (opts.body ||
+          ('これは ' + opts.desc + ' に書かれた日本語の本文です。吾輩は猫である。名前はまだ無い。')) + '</p>';
+    return '<!DOCTYPE html><html lang="ja"><head><meta charset="utf-8">' + csp +
+      '<style>' + style + '</style></head><body>' + text +
+      '<p style="font-size:12px;color:#888;writing-mode:horizontal-tb">' +
+        '<span id="own">自前スクリプト: 動かなかった</span><br>' +
+        '<span id="evil">ePub 由来スクリプト: 阻止された</span><br>' +
+        '<span id="evil2">ePub 由来 on* ハンドラ: 阻止された</span></p>' +
+      '<img src="data:," alt="" style="display:none" ' +
+        'onerror="document.getElementById(\'evil2\').textContent=' +
+        '\'ePub 由来 on* ハンドラ: 実行された\'">' +
+      '<script>document.getElementById("evil").textContent=' +
+        '"ePub 由来スクリプト: 実行された";<\/script>' +
+      '<script nonce="' + NONCE + '">document.getElementById("own").textContent=' +
+        '"自前スクリプト: 動いた";' +
+        'setTimeout(function(){parent.postMessage({probe:"' + opts.tag + '",' +
+        'own:document.getElementById("own").textContent,' +
+        'evil:document.getElementById("evil").textContent,' +
+        'evil2:document.getElementById("evil2").textContent},"*");},400);<\/script>' +
+      '</body></html>';
+  }
+
+  document.getElementById('f-b').srcdoc  = docFor({ tag:'B',  desc:'srcdoc の iframe（sandbox なし・CSP なし）' });
+  document.getElementById('f-c').srcdoc  = docFor({ tag:'C',  desc:'srcdoc の iframe（現行の sandbox）' });
+  document.getElementById('f-c2').srcdoc = docFor({ tag:'C2', desc:'srcdoc の iframe（sandbox + allow-same-origin）' });
+  document.getElementById('f-c3').srcdoc = docFor({ tag:'C3', desc:'srcdoc の iframe（sandbox なし + CSP）', csp:true });
+  document.getElementById('f-c4').srcdoc = docFor({ tag:'C4', desc:'srcdoc の iframe（sandbox + allow-same-origin + CSP）', csp:true });
+  document.getElementById('f-f').srcdoc  = docFor({ tag:'F', csp:true, vertical:true });
+
+  var got = {};
+  window.addEventListener('message', function (e) {
+    var d = e.data; if (!d || !d.probe) return;
+    got[d.probe] = d;
+    var lines = ['B','C','C2','C3','C4','F'].map(function (k) {
+      var g = got[k];
+      return k + ': ' + (g ? g.own + ' / ' + g.evil + ' / ' + g.evil2 : '応答なし');
+    });
+    document.getElementById('summary').textContent = lines.join('\n');
+  });
+
+  // ── G / H / I: 翻訳が「章送り」に追従するか（Edge で本文が原文に戻る件）
+  var NEXT = 'これは次の章の本文です。国境の長いトンネルを抜けると雪国であった。';
+  document.getElementById('f-g').srcdoc = docFor({ tag:'G', desc:'srcdoc の入れ替え前の章', csp:true });
+  document.getElementById('f-h').srcdoc = docFor({ tag:'H', desc:'中身を差し替える前の章', csp:true });
+  document.getElementById('f-i').srcdoc = docFor({ tag:'I', desc:'段落を足す前の章', csp:true });
+
+  document.getElementById('btn-g').addEventListener('click', function () {
+    document.getElementById('f-g').srcdoc =
+      docFor({ tag:'G2', desc:'srcdoc を入れ替えた後の章', csp:true, body:NEXT });
+  });
+  document.getElementById('btn-h').addEventListener('click', function () {
+    var d = document.getElementById('f-h').contentDocument;
+    if (!d) { alert('contentDocument が読めません'); return; }
+    d.body.innerHTML = '<p>[H2] ' + NEXT + '</p>';
+  });
+  document.getElementById('f-j').srcdoc = docFor({ tag:'J', desc:'document.write で書き直す前の章', csp:true });
+  document.getElementById('btn-j').addEventListener('click', function () {
+    var d = document.getElementById('f-j').contentDocument;
+    if (!d) { alert('contentDocument が読めません'); return; }
+    // ⚠ 新しい文書の CSP meta は書かない。document.open() は元の文書の CSP を保つので、
+    //    nonce も元のものを使い回す必要がある（本番で採るならフレーム文書ごとに nonce を固定する）
+    d.open();
+    d.write('<style>body{font:16px/1.8 system-ui,sans-serif;margin:8px;background:#fff}</style>' +
+            '<p>[J2] ' + NEXT + '</p>' +
+            '<p style="font-size:12px;color:#888"><span id="own2">書き直し後のスクリプト: 動かなかった</span></p>' +
+            '<' + 'script nonce="' + NONCE + '">document.getElementById("own2").textContent=' +
+            '"書き直し後のスクリプト: 動いた";</' + 'script>');
+    d.close();
+  });
+
+  document.getElementById('btn-i').addEventListener('click', function () {
+    var d = document.getElementById('f-i').contentDocument;
+    if (!d) { alert('contentDocument が読めません'); return; }
+    d.body.insertAdjacentHTML('beforeend', '<p>[I2] ' + NEXT + '</p>');
+  });
+
+  var sh = document.getElementById('host-e').attachShadow({ mode: 'open' });
+  sh.innerHTML = '<p style="font:16px/1.8 system-ui,sans-serif">' +
+    '[E] これは Shadow DOM の中に書かれた日本語の本文です。吾輩は猫である。名前はまだ無い。</p>';
+
+  // ── Translator API（Chrome 138+ / Edge 148+）
+  var st = document.getElementById('tr-status');
+  var out = document.getElementById('tr-out');
+  if (!('Translator' in self)) {
+    st.textContent = '× この環境には Translator API がありません（' + navigator.userAgent + '）';
+  } else {
+    st.textContent = '○ Translator API あり。availability を問い合わせ中…';
+    Translator.availability({ sourceLanguage: 'ja', targetLanguage: 'zh-Hans' })
+      .then(function (a) { st.textContent = '○ Translator API あり / ja→zh-Hans availability = ' + a; })
+      .catch(function (e) { st.textContent = '○ Translator API あり / availability が失敗: ' + e; });
+  }
+  document.getElementById('tr-run').addEventListener('click', function () {
+    if (!('Translator' in self)) { out.textContent = 'Translator API が無いので実行できません'; return; }
+    out.textContent = '準備中…（初回はモデルの取得が走ります）';
+    Translator.create({
+      sourceLanguage: 'ja', targetLanguage: 'zh-Hans',
+      monitor: function (m) {
+        m.addEventListener('downloadprogress', function (e) {
+          out.textContent = 'モデル取得中… ' + Math.round(e.loaded * 100) + '%';
+        });
+      }
+    }).then(function (tr) {
+      return tr.translate('吾輩は猫である。名前はまだ無い。どこで生れたか頓と見当がつかぬ。');
+    }).then(function (r) { out.textContent = '結果: ' + r; })
+      .catch(function (e) { out.textContent = '失敗: ' + e; });
+  });
+})();
+</script>
+</body>
+</html>
