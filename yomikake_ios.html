@@ -620,7 +620,9 @@
   .rd-author-row { display:flex; align-items:center; gap:10px; margin-bottom:8px; font-size:13px; }
   .rd-author-name { width:38%; flex-shrink:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .rd-author-bar-wrap { flex:1; background:var(--ui-border); border-radius:5px; height:14px; overflow:hidden; }
-  .rd-author-bar { height:100%; background:var(--accent); border-radius:5px; min-width:2px; }
+  /* ⚠ display:block は必須 — <span> のままだと幅も高さも効かず、下地だけが見えて
+     「棒グラフが 1 ドットも出ない」状態になる（.rd-cal-legend の inline-block と同じ罠）*/
+  .rd-author-bar { display:block; height:100%; background:var(--accent); border-radius:5px; min-width:2px; }
   .rd-author-cnt { width:28px; text-align:right; flex-shrink:0; opacity:.75; font-variant-numeric:tabular-nums; }
   .rd-author-more { font-size:12px; opacity:.55; margin-top:2px; }
   .rd-recent-row { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:9px 4px; border-bottom:1px solid var(--ui-border); cursor:pointer; font-size:13px; }

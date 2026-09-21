@@ -309,6 +309,7 @@ G2/G3 分（`readingData.lastBook`, `.totalTime`, `.speed`, `.timeToFinish`, `.s
 - 本体 `yomikake.html` は CRLF、`yomikake_ios.html` は LF。
 - iOS 版差分：再オープンは IDB キャッシュ経由（FSA 無し）。それ以外の統計ロジックは共通。
 - `closeBook()` で G2 の計測フラッシュ＋タイマー停止。`loadEpub()` で `_lastActivityTs` リセット。
+- **`.rd-author-bar` には `display:block` が要る（2026-09-21 修正）** — 「よく読む著者」の棒は `<span class="rd-author-bar-wrap"><span class="rd-author-bar" style="width:N%">` という入れ子で、外側は flex アイテムなので自動で block 化されるが、**内側はインラインのままなので `width` / `height:100%` / `min-width` がどれも効かず、幅も高さも 0 になる**。下地（`.rd-author-bar-wrap` の背景）だけが残るため、**全行が同じ長さの帯に見えて「棒が 1 ドットも出ない」**（実データ 158 冊でも出ず、件数が少ないせいだと誤解しやすい）。同じ構造の `.rd-lb-bar > span` には最初から `display:block` があり、こちらだけ漏れていた。`.rd-cal-legend .rd-cal-cell { display:inline-block }` も同種の後追い。**スパンに寸法を与えるときは display を必ず添える。**検査は `tests/cases/reading-data-authors.js`（両ファイル各 7 assertion・実際に `openReadingData()` して**棒の実寸を測る**。クラスの有無ではなく画素で見るのが要点）。
 - 墓標（完全削除）：削除実体は `_rlPurgeBook()` ではなく **`_rlPurgeLocalData(bookKey)`** で行われる（FSA・IDB・`epub_last_book` もここ）。よって **`_rlPurgeLocalData()` に `epub_book_stats` マップから当該 `bookKey` エントリを削除する処理を追加**する。`_rlApplyTombstones()` が残存本に対して `_rlPurgeLocalData()` を呼ぶので、**端末間の完全削除伝播も自動的に stats へ波及**する。`epub_reading_days` は本に紐づかないため触らない（§12-E）。
 
 ---
