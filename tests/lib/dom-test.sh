@@ -50,7 +50,12 @@ shim = ('<script>/* headless の --dump-dom では rAF が発火しないので�
         'window.requestAnimationFrame=function(f){return setTimeout(function(){f(performance.now());},8);};\n'
         'window.cancelAnimationFrame=function(i){clearTimeout(i);};</script>\n')
 
-inject = ('<div id="yomi-test-out"></div>\n<script>\n'
+# ⚠ 出力先は画面の外へ固定する。本文の流れに置くと結果が増えるたびにページが伸び、
+#    アプリ側の読書エリア（dvh/flex）が縮む。実寸を測るケースでは、同じ本の同じ章が
+#    assertion の数だけ長くなって見え、比較が成立しなくなる（--dump-dom は見た目に
+#    関係なく DOM を出すので、隠しても結果の取り出しには影響しない）。
+inject = ('<div id="yomi-test-out" style="position:fixed;left:-99999px;top:0;'
+          'width:1px;height:1px;overflow:hidden"></div>\n<script>\n'
           'window.__T=[];window.T=function(n,c,d){__T.push((c?"PASS":"FAIL")+" | "+n+(d?" | "+d:""));};\n'
           'window.onerror=function(m){__T.push("FAIL | window.onerror | "+m);};\n'
           'window.addEventListener("unhandledrejection",function(e){'
@@ -72,7 +77,7 @@ PY
   | python3 -c "
 import sys, re, html
 d = sys.stdin.read()
-m = re.search(r'<div id=\"yomi-test-out\">(.*?)</div>', d, re.S)
+m = re.search(r'<div id=\"yomi-test-out\"[^>]*>(.*?)</div>', d, re.S)
 if not m:
     print('FAIL | ページが実行されませんでした（出力なし）'); sys.exit(0)
 body = html.unescape(m.group(1)).strip()

@@ -26,6 +26,7 @@ declare -A CASE_ENV=(
   [cover-thumb]="RAF_SHIM=1 VTB=30000"
   [kosync]="RAF_SHIM=1 VTB=30000"
   [epub-sanitize]="RAF_SHIM=1 VTB=30000"
+  [blank-lines]="RAF_SHIM=1 VTB=45000"
 )
 declare -A CASE_FLAGS=(
   [e2e-reflow]="--allow-file-access-from-files"
@@ -39,6 +40,8 @@ declare -A CASE_FLAGS=(
   [cover-thumb]="--allow-file-access-from-files"
   [kosync]="--allow-file-access-from-files"
   [epub-sanitize]="--allow-file-access-from-files"
+  # おまかせの判定は「1画面に入る行数」を見るので、窓幅を固定しないと境界(25行)を跨いでフレークする
+  [blank-lines]="--allow-file-access-from-files --window-size=520,900"
   # sw.js を fetch して中身（multipart パーサ）を直接叩く
   [share-receive]="--allow-file-access-from-files"
 )
