@@ -4688,6 +4688,11 @@ function buildScrollScript(scrollTarget, writingMode, readySeq) {
   if (writingMode === 'horizontal') {
     return `(function(){
   var STEP = 0.92;
+  // 表示倍率が整数でない環境では 100vw / innerWidth が小数になり、body.offsetWidth（整数）との差に
+  // 1–2px の正の誤差が残る。本文がちょうど 1 画面の全画面画像ページでは、この誤差が
+  // 「余白だけのページ」を 1 枚生む（PC 版で実機再現。Windows の 125%/150% 拡大表示）。
+  // 数 px は誤差として畳む（畳んで失うのは 1 文字に満たない幅なので読み落としは起きない）。
+  var EDGE_EPS = 4;
   var initTarget = ${t};
   var body = document.body;
   var ty = 0;
@@ -4717,7 +4722,7 @@ function buildScrollScript(scrollTarget, writingMode, readySeq) {
 
   function reportPos(){
     var ms = maxS();
-    if(ms <= 0){ postPos(0); return; }
+    if(ms <= EDGE_EPS){ postPos(0); return; }
     postPos(Math.max(0, Math.min(1, ty / ms)));
   }
 
@@ -4753,7 +4758,7 @@ function buildScrollScript(scrollTarget, writingMode, readySeq) {
 
   function doScroll(dir){
     var ms = maxS();
-    if(ms <= 0){ postEdge(dir); return; }
+    if(ms <= EDGE_EPS){ postEdge(dir); return; }
     var step = pageStep(vh());
     if(dir === 1){
       if(ty >= ms + 2){ postEdge(1); return; }
@@ -4793,6 +4798,11 @@ ${INIT_FN}
       : '1em';
     return `(function(){
   var STEP = 0.92;
+  // 表示倍率が整数でない環境では 100vw / innerWidth が小数になり、body.offsetWidth（整数）との差に
+  // 1–2px の正の誤差が残る。本文がちょうど 1 画面の全画面画像ページでは、この誤差が
+  // 「余白だけのページ」を 1 枚生む（PC 版で実機再現。Windows の 125%/150% 拡大表示）。
+  // 数 px は誤差として畳む（畳んで失うのは 1 文字に満たない幅なので読み落としは起きない）。
+  var EDGE_EPS = 4;
   var initTarget = ${t};
   var body = document.body;
   var _axis = null; // 'h' = vertical-rl (translateX), 'v' = horizontal-tb (translateY)
@@ -4872,11 +4882,11 @@ ${INIT_FN}
     var ax = detectAxis(), ms;
     if(ax === 'h'){
       ms = Math.max(0, body.offsetWidth - vw());
-      if(ms <= 0){ postPos(0); return; }
+      if(ms <= EDGE_EPS){ postPos(0); return; }
       postPos(Math.max(0, Math.min(1, (tx + ms) / ms)));
     } else {
       ms = Math.max(0, body.offsetHeight - vh());
-      if(ms <= 0){ postPos(0); return; }
+      if(ms <= EDGE_EPS){ postPos(0); return; }
       postPos(Math.max(0, Math.min(1, ty / ms)));
     }
   }
@@ -4914,7 +4924,7 @@ ${INIT_FN}
     var ax = detectAxis(), ms, step;
     if(ax === 'h'){
       ms = Math.max(0, body.offsetWidth - vw());
-      if(ms <= 0){ postEdge(dir); return; }
+      if(ms <= EDGE_EPS){ postEdge(dir); return; }
       step = pageStep(vw());
       if(dir === 1){
         if(tx >= 2){ postEdge(1); return; }
@@ -4927,7 +4937,7 @@ ${INIT_FN}
       }
     } else {
       ms = Math.max(0, body.offsetHeight - vh());
-      if(ms <= 0){ postEdge(dir); return; }
+      if(ms <= EDGE_EPS){ postEdge(dir); return; }
       step = pageStep(vh());
       if(dir === 1){
         if(ty >= ms + 2){ postEdge(1); return; }
@@ -4969,6 +4979,11 @@ ${INIT_FN}
   // Default: 縦書き（vertical）- translateX
   return `(function(){
   var STEP = 0.92;
+  // 表示倍率が整数でない環境では 100vw / innerWidth が小数になり、body.offsetWidth（整数）との差に
+  // 1–2px の正の誤差が残る。本文がちょうど 1 画面の全画面画像ページでは、この誤差が
+  // 「余白だけのページ」を 1 枚生む（PC 版で実機再現。Windows の 125%/150% 拡大表示）。
+  // 数 px は誤差として畳む（畳んで失うのは 1 文字に満たない幅なので読み落としは起きない）。
+  var EDGE_EPS = 4;
   var initTarget = ${t};
   var body = document.body;
   var tx = 0;
@@ -4998,7 +5013,7 @@ ${INIT_FN}
 
   function reportPos(){
     var ms = maxS();
-    if(ms <= 0){ postPos(0); return; }
+    if(ms <= EDGE_EPS){ postPos(0); return; }
     // ratio: 0=先頭(tx=-ms), 1=末尾(tx=0)
     postPos(Math.max(0, Math.min(1, (tx + ms) / ms)));
   }
@@ -5035,7 +5050,7 @@ ${INIT_FN}
 
   function doScroll(dir){
     var ms = maxS();
-    if(ms <= 0){ postEdge(dir); return; }
+    if(ms <= EDGE_EPS){ postEdge(dir); return; }
     var step = pageStep(vw());
     if(dir === 1){ // 前進: tx → 0 → blank zone (tx > 0)
       if(tx >= 2){ postEdge(1); return; }

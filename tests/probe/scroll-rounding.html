@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>章末判定の丸め誤差の実測</title>
+<style>
+  body { font:16px/1.7 system-ui,-apple-system,"Hiragino Kaku Gothic ProN",sans-serif;
+         margin:0; padding:16px; background:#FDF8F0; color:#222; }
+  h1 { font-size:18px; margin:0 0 8px; }
+  .note { font-size:13px; color:#555; background:#fff; border:1px solid #ddd;
+          border-radius:6px; padding:10px 12px; margin:0 0 16px; }
+  table { border-collapse:collapse; background:#fff; font-size:13px; }
+  th,td { border:1px solid #ddd; padding:4px 10px; text-align:right;
+          font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
+  th { background:#efe9df; text-align:center; }
+  td.l { text-align:left; }
+  .ng { background:#fde8e4; font-weight:bold; }
+  .ok { color:#666; }
+  iframe { position:absolute; left:-10000px; top:0; width:100%; height:300px; border:0; }
+  code { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:12px; }
+</style>
+</head>
+<body>
+
+<h1>章末判定の丸め誤差の実測</h1>
+
+<div class="note">
+  <b>何を測るか</b><br>
+  全画面画像ページ（<code>img{width:100%;height:100%}</code> の表紙・挿絵）は本文がちょうど 1 画面ぶんなので、
+  縦書きでは <code>scrollWidth</code> が <code>2 × clientWidth</code> にぴったり一致するはず。<br>
+  ところが <b>表示倍率が整数でない環境</b>（Windows の 125%/150% 拡大表示、ブラウザのズーム）では
+  <code>100vw</code> が小数になり、切り上げの <code>scrollWidth</code> と切り捨ての <code>clientWidth</code> の差で
+  <b>「余り」が 1px 残る</b>。yomikake はこの 1px を「まだ本文が残っている」と読んで
+  真っ白なページを 1 枚挟んでいた（v2.24.1 で <code>EDGE_EPS = 4</code> を入れて解消）。<br><br>
+  <b>手順</b>: このページをブラウザで開くだけ。<b>余り</b>の列が 0 以外なら誤差が出ている。
+  ブラウザごと・ウィンドウ幅ごと・Ctrl+スクロールのズームごとに変わるので、
+  <b>Chrome と Edge で違って見えるのは engine の差ではなく窓幅の丸めの偶然</b>であることも確かめられる。<br>
+  <b>「標準」「中」はまず 0 になる</b> — iframe 幅が <code>max-width:900px / 1400px</code> という整数で
+  止まるので小数が入り込まない。<b>「狭」「なし」だけ窓幅そのものに依存する</b>ので誤差が出る。
+</div>
+
+<div>倍率(devicePixelRatio): <b id="dpr"></b> / 画面幅: <b id="iw"></b>px</div>
+<table id="tbl">
+  <tr><th>幅の内訳</th><th>iframe 幅</th><th>scrollWidth</th><th>clientWidth</th><th>余り</th></tr>
+</table>
+
+<script>
+document.getElementById('dpr').textContent = window.devicePixelRatio;
+document.getElementById('iw').textContent  = window.innerWidth;
+
+// yomikake が本文 iframe へ注入しているものと同じ骨格
+// （ePub 側: html,body{width:100%;height:100%} / img{width:100%;height:100%;object-fit:contain}）
+var SRCDOC = '<!DOCTYPE html><html><head><meta charset="utf-8"><style>' +
+  'html,body{margin:0;padding:0;width:100%;height:100%}' +
+  'img{width:100%;height:100%;object-fit:contain;display:block}' +
+  'html{writing-mode:vertical-rl!important;padding-left:100vw!important;' +
+    'height:100%!important;overflow-y:hidden!important;}' +
+  'body{writing-mode:vertical-rl!important;margin:0!important;height:100%!important;' +
+    'overflow-y:hidden!important;box-sizing:border-box!important;padding-bottom:10px!important;}' +
+  'img{max-width:100%!important;max-height:95vh!important;object-fit:contain!important;}' +
+  '</style></head><body><img src="data:image/gif;base64,' +
+  'R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw=="></body></html>';
+
+// 余白設定（--page-padding / --frame-max-width）ごとに iframe 幅が変わる。
+// 幅が数 px 変わるだけで丸めの端数が変わる＝「狭のときだけ出る」の正体。
+var CASES = [
+  ['標準 (padding 12px / max 900px)',  12,  900],
+  ['中   (padding 6px  / max 1400px)',  6, 1400],
+  ['狭   (padding 4px  / max 2000px)',  4, 2000],
+  ['なし (padding 0px  / max 100%)',    0, 999999]
+];
+
+(function run(i){
+  if (i >= CASES.length) return;
+  var c = CASES[i];
+  var wrap = document.createElement('div');
+  wrap.style.cssText = 'position:absolute;left:-10000px;top:0;width:100%;display:flex;' +
+                       'justify-content:center;box-sizing:border-box;padding:' + c[1] + 'px';
+  var f = document.createElement('iframe');
+  f.style.cssText = 'position:static;width:100%;max-width:' + c[2] + 'px;height:300px;border:0';
+  f.srcdoc = SRCDOC;
+  wrap.appendChild(f);
+  document.body.appendChild(wrap);
+  f.onload = function(){
+    var d  = f.contentDocument.documentElement;
+    var sw = d.scrollWidth, vw = d.clientWidth, rest = sw - 2 * vw;
+    var tr = document.createElement('tr');
+    tr.innerHTML = '<td class="l">' + c[0] + '</td><td>' +
+      f.getBoundingClientRect().width.toFixed(2) + '</td><td>' + sw + '</td><td>' + vw +
+      '</td><td class="' + (rest === 0 ? 'ok' : 'ng') + '">' + rest + '</td>';
+    document.getElementById('tbl').appendChild(tr);
+    wrap.remove();
+    run(i + 1);
+  };
+})(0);
+</script>
+</body>
+</html>
