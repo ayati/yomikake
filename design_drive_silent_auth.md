@@ -4,7 +4,7 @@
 
 関連: CLAUDE.md §Google Drive Bookmark Sync・`design_kosync.md`（資格情報を別キーに置く前例）
 
-**状態: 実装完了・実機確認済み（2026-09-23・4 環境）。リリース待ち。** テスト `tests/cases/drive-auth.js`（両ファイル各 70 assertion）。決定事項: §3-2（OFF で記憶を消す）・§3-4（iOS は最初の click／EPUB_TAP に相乗り）。 実測は 2026-09-23（PC・Android・iPad・iPhone）。iOS の「最初のタップに相乗り」も測定済み。
+**状態: v2.26.0 でリリース（2026-09-24）。4 環境（PC Chrome・Android Chrome・iPhone・iPad）で最終版を実機確認済み。** テスト `tests/cases/drive-auth.js`（両ファイル各 70 assertion）。決定事項: §3-2（OFF で記憶を消す）・§3-4（iOS は最初の click／EPUB_TAP に相乗り）。 実測は 2026-09-23（PC・Android・iPad・iPhone）。iOS の「最初のタップに相乗り」も測定済み。
 
 ---
 
@@ -265,6 +265,8 @@ window.open noact -> NULL
 | iPad Safari | ✅ 同上 |
 | Android Chrome | ✅ 同上 |
 | 自動同期 OFF→ON でアカウント選択 | ✅ PC Chrome・Android Chrome・iPhone・iPad とも出る |
+
+**最終版の再確認（2026-09-24）: ✅ PC Chrome・Android Chrome・iPhone・iPad とも良好。** iOS は「開く」の後の最初の操作で Drive に接続し、しおり同期が期待どおり動く。
 
 **iPad の Safari タブ（2026-09-24・§3-4-3 の修正後・診断版で記録）: ✅**
 起動時は `popup_failed_to_open`（`settled=true busy=false`＝固まらない）→ 一覧の「開く」「続きから」は除外されてファイルピッカー・本の表示が通る →
