@@ -467,6 +467,7 @@ Both files support **4 languages**: `ja` (Japanese), `en` (English), `zh-TW` (Tr
 | `epub_lang` | selected UI language (`ja` / `en` / `zh-TW` / `zh-CN`) |
 | `epub_consolidate_v1` | one-shot flag set after `consolidateBookmarks()` runs once at startup |
 | `epub_book_prefs` | `{v:1, books:{[bookKey]:{writingMode?, fontMode?, fontSize?, spreadMode?, fxlRegionOrder?, blankLines?, dialogueGap?, t}}}` — **本ごとの表示設定**（v2.16.0）。キーは `state.bookKey`（`makeBookKey()`）。**しおりとは別キー**にすることで Drive 同期・JSON 書き出しに載らないことを構造的に保証する。300冊 / 730日で剪定 |
+| `epub_drive_account` | `{email, t}` — この端末で Drive の許可を済ませた印と、`login_hint` 用のメールアドレス（`about.get` で取得。取れなければ `''`）。自動同期 OFF で消える。しおり JSON にも Drive にも載らない（別キー）。トークンは入れない |
 | `epub_kosync` | `{server, username, userkey, method, autoSync, deviceId, deviceName}` — **KOReader 同期の設定**（v2.22.0）。`userkey` は md5 したパスワードで **API に対してパスワードと等価**。しおり JSON にも Drive にも**絶対に載せない**（別キーであること自体が保証） |
 | `epub_kosync_docs` | `{v:1, books:{[bookKey]:{bin, fn, name, size, t}}}` — bookKey ↔ KOReader のドキュメントハッシュの対応表（v2.22.0）。300冊 / 730日で剪定 |
 | `epub_tap_guide_v1` | one-shot flag set after the tap guide has been shown once (v2.8.0) |
@@ -640,6 +641,15 @@ Both files support syncing `epub_pos_*` / `epub_last_book` keys to/from Google D
 - **`google.accounts` guard** — `driveAuth()` checks `typeof google === 'undefined'` and throws a human-readable error when the GIS script has not loaded (e.g., `file://` mode).
 - **Auto-save** — `const AUTO_SAVE_INTERVAL = 60000` (1 min). When `state.driveAutoSave` is true, each `EPUB_POS` event schedules a debounced `driveUploadCore()` call via `scheduleAutoSave()`. Toggled by a switch in the settings popover; `updateAutoSaveToggleUI()` syncs the UI: it adds/removes the `auto-save-on` CSS class on `#drive-upload-btn` (toolbar upload button), which applies `box-shadow:0 0 0 1.5px var(--ui-text)` as a visual indicator that auto-save is active. Persisted in `epub_settings` as `driveAutoSave`. Forced off on `file://` during init. `_autoSaveBusy` flag prevents concurrent uploads.
 - **Token lifecycle** — `_tokenClient` holds the GIS `TokenClient` instance (created once on first auth, reused thereafter). `_driveTokenExpiry` stores the expiry timestamp from `r.expires_in`. `driveAuth()` returns the cached token if >5 min remain; otherwise calls `requestAccessToken({ prompt: '' })` on the existing client for a silent refresh (no popup). `scheduleTokenRefresh()` arms a timer 5 min before expiry to proactively refresh in the background. `runAutoSave()` retries once with silent refresh on 401; only if that also fails does it disable auto-save and show `toast.driveAutoSaveExpired`.
+- **起動時のアカウント選択をなくす（設計書 `design_drive_silent_auth.md`・両ファイル）** (`DRIVE_ACCOUNT_KEY`, `_driveAccountGet`/`_driveAccountSet`/`_driveAccountForget`, `_driveRememberAccount`, `_driveAuthedOnce`, `_authOnToken`/`_authOnError`, `_isDrivePopupError`, `_driveGestureRetry`, `driveRetryOnGesture`)
+  - **原因は `prompt` 未指定**。ページを読み込み直すと `_tokenClient` が作り直され、毎回 prompt 未指定で呼んでいたので起動のたびにアカウント選択が出ていた。**hint だけでは消えない**（実測）。
+  - 一度トークンが取れた端末は `epub_drive_account` に印（＋`about.get` で取ったメールアドレス）を残し、以後は **`prompt:''` ＋ `login_hint`** で呼ぶ。タップ不要でポップアップが一瞬開いて閉じるだけ（実測 PC 0.5s・Android 1.2s）。**GIS のトークン方式ではこのチラつきは消せない**（リフレッシュトークンが無い）。消すならサーバー側でリフレッシュトークンを持つしかない（設計書 §6）。
+  - **`prompt:'none'` は使わない** — 許可が取り消されていたときにエラーで終わるだけで、利用者が自力で復帰できない。
+  - **⚠ `error_callback` は必須。** ポップアップを閉じた（`popup_closed`）／開けなかった（`popup_failed_to_open`）ときは `callback` が呼ばれない。v2.25.0 まではこれを受けておらず、`_authPromise` が残って**以後の Drive 操作がページを読み込み直すまで全部固まっていた**。TokenClient は 1 個を使い回すので、成功・失敗ハンドラは `_authOnToken` / `_authOnError` の受け口を呼び出しごとに差し替える。
+  - **iOS Safari はユーザー操作なしの起動直後に必ず `popup_failed_to_open`**（iPad・iPhone・全条件で実測。PC でもタブが裏で開くと出る）。このときだけ `_driveGestureRetry` を立て、**次の親 `click` / `keydown`（capture）または `EPUB_TAP` / `EPUB_KEY` の受信**で `driveRetryOnGesture()` が取り直す。iframe 内のタップはユーザー操作として親にも及ぶので postMessage 受信時点でも開ける（実測）。**⚠ `touchend` は使わない**（iOS ではまだユーザー操作と認められない・実測）。**⚠ ハンドラから `requestAccessToken` まで `await` を挟まない**（文脈が切れる）。`popup_closed` では仕掛けない（閉じたのは利用者の意思）。
+  - ポップアップ由来の失敗（`_isDrivePopupError`）では**自動保存を止めない**（止めると iOS の起動直後や、うっかり閉じただけで自動同期が OFF になる）。
+  - **自動同期 OFF で記憶とメモリ上のトークンを捨てる**（`_driveAccountForget`）。ON に戻すとアカウント選択から始まる＝アカウントを切り替える唯一の手段。回復不能で止めたときも同じ。
+  - 実測の検査ページは `tests/probe/drive-silent-auth.html`（OAuth の承認済み生成元 `https://www.ayati.com` 配下でないと動かない）。テストは `tests/cases/drive-auth.js`（両ファイル各 44 assertion・GIS をモックして requestAccessToken の引数・固まらないこと・click で**同期的に**呼ばれることを見る）。**ポップアップが実際に出るか・チラつき・iOS でブロックされるかは実機でしか確かめられない。**
 
 ### Help Modal
 

@@ -4,7 +4,7 @@
 
 関連: CLAUDE.md §Google Drive Bookmark Sync・`design_kosync.md`（資格情報を別キーに置く前例）
 
-**状態: 設計（承認待ち）。** 決定事項: §3-2（OFF で記憶を消す）・§3-4（iOS は最初の click／EPUB_TAP に相乗り）。 実測は 2026-09-23（PC・Android・iPad・iPhone）。iOS の「最初のタップに相乗り」も測定済み。
+**状態: 実装完了・実機確認待ち（2026-09-23）。** テスト `tests/cases/drive-auth.js`（両ファイル各 44 assertion）。決定事項: §3-2（OFF で記憶を消す）・§3-4（iOS は最初の click／EPUB_TAP に相乗り）。 実測は 2026-09-23（PC・Android・iPad・iPhone）。iOS の「最初のタップに相乗り」も測定済み。
 
 ---
 
