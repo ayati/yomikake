@@ -1545,6 +1545,7 @@ let _driveTokenExpiry = 0;     // トークン有効期限タイムスタンプ 
 let _tokenClient      = null;  // GIS TokenClient インスタンス（再利用・サイレントリフレッシュ用）
 let _authPromise      = null;  // 進行中の driveAuth Promise（同時実行防止用）
 let _authOnToken      = null;  // 進行中の認証の成功ハンドラ（TokenClient は 1 個を使い回すので呼び出しごとに差し替える）
+let _driveAuthedOnce  = false; // このページで一度でもトークンを取れたか（localStorage が使えない環境の保険）
 let _authOnError      = null;  // 進行中の認証の失敗ハンドラ（error_callback の受け口。design_drive_silent_auth.md §3-3）
 let _refreshTimer     = null;  // トークン事前リフレッシュの setTimeout ID
 let _autoSaveTimer    = null;  // Drive自動保存の pending setTimeout ID
@@ -11947,6 +11948,8 @@ function driveAuth() {
       _driveToken = r.access_token;
       _driveTokenExpiry = Date.now() + (r.expires_in || 3600) * 1000;
       scheduleTokenRefresh();
+      _driveAuthedOnce = true;
+      _driveRememberAccount(r.access_token);  // fire-and-forget（失敗しても認証自体は成功）
       resolve(_driveToken);
     };
     // ポップアップを閉じた（popup_closed）・開けなかった（popup_failed_to_open）ときは
@@ -11958,20 +11961,64 @@ function driveAuth() {
       reject(new Error((e && e.type) || 'auth_error'));
     };
     if (!_tokenClient) {
-      // 初回: ポップアップで認証
       _tokenClient = google.accounts.oauth2.initTokenClient({
         client_id: GOOGLE_CLIENT_ID,
         scope: 'https://www.googleapis.com/auth/drive.appdata',
         callback: r => { if (_authOnToken) _authOnToken(r); },
         error_callback: e => { if (_authOnError) _authOnError(e); },
       });
-      _tokenClient.requestAccessToken();
+    }
+    // この端末で一度許可を済ませていれば prompt:'' ＋ login_hint で呼ぶ。
+    // prompt 未指定だと GIS は毎回アカウント選択を出す（起動のたびにタップを求められていた原因）。
+    // prompt:'' ならタップ不要でポップアップが一瞬開いて閉じるだけ（実測: PC 0.5s・Android 1.2s）。
+    // 'none' にしないのは、許可が取り消されていたときに Google が必要な画面を出せるようにするため。
+    const acct = _driveAccountGet();
+    if (acct || _driveAuthedOnce) {
+      const o = { prompt: '' };
+      if (acct && acct.email) o.login_hint = acct.email;  // 複数アカウントの端末で選択画面を出さない
+      _tokenClient.requestAccessToken(o);
     } else {
-      // 2回目以降: prompt:'' でユーザー操作なしにサイレントリフレッシュ
-      _tokenClient.requestAccessToken({ prompt: '' });
+      _tokenClient.requestAccessToken();  // 初回: アカウント選択・同意
     }
   });
   return _authPromise;
+}
+
+// ── この端末で許可を済ませた Google アカウントの記憶（design_drive_silent_auth.md §3-1） ──
+// しおりとは別キー。collectBookmarks() の走査対象（epub_pos_* / epub_last_book）から外れるので
+// 書き出しにも Drive にも載らない。持つのはメールアドレスだけで、トークンは今までどおりメモリのみ。
+const DRIVE_ACCOUNT_KEY = 'epub_drive_account';
+function _driveAccountGet() {
+  try {
+    const o = JSON.parse(localStorage.getItem(DRIVE_ACCOUNT_KEY));
+    if (!o || typeof o !== 'object') return null;
+    return { email: typeof o.email === 'string' ? o.email : '', t: o.t || '' };
+  } catch (e) { return null; }
+}
+function _driveAccountSet(email) {
+  try { localStorage.setItem(DRIVE_ACCOUNT_KEY, JSON.stringify({ email: email || '', t: new Date().toISOString() })); } catch (e) {}
+}
+// 自動同期 OFF・回復不能な失敗で呼ぶ。次の認証はアカウント選択から始まる（＝選び直せる）
+function _driveAccountForget() {
+  try { localStorage.removeItem(DRIVE_ACCOUNT_KEY); } catch (e) {}
+  _driveAuthedOnce = false;
+  _driveToken = null; _driveTokenExpiry = 0; state.driveFileId = null;
+  clearTimeout(_refreshTimer);
+}
+// トークンが取れたら「許可済み」の印を書き、login_hint 用のメールアドレスを drive.appdata の権限のまま取る
+// （about.get は drive.appdata でも user を返す — 4 環境で実測済み）。取れなくても印は残す。
+async function _driveRememberAccount(token) {
+  const cur = _driveAccountGet();
+  if (cur && cur.email) return;
+  if (!cur) _driveAccountSet('');
+  try {
+    const res = await fetch('https://www.googleapis.com/drive/v3/about?fields=user(emailAddress)',
+                            { headers: { Authorization: 'Bearer ' + token } });
+    if (!res.ok) return;
+    const j = await res.json();
+    const mail = j && j.user && j.user.emailAddress;
+    if (typeof mail === 'string' && mail.length <= 320 && /^[^\s@]+@[^\s@]+$/.test(mail)) _driveAccountSet(mail);
+  } catch (e) { /* 印だけで動く（prompt:'' のみ） */ }
 }
 
 // 認証ポップアップ由来の失敗か（閉じた／開けなかった）。回復不能な失敗と区別する —
@@ -12284,8 +12331,10 @@ async function runAutoSave() {
         _autoSaveDirty = true; // 未送信のまま持ち越し
         // 認証画面を閉じた／開けなかっただけなら止めない（次の機会に取り直す）
         if (_isDrivePopupError(e2)) return;
-        // Googleセッション切れなど回復不能 → 自動保存を停止してユーザーに通知
+        // Googleセッション切れなど回復不能 → 自動保存を停止してユーザーに通知。
+        // アカウントの記憶も消す（手動で ON にし直すとアカウント選択からやり直せる）
         state.driveAutoSave = false;
+        _driveAccountForget();
         saveSettings();
         updateAutoSaveToggleUI();
         showToast(t('toast.driveAutoSaveExpired'));
@@ -12336,10 +12385,11 @@ async function driveSaveNow() {
 
 async function toggleDriveAutoSave() {
   if (state.driveAutoSave) {
-    // OFF にする
+    // OFF にする。覚えたアカウントとメモリ上のトークンも捨てる —
+    // 次に ON にするとアカウント選択から始まるので、別のアカウントに切り替えられる（§3-2）
     state.driveAutoSave = false;
     clearTimeout(_autoSaveTimer);
-    clearTimeout(_refreshTimer);
+    _driveAccountForget();
     saveSettings();
     updateAutoSaveToggleUI();
     return;
