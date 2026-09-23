@@ -1495,6 +1495,8 @@ let _driveToken       = null;  // OAuth アクセストークン（メモリの�
 let _driveTokenExpiry = 0;     // トークン有効期限タイムスタンプ (ms)
 let _tokenClient      = null;  // GIS TokenClient インスタンス（再利用・サイレントリフレッシュ用）
 let _authPromise      = null;  // 進行中の driveAuth Promise（同時実行防止用）
+let _authOnToken      = null;  // 進行中の認証の成功ハンドラ（TokenClient は 1 個を使い回すので呼び出しごとに差し替える）
+let _authOnError      = null;  // 進行中の認証の失敗ハンドラ（error_callback の受け口。design_drive_silent_auth.md §3-3）
 let _refreshTimer     = null;  // トークン事前リフレッシュの setTimeout ID
 let _autoSaveTimer    = null;  // Drive自動保存の pending setTimeout ID
 let _lastAutoSaveAt   = 0;     // 最後の自動保存成功タイムスタンプ (ms)
@@ -11722,7 +11724,7 @@ function driveAuth() {
     return Promise.reject(new Error('Google Identity Services が読み込まれていません。HTTP/HTTPS サーバー経由で開いてください。'));
   }
   _authPromise = new Promise((resolve, reject) => {
-    const onToken = r => {
+    _authOnToken = r => {
       _authPromise = null;
       if (r.error) { _driveToken = null; reject(new Error(r.error)); return; }
       _driveToken = r.access_token;
@@ -11730,21 +11732,37 @@ function driveAuth() {
       scheduleTokenRefresh();
       resolve(_driveToken);
     };
+    // ポップアップを閉じた（popup_closed）・開けなかった（popup_failed_to_open）ときは
+    // callback が呼ばれず error_callback にだけ届く。ここで捨てないと _authPromise が
+    // 解決も破棄もされずに残り、以後の driveAuth() が全部それを返して Drive が固まる
+    // （ページを読み込み直すまで戻らなかった）。
+    _authOnError = e => {
+      _authPromise = null;
+      reject(new Error((e && e.type) || 'auth_error'));
+    };
     if (!_tokenClient) {
       // 初回: ポップアップで認証
       _tokenClient = google.accounts.oauth2.initTokenClient({
         client_id: GOOGLE_CLIENT_ID,
         scope: 'https://www.googleapis.com/auth/drive.appdata',
-        callback: onToken,
+        callback: r => { if (_authOnToken) _authOnToken(r); },
+        error_callback: e => { if (_authOnError) _authOnError(e); },
       });
       _tokenClient.requestAccessToken();
     } else {
       // 2回目以降: prompt:'' でユーザー操作なしにサイレントリフレッシュ
-      _tokenClient.callback = onToken;
       _tokenClient.requestAccessToken({ prompt: '' });
     }
   });
   return _authPromise;
+}
+
+// 認証ポップアップ由来の失敗か（閉じた／開けなかった）。回復不能な失敗と区別する —
+// これで自動保存を止めると、iOS の起動直後（ユーザー操作なしでは必ず開けない）や
+// 認証画面をうっかり閉じただけで自動同期が OFF になってしまう。
+function _isDrivePopupError(e) {
+  const m = e && e.message;
+  return m === 'popup_failed_to_open' || m === 'popup_closed';
 }
 
 // トークン有効期限の5分前にサイレントリフレッシュをスケジュール
@@ -12043,8 +12061,10 @@ async function runAutoSave() {
         await driveUploadCore(token2);
         _lastAutoSaveAt = Date.now();
       } catch(e2) {
-        // Googleセッション切れなど回復不能 → 自動保存を停止してユーザーに通知
         _autoSaveDirty = true; // 未送信のまま持ち越し
+        // 認証画面を閉じた／開けなかっただけなら止めない（次の機会に取り直す）
+        if (_isDrivePopupError(e2)) return;
+        // Googleセッション切れなど回復不能 → 自動保存を停止してユーザーに通知
         state.driveAutoSave = false;
         saveSettings();
         updateAutoSaveToggleUI();
