@@ -1497,6 +1497,7 @@ let _tokenClient      = null;  // GIS TokenClient インスタンス（再利用
 let _authPromise      = null;  // 進行中の driveAuth Promise（同時実行防止用）
 let _authOnToken      = null;  // 進行中の認証の成功ハンドラ（TokenClient は 1 個を使い回すので呼び出しごとに差し替える）
 let _driveAuthedOnce  = false; // このページで一度でもトークンを取れたか（localStorage が使えない環境の保険）
+let _driveGestureRetry = false; // 起動直後などユーザー操作なしで認証画面を開けなかった → 次の操作で取り直す
 let _authOnError      = null;  // 進行中の認証の失敗ハンドラ（error_callback の受け口。design_drive_silent_auth.md §3-3）
 let _refreshTimer     = null;  // トークン事前リフレッシュの setTimeout ID
 let _autoSaveTimer    = null;  // Drive自動保存の pending setTimeout ID
@@ -6412,9 +6413,11 @@ window.addEventListener('message', e => {
     updatePageInfo();
   }
   if (e.data.type === 'EPUB_TAP') {
+    driveRetryOnGesture();  // 本文タップに相乗りして Drive 認証を取り直す（先に呼ぶ＝ユーザー操作の文脈内）
     runTapAction(tapZoneAction(e.data.xr, e.data.yr));
   }
   if (e.data.type === 'EPUB_KEY') {
+    driveRetryOnGesture();
     // 本文クリックで iframe に移ったフォーカスを親へ引き取る。
     // これ以降のキーは転送を経ずに直接 handleKey へ届くので、
     // ユーザージェスチャが要る操作（全画面 API・読み上げ開始）も通るようになる。
@@ -11741,7 +11744,12 @@ function driveAuth() {
     // （ページを読み込み直すまで戻らなかった）。
     _authOnError = e => {
       _authPromise = null;
-      reject(new Error((e && e.type) || 'auth_error'));
+      const type = (e && e.type) || 'auth_error';
+      // iOS Safari はユーザー操作なしの起動直後だと必ずここに来る（4 環境で実測）。
+      // 次のクリック・キー・本文タップで取り直す（driveRetryOnGesture）。
+      // 閉じた（popup_closed）は利用者の意思なので、操作のたびに開き直したりはしない。
+      if (type === 'popup_failed_to_open' && state.driveAutoSave) _driveGestureRetry = true;
+      reject(new Error(type));
     };
     if (!_tokenClient) {
       _tokenClient = google.accounts.oauth2.initTokenClient({
@@ -11802,6 +11810,20 @@ async function _driveRememberAccount(token) {
     const mail = j && j.user && j.user.emailAddress;
     if (typeof mail === 'string' && mail.length <= 320 && /^[^\s@]+@[^\s@]+$/.test(mail)) _driveAccountSet(mail);
   } catch (e) { /* 印だけで動く（prompt:'' のみ） */ }
+}
+
+// 起動直後に開けなかった認証を、最初のユーザー操作に相乗りして取り直す（design_drive_silent_auth.md §3-4）。
+// 親の click / keydown（capture）と、本文 iframe からの EPUB_TAP / EPUB_KEY の受信から呼ぶ。
+// iframe 内のタップはユーザー操作として親にも及ぶので、postMessage を受けた時点でも開ける（iPad・iPhone で実測）。
+// ⚠ touchend は使わない — iOS ではこの時点でまだユーザー操作と認められず、やはり開けない（実測）。
+// ⚠ ここから requestAccessToken までの間に await を挟まないこと。文脈が切れて開けなくなる。
+//   driveAuth() の Promise executor は同期で requestAccessToken まで進む。
+function driveRetryOnGesture() {
+  if (!_driveGestureRetry) return;
+  if (!state.driveAutoSave) { _driveGestureRetry = false; return; }
+  if (_authPromise || typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2) return;
+  _driveGestureRetry = false;  // 再び開けなければ _authOnError が立て直す
+  driveAuth().then(() => driveSyncPull({ force: true }), () => {});
 }
 
 // 認証ポップアップ由来の失敗か（閉じた／開けなかった）。回復不能な失敗と区別する —
@@ -12927,6 +12949,9 @@ if (location.protocol !== 'http:' && location.protocol !== 'https:') {
 
 // 起動時: 自動保存ON なら Drive の最新しおりをサイレント取り込み（本を開く前に最新化）
 if (state.driveAutoSave) driveSyncPull({ force: true });
+// iOS は起動直後に認証画面を開けない → 最初の操作で取り直す。capture で各ハンドラより先に拾う
+document.addEventListener('click', driveRetryOnGesture, true);
+document.addEventListener('keydown', driveRetryOnGesture, true);
 
 // ══════════════════════════════════════════
 //  PWA: Service Worker 登録（ホーム画面追加で standalone＋オフライン起動）

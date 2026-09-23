@@ -137,6 +137,79 @@
   state.driveAutoSave = false;
   saveSettings = _origSS;
 
+  // ── §3-4 起動時に開けなかったら最初の操作で取り直す ──
+  var _origPull = driveSyncPull, pulls = [];
+  driveSyncPull = function (o) { pulls.push(o); return Promise.resolve(); };
+  state.driveAutoSave = true;
+
+  await resetAuth(); _driveGestureRetry = false;
+  gis.seq.push('closed');
+  await settle(driveAuth());
+  T('閉じた（popup_closed）では取り直しを仕掛けない', _driveGestureRetry === false);
+
+  await resetAuth(); _driveGestureRetry = false;
+  state.driveAutoSave = false;
+  gis.seq.push('failopen');
+  await settle(driveAuth());
+  T('自動同期 OFF なら取り直しを仕掛けない', _driveGestureRetry === false);
+  state.driveAutoSave = true;
+
+  // 実際の場面: 許可済みの端末で起動した直後（iOS はここで必ず開けない）
+  await resetAuth(); _driveGestureRetry = false;
+  _driveAccountSet('reader@example.com');
+  gis.seq.push('failopen');
+  await settle(driveAuth());
+  T('開けなかったら取り直しを仕掛ける', _driveGestureRetry === true);
+
+  var n0 = gis.calls.length;
+  document.body.dispatchEvent(new Event('touchend', { bubbles: true }));
+  T('touchend では取り直さない（iOS では開けない）', gis.calls.length === n0);
+
+  // click → requestAccessToken まで同期で届くこと（await を挟むとユーザー操作の文脈が切れる）
+  pulls.length = 0;
+  document.body.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  T('最初の click で requestAccessToken が同期で呼ばれる', gis.calls.length === n0 + 1, 'calls=' + gis.calls.length);
+  T('取り直しは prompt:\'\'（アカウント選択を出さない）', gis.calls[n0] && gis.calls[n0].prompt === '');
+  T('仕掛けは外れる', _driveGestureRetry === false);
+  await wait(30);
+  T('取れたら同期（force）を走らせる', pulls.length === 1 && pulls[0] && pulls[0].force === true);
+  document.body.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  T('2 回目の click では何もしない', gis.calls.length === n0 + 1);
+
+  // また開けなければ仕掛け直す（最初の操作がスワイプ等だった場合に次の操作で取れるように）
+  await resetAuth(); _driveGestureRetry = false;
+  gis.seq.push('failopen', 'failopen');
+  await settle(driveAuth());
+  document.body.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  await wait(30);
+  T('取り直しも開けなければ仕掛け直す', _driveGestureRetry === true);
+
+  // keydown
+  await resetAuth(); _driveGestureRetry = false;
+  gis.seq.push('failopen');
+  await settle(driveAuth());
+  n0 = gis.calls.length;
+  document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Shift', bubbles: true }));
+  T('keydown でも取り直す', gis.calls.length === n0 + 1);
+  await wait(30);
+
+  // 本文 iframe からの EPUB_TAP / EPUB_KEY（yomikake の本文タップの経路）
+  var ifr = document.getElementById('content-iframe');
+  var origRunTap = runTapAction, origHandleKey = handleKey;
+  runTapAction = function () {}; handleKey = function () {};
+  ['EPUB_TAP', 'EPUB_KEY'].forEach(function (type) {
+    _driveGestureRetry = true; _driveToken = null; _authPromise = null;
+    var before = gis.calls.length;
+    window.dispatchEvent(new MessageEvent('message', {
+      data: { type: type, xr: 0.5, yr: 0.5, key: 'Shift' }, source: ifr.contentWindow }));
+    T(type + ' の受信で取り直す', gis.calls.length === before + 1, 'calls ' + before + '→' + gis.calls.length);
+  });
+  runTapAction = origRunTap; handleKey = origHandleKey;
+  await wait(30);
+
+  driveSyncPull = _origPull;
+  state.driveAutoSave = false; _driveGestureRetry = false;
+
   // ── 自動保存: ポップアップ由来の失敗では自動同期を止めない ──
   var _origUpload = driveUploadCore, _origSaveSettings = saveSettings;
   saveSettings = function () {};
