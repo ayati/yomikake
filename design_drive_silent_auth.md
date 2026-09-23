@@ -4,7 +4,7 @@
 
 関連: CLAUDE.md §Google Drive Bookmark Sync・`design_kosync.md`（資格情報を別キーに置く前例）
 
-**状態: 実装完了・実機確認済み（2026-09-23・4 環境）。リリース待ち。** テスト `tests/cases/drive-auth.js`（両ファイル各 63 assertion）。決定事項: §3-2（OFF で記憶を消す）・§3-4（iOS は最初の click／EPUB_TAP に相乗り）。 実測は 2026-09-23（PC・Android・iPad・iPhone）。iOS の「最初のタップに相乗り」も測定済み。
+**状態: 実装完了・実機確認済み（2026-09-23・4 環境）。リリース待ち。** テスト `tests/cases/drive-auth.js`（両ファイル各 70 assertion）。決定事項: §3-2（OFF で記憶を消す）・§3-4（iOS は最初の click／EPUB_TAP に相乗り）。 実測は 2026-09-23（PC・Android・iPad・iPhone）。iOS の「最初のタップに相乗り」も測定済み。
 
 ---
 
@@ -201,6 +201,27 @@ iOS の Safari タブで「リストへ」の保存が直らなかったので�
   `driveSaveNow` は `_autoSaveBusy` を待つ `await` の間にユーザー操作の文脈を失って開けなかった。
 - → 失敗時は最低 `AUTO_SAVE_RETRY_MIN`（30 秒）空ける。認証画面を開けなかった失敗では再試行を組まず、次のユーザー操作を待つ。
   テストは直す前のコードで「0.3 秒に認証 34 回／送信 74 回」を再現して落ちることを確認済み。
+
+### 3-4-3. 失敗済みの Promise が「進行中の認証」として残る（実機の診断版で特定・2026-09-24）
+
+§3-4-2 を直しても iOS の Safari タブで直らず、記録を読み込みの最初から取り直した。
+
+```
+driveAuth IN busy=false ... from=driveSyncPull
+  requestAccessToken (初回)
+window.open noact -> NULL
+  GIS error_callback type=popup_failed_to_open   ← requestAccessToken が戻る前
+  requestAccessToken returned
+（以後ずっと authBusy=true）
+```
+
+- **GIS は小窓を開けなかったとき `error_callback` を同期で呼ぶ。** `_authPromise = new Promise(executor)` の executor の中で
+  `_authOnError` が `_authPromise = null` にしたあと、`new Promise` が戻ってから失敗済みの Promise が代入されていた。
+- 以後の `driveAuth()` は新しい認証を始めず、その失敗を返すだけ。§3-4-2 の「8ms 間隔の連打」の正体もこれ
+  （新しい認証ではなく、失敗済みの Promise を即座に受け取っていた）。取り直しは `_authPromise` を見て「認証中」と判断し見送っていた。
+- PC・Android は小窓が開くので返事は必ず非同期で、表に出なかった。**テストのモックも非同期でしか返さなかったので見逃した。**
+- → `settled` フラグで決着済みなら代入しない。GIS の例外も executor 内の try/catch で同様に扱う。
+  テストに同期で返すモード（`failopen-sync` / `throw`）を足し、直す前のコードで落ちることを確認済み。
 
 ### 3-5. 変えないもの
 

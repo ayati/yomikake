@@ -11945,8 +11945,14 @@ function driveAuth() {
   if (typeof google === 'undefined' || !google.accounts) {
     return Promise.reject(new Error('Google Identity Services が読み込まれていません。HTTP サーバー経由で開いてください。'));
   }
-  _authPromise = new Promise((resolve, reject) => {
+  // ⚠ GIS は小窓を開けなかったとき error_callback を「同期で」呼ぶ（requestAccessToken が戻る前。
+  //   iOS Safari で実測）。つまり下の executor の中で決着しうる。決着後に _authPromise へ代入すると、
+  //   失敗済みの Promise が「進行中の認証」として残り、以後の driveAuth() が全部その失敗を返し続ける
+  //   （取り直しも「認証中」と見て見送る）。決着したかを settled で見てから代入する。
+  let settled = false;
+  const p = new Promise((resolve, reject) => {
     _authOnToken = r => {
+      settled = true;
       _authPromise = null;
       if (r.error) { _driveToken = null; reject(new Error(r.error)); return; }
       _driveToken = r.access_token;
@@ -11961,6 +11967,7 @@ function driveAuth() {
     // 解決も破棄もされずに残り、以後の driveAuth() が全部それを返して Drive が固まる
     // （ページを読み込み直すまで戻らなかった）。
     _authOnError = e => {
+      settled = true;
       _authPromise = null;
       const type = (e && e.type) || 'auth_error';
       // iOS Safari はユーザー操作なしの起動直後だと必ずここに来る（4 環境で実測）。
@@ -11969,28 +11976,35 @@ function driveAuth() {
       if (type === 'popup_failed_to_open' && state.driveAutoSave) _driveGestureRetry = true;
       reject(new Error(type));
     };
-    if (!_tokenClient) {
-      _tokenClient = google.accounts.oauth2.initTokenClient({
-        client_id: GOOGLE_CLIENT_ID,
-        scope: 'https://www.googleapis.com/auth/drive.appdata',
-        callback: r => { if (_authOnToken) _authOnToken(r); },
-        error_callback: e => { if (_authOnError) _authOnError(e); },
-      });
-    }
-    // この端末で一度許可を済ませていれば prompt:'' ＋ login_hint で呼ぶ。
-    // prompt 未指定だと GIS は毎回アカウント選択を出す（起動のたびにタップを求められていた原因）。
-    // prompt:'' ならタップ不要でポップアップが一瞬開いて閉じるだけ（実測: PC 0.5s・Android 1.2s）。
-    // 'none' にしないのは、許可が取り消されていたときに Google が必要な画面を出せるようにするため。
-    const acct = _driveAccountGet();
-    if (acct || _driveAuthedOnce) {
-      const o = { prompt: '' };
-      if (acct && acct.email) o.login_hint = acct.email;  // 複数アカウントの端末で選択画面を出さない
-      _tokenClient.requestAccessToken(o);
-    } else {
-      _tokenClient.requestAccessToken();  // 初回: アカウント選択・同意
+    try {
+      if (!_tokenClient) {
+        _tokenClient = google.accounts.oauth2.initTokenClient({
+          client_id: GOOGLE_CLIENT_ID,
+          scope: 'https://www.googleapis.com/auth/drive.appdata',
+          callback: r => { if (_authOnToken) _authOnToken(r); },
+          error_callback: e => { if (_authOnError) _authOnError(e); },
+        });
+      }
+      // この端末で一度許可を済ませていれば prompt:'' ＋ login_hint で呼ぶ。
+      // prompt 未指定だと GIS は毎回アカウント選択を出す（起動のたびにタップを求められていた原因）。
+      // prompt:'' ならタップ不要でポップアップが一瞬開いて閉じるだけ（実測: PC 0.5s・Android 1.2s）。
+      // 'none' にしないのは、許可が取り消されていたときに Google が必要な画面を出せるようにするため。
+      const acct = _driveAccountGet();
+      if (acct || _driveAuthedOnce) {
+        const o = { prompt: '' };
+        if (acct && acct.email) o.login_hint = acct.email;  // 複数アカウントの端末で選択画面を出さない
+        _tokenClient.requestAccessToken(o);
+      } else {
+        _tokenClient.requestAccessToken();  // 初回: アカウント選択・同意
+      }
+    } catch (err) {
+      // GIS 側の例外（読み込み途中など）。executor の throw は reject になるが、settled を立てないと固まる
+      settled = true;
+      reject(err);
     }
   });
-  return _authPromise;
+  if (!settled) _authPromise = p;
+  return p;
 }
 
 // ── この端末で許可を済ませた Google アカウントの記憶（design_drive_silent_auth.md §3-1） ──

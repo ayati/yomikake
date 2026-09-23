@@ -14,6 +14,9 @@
       return { requestAccessToken: function (o) {
         gis.calls.push(o === undefined ? null : o);
         var mode = gis.seq.length ? gis.seq.shift() : 'ok';
+        // 実機の GIS は小窓を開けなかったとき error_callback を同期で呼ぶ（iOS Safari で実測）
+        if (mode === 'failopen-sync') { gis.cfg.error_callback({ type: 'popup_failed_to_open' }); return; }
+        if (mode === 'throw') throw new Error('gis broken');
         setTimeout(function () {
           if (mode === 'ok') gis.cfg.callback({ access_token: 'tok' + gis.calls.length, expires_in: 3600 });
           else if (mode === 'failopen') gis.cfg.error_callback({ type: 'popup_failed_to_open' });
@@ -66,6 +69,23 @@
   var r3 = await settle(driveAuth());
   T('開けなかったら reject される', !r3.ok && r3.e.message === 'popup_failed_to_open');
   T('開けなかったあと _authPromise が残らない', _authPromise === null);
+
+  // ── GIS が失敗を同期で返す（requestAccessToken が戻る前に error_callback）──
+  // 決着後に _authPromise へ代入していたため、失敗済みの Promise が「進行中」として残り、
+  // 以後の driveAuth() が全部その失敗を返し続けた（iPad の実機記録で特定）
+  await resetAuth();
+  gis.seq.push('failopen-sync');
+  var rs = await settle(driveAuth());
+  T('同期の失敗も reject される', !rs.ok && rs.e.message === 'popup_failed_to_open');
+  T('同期の失敗のあと _authPromise が残らない（固まらない）', _authPromise === null);
+  var rs2 = await settle(driveAuth());
+  T('同期の失敗のあとの次の driveAuth は新しい認証を始める', gis.calls.length === 2 && rs2.ok, 'calls=' + gis.calls.length);
+
+  await resetAuth();
+  gis.seq.push('throw');
+  var rt = await settle(driveAuth());
+  T('GIS が例外を投げても reject される', !rt.ok && rt.e.message === 'gis broken');
+  T('GIS が例外を投げたあと _authPromise が残らない', _authPromise === null);
 
   T('_isDrivePopupError: 閉じた／開けなかったはポップアップ由来',
     _isDrivePopupError(new Error('popup_closed')) && _isDrivePopupError(new Error('popup_failed_to_open')));
@@ -226,6 +246,17 @@
   var cardChild = document.createElement('span'); card.appendChild(cardChild); document.body.appendChild(card);
   T('読みかけリストのカードの中では取り直さない', skipped(cardChild));
   card.remove();
+
+  // 実機の流れ: 起動時に同期で失敗 → 本文タップ／「リストへ」で取り直す
+  await resetAuth(); _driveGestureRetry = false;
+  _driveAccountSet('reader@example.com');
+  gis.seq.push('failopen-sync');
+  await settle(driveAuth());
+  T('起動時の同期の失敗でも取り直しを仕掛け、認証中のままにならない', _driveGestureRetry === true && _authPromise === null);
+  n0 = gis.calls.length;
+  T('そのあとの「次へ」で取り直す', !skipped(byId('btn-scroll-fwd')) && gis.calls.length === n0 + 1);
+  await wait(30);
+  n0 = await armed();
 
   // 権利の要らない操作では取り直す（iOS 版のページ送りはスワイプかボタン。ボタンまで除外すると
   // 読書中に取り直す機会が無く、閉じたときの保存が失敗した — 実機で発覚）
