@@ -4,7 +4,7 @@
 
 関連: CLAUDE.md §Google Drive Bookmark Sync・`design_kosync.md`（資格情報を別キーに置く前例）
 
-**状態: 実装完了・実機確認済み（2026-09-23・4 環境）。リリース待ち。** テスト `tests/cases/drive-auth.js`（両ファイル各 56 assertion）。決定事項: §3-2（OFF で記憶を消す）・§3-4（iOS は最初の click／EPUB_TAP に相乗り）。 実測は 2026-09-23（PC・Android・iPad・iPhone）。iOS の「最初のタップに相乗り」も測定済み。
+**状態: 実装完了・実機確認済み（2026-09-23・4 環境）。リリース待ち。** テスト `tests/cases/drive-auth.js`（両ファイル各 63 assertion）。決定事項: §3-2（OFF で記憶を消す）・§3-4（iOS は最初の click／EPUB_TAP に相乗り）。 実測は 2026-09-23（PC・Android・iPad・iPhone）。iOS の「最初のタップに相乗り」も測定済み。
 
 ---
 
@@ -189,6 +189,18 @@ hint を覚えると、別のアカウントに切り替える手段が要る。
 `_driveRememberAccount` は about の応答を待つ間に `_driveAccountForget`（自動同期 OFF）が挟まると、
 応答後に記憶を書き戻していた。起動直後のチラつきの最中に OFF を押すと「OFF→ON で選び直す」が効かなくなる。
 → `_driveAcctGen` を `_driveAccountForget` のたびに進め、取得開始時の値と違えば書き込まない。
+
+### 3-4-2. 自動保存の失敗→即再試行の連打（実機の診断版で発見・2026-09-23）
+
+iOS の Safari タブで「リストへ」の保存が直らなかったので、診断版（`temp_sample/drivedebug/`・リリースしない）で記録を取った。
+**`runAutoSave` が 8ms 間隔で `driveAuth` → `popup_failed_to_open` を延々と繰り返していた。**
+
+- 失敗時の再試行を `AUTO_SAVE_INTERVAL - (now - _lastAutoSaveAt)` で組んでいたため、一度も成功していないと 0 になる。
+  通信断（`driveUploadCore` が即失敗）でも同じで、**v2.25.0 以前からの潜在不具合**。§3-3 の「認証が固まる」不具合がそこで止めていたので表に出なかった。
+- 「リストへ」を押した瞬間もこの連打の認証が進行中（`authBusy=true`）だったため、取り直しは見送られ、
+  `driveSaveNow` は `_autoSaveBusy` を待つ `await` の間にユーザー操作の文脈を失って開けなかった。
+- → 失敗時は最低 `AUTO_SAVE_RETRY_MIN`（30 秒）空ける。認証画面を開けなかった失敗では再試行を組まず、次のユーザー操作を待つ。
+  テストは直す前のコードで「0.3 秒に認証 34 回／送信 74 回」を再現して落ちることを確認済み。
 
 ### 3-5. 変えないもの
 

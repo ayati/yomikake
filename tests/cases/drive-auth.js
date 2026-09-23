@@ -303,6 +303,43 @@
   T('回復不能（取り直しても 401）なら従来どおり自動同期を止める', state.driveAutoSave === false);
   T('回復不能で止めたらアカウントの記憶も消す', localStorage.getItem('epub_drive_account') === null);
 
+  // ── 失敗→即再試行の連打をしない（iOS の Safari タブで 8ms 間隔の無限ループを実測） ──
+  // 一度も成功していない（_lastAutoSaveAt=0）と「前回の成功から 1 分」の待ち時間が 0 になっていた
+  await resetAuth();
+  _lastAutoSaveAt = 0; _autoSaveBusy = false; _driveGestureRetry = false;
+  state.driveAutoSave = true;
+  _driveAccountSet('reader@example.com');
+  for (var k = 0; k < 50; k++) gis.seq.push('failopen');
+  var up2 = 0; driveUploadCore = async function () { up2++; return 1; };
+  await runAutoSave();
+  var c1 = gis.calls.length;
+  await wait(300);
+  T('認証画面を開けなかった自動保存は即再試行しない（連打しない）', gis.calls.length === c1, 'calls ' + c1 + '→' + gis.calls.length);
+  T('その間も未送信は持ち越し', _autoSaveDirty === true);
+  T('取り直しは次のユーザー操作を待つ', _driveGestureRetry === true);
+
+  // 待っている間に読み進めても（EPUB_POS → scheduleAutoSave）送りに行かない
+  scheduleAutoSave(); await wait(50);
+  T('操作待ちの間は scheduleAutoSave しても認証に行かない', gis.calls.length === c1);
+
+  // ユーザー操作で取れたら、待たせていた自動保存を送る
+  gis.seq.length = 0;
+  driveRetryOnGesture({ target: document.body });
+  await wait(80);
+  T('操作で認証が取れたら保留分を送る', up2 === 1, 'uploads=' + up2);
+  clearTimeout(_autoSaveTimer);
+
+  // ポップアップ以外の失敗（通信断など）も最低 30 秒空ける
+  await resetAuth();
+  _lastAutoSaveAt = 0; _autoSaveBusy = false; _driveGestureRetry = false;
+  var up3 = 0; driveUploadCore = async function () { up3++; throw new Error('Failed to fetch'); };
+  await runAutoSave();
+  await wait(300);
+  T('通信断などの失敗でも即再試行しない', up3 === 1, 'uploads=' + up3);
+  T('再試行の最小間隔は 30 秒', AUTO_SAVE_RETRY_MIN >= 30000);
+  clearTimeout(_autoSaveTimer);
+  _autoSaveDirty = false;
+
   driveUploadCore = _origUpload; saveSettings = _origSaveSettings;
   state.driveAutoSave = false; _autoSaveDirty = false;
   await resetAuth();

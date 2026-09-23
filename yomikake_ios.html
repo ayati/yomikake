@@ -1509,6 +1509,7 @@ let _driveSyncBusy    = false; // サイレント同期pull の同時実行防�
 let _lastSyncPullAt   = 0;     // 最後にサイレント同期pull した時刻 (ms) — 連続復帰のスロットリング用
 const AUTO_SAVE_INTERVAL = 60000; // 自動保存の最小間隔: 1分 (ms)
 const SYNC_PULL_THROTTLE = 15000; // 復帰時 pull の最小間隔 (ms)
+const AUTO_SAVE_RETRY_MIN = 30000; // 自動保存が失敗したときの再試行の最小間隔 (ms)
 
 // ══════════════════════════════════════════
 //  i18n — 国際化
@@ -11845,7 +11846,10 @@ function driveRetryOnGesture(ev) {
   if (!state.driveAutoSave) { _driveGestureRetry = false; return; }
   if (_authPromise || typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2) return;
   _driveGestureRetry = false;  // 再び開けなければ _authOnError が立て直す
-  driveAuth().then(() => driveSyncPull({ force: true }), () => {});
+  driveAuth().then(() => {
+    driveSyncPull({ force: true });
+    if (_autoSaveDirty) scheduleAutoSave();  // 待たせていた自動保存を送る
+  }, () => {});
 }
 
 // 認証ポップアップ由来の失敗か（閉じた／開けなかった）。回復不能な失敗と区別する —
@@ -12119,6 +12123,9 @@ function scheduleAutoSave() {
   if (!state.driveAutoSave || !GOOGLE_CLIENT_ID) return;
   _autoSaveDirty = true;
   if (_autoSaveBusy) return;
+  // 認証画面を開けず次のユーザー操作を待っている間は送らない（送っても毎回 popup_failed_to_open で終わる）。
+  // 取れたら driveRetryOnGesture が保留分を送る
+  if (_driveGestureRetry && !_driveToken) return;
   clearTimeout(_autoSaveTimer);
   const elapsed = Date.now() - _lastAutoSaveAt;
   const delay = Math.max(0, AUTO_SAVE_INTERVAL - elapsed);
@@ -12139,11 +12146,14 @@ async function runAutoSave() {
   if (!state.driveAutoSave || _autoSaveBusy) return;
   _autoSaveBusy = true;
   _autoSaveDirty = false;
+  let failed = false, waitGesture = false;
   try {
     const token = await driveAuth();
     await driveUploadCore(token);
     _lastAutoSaveAt = Date.now();
   } catch(e) {
+    failed = true;
+    if (_isDrivePopupError(e)) waitGesture = true;
     if (e.message && e.message.startsWith('401')) {
       // 万一トークンが失効していた場合: サイレントリフレッシュを試みてリトライ
       _driveToken = null;
@@ -12154,7 +12164,7 @@ async function runAutoSave() {
       } catch(e2) {
         _autoSaveDirty = true; // 未送信のまま持ち越し
         // 認証画面を閉じた／開けなかっただけなら止めない（次の機会に取り直す）
-        if (_isDrivePopupError(e2)) return;
+        if (_isDrivePopupError(e2)) { waitGesture = true; return; }
         // Googleセッション切れなど回復不能 → 自動保存を停止してユーザーに通知。
         // アカウントの記憶も消す（手動で ON にし直すとアカウント選択からやり直せる）
         state.driveAutoSave = false;
@@ -12169,10 +12179,15 @@ async function runAutoSave() {
     }
   } finally {
     _autoSaveBusy = false;
-    // アップロード中に新たな変更が来ていた（busy で弾かれた）分を追従
-    if (_autoSaveDirty && state.driveAutoSave) {
+    // アップロード中に新たな変更が来ていた（busy で弾かれた）分を追従。
+    // ⚠ 失敗したときは最低 AUTO_SAVE_RETRY_MIN 空ける。「前回の成功から 1 分」だけで計算すると、
+    //   一度も成功していない（_lastAutoSaveAt=0）ときに待ち時間が 0 になり、失敗→即再試行が
+    //   数ミリ秒間隔で止まらなくなる（iOS の Safari タブで実測: 8ms 間隔。認証が固まっていた頃は表に出なかった）。
+    // ⚠ 認証画面を開けなかった（waitGesture）ときは再試行しない。次のユーザー操作で driveRetryOnGesture が送る。
+    if (_autoSaveDirty && state.driveAutoSave && !waitGesture) {
       clearTimeout(_autoSaveTimer);
-      _autoSaveTimer = setTimeout(runAutoSave, Math.max(0, AUTO_SAVE_INTERVAL - (Date.now() - _lastAutoSaveAt)));
+      const wait = Math.max(0, AUTO_SAVE_INTERVAL - (Date.now() - _lastAutoSaveAt));
+      _autoSaveTimer = setTimeout(runAutoSave, failed ? Math.max(AUTO_SAVE_RETRY_MIN, wait) : wait);
     }
   }
 }
