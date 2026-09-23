@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Drive 認証を黙って通せるかの検査</title>
+<style>
+  body { font:15px/1.7 system-ui,-apple-system,"Hiragino Kaku Gothic ProN",sans-serif;
+         margin:0; padding:16px; background:#FDF8F0; color:#222; }
+  h1 { font-size:18px; margin:0 0 8px; }
+  h2 { font-size:14px; margin:18px 0 6px; }
+  .note { font-size:13px; color:#555; background:#fff; border:1px solid #ddd;
+          border-radius:6px; padding:10px 12px; margin:0 0 14px; }
+  .row { display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin:0 0 6px; }
+  .cond { background:#fff; border:1px solid #ccc; border-radius:6px; padding:8px 10px; margin:0 0 8px; }
+  .cond code { font-size:12px; }
+  .tag { font-family:ui-monospace,monospace; font-weight:700; }
+  button { font:14px system-ui; padding:6px 12px; border-radius:6px; border:1px solid #999;
+           background:#fff; cursor:pointer; }
+  button.primary { background:#8a5a2b; color:#fff; border-color:#8a5a2b; }
+  input[type=email] { font:14px system-ui; padding:6px 8px; border:1px solid #999; border-radius:6px;
+                      width:min(320px, 100%); box-sizing:border-box; }
+  select { font:14px system-ui; padding:5px; }
+  #log { white-space:pre-wrap; font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;
+         background:#fff; border:1px solid #ccc; border-radius:6px; padding:8px; min-height:80px;
+         overflow-wrap:anywhere; }
+  #status { font-size:13px; }
+  code { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
+</style>
+</head>
+<body>
+
+<h1>Drive 認証を黙って通せるかの検査</h1>
+
+<div class="note">
+  <b>知りたいこと</b>: いまの yomikake は起動のたびに「アカウントを選択」画面が出る。
+  <code>hint</code>（メールアドレス）と <code>prompt</code> を変えると、
+  (1) 画面が出なくなるか (2) ポップアップが一瞬開いて勝手に閉じるだけで済むか (3) ユーザー操作なしの起動時でもブロックされないか、を測る。<br><br>
+  <b>置き場所</b>: OAuth の「承認済みの JavaScript 生成元」に登録済みのオリジンでないと動かない。
+  <code>https://www.ayati.com/</code> 配下ならパスはどこでもよい（例 <code>/book/tests/probe/drive-silent-auth.html</code>）。<br><br>
+  <b>手順</b><br>
+  1. 下の欄に Drive 同期で使っている Google アカウントのメールアドレスを入れる（この端末の localStorage にだけ保存）。<br>
+  2. <b>ボタン操作での検査</b>: <span class="tag">[A]〜[E]</span> を 1 つずつ押し、
+     <b>画面に何が見えたか</b>（何も出ない／一瞬チラつく／アカウント選択が出る／同意画面が出る）を記録する。<br>
+  3. <b>起動時の検査（本命）</b>: 「起動時に実行」で条件を 1 つ選ぶ →
+     <b>タブを閉じて開き直す</b>（リロードでもよいが、閉じて開くほうが実際の起動に近い）→ 見えたものを記録する。
+     条件を変えて <span class="tag">[A]</span> 〜 <span class="tag">[E]</span> を順に。<br>
+  4. <span class="tag">[F]</span> は、今の権限（<code>drive.appdata</code>）のままメールアドレスを自動で取れるかの検査。
+     トークンを取った直後に押す。<br>
+  5. 最後に「ログをコピー」して持ち帰る。ログにトークン本体は出さない。
+</div>
+
+<h2>メールアドレス（hint に使う）</h2>
+<div class="row">
+  <input type="email" id="email" placeholder="you@gmail.com" autocomplete="email">
+  <button onclick="saveEmail()">保存</button>
+</div>
+
+<h2>条件</h2>
+<div id="conds"></div>
+
+<div class="cond">
+  <div><span class="tag">[F]</span> 取ったトークンで <code>drive/v3/about?fields=user</code> を読み、メールアドレスが取れるか</div>
+  <div class="row" style="margin-top:6px"><button onclick="probeAbout()">[F] を実行</button></div>
+</div>
+
+<h2>本文 iframe（[I] [J] 用）</h2>
+<div class="note">yomikake の本文と同じ <code>sandbox</code> 属性の srcdoc iframe。[I] [J] を選んで開き直したら、<b>この枠の中</b>をタップする。</div>
+<iframe id="content" sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+        style="width:100%;height:140px;border:1px solid #ccc;border-radius:6px;background:#fff"></iframe>
+
+<h2>起動時に実行</h2>
+<div class="note">
+  <span class="tag">[A]〜[E]</span> は読み込み直後に実行。<br>
+  <span class="tag">[G]〜[J]</span> は iOS 向けで、<b>開き直したあと最初のタップ</b>で <span class="tag">[C]</span> の条件を実行する（起動直後はブロックされるので、読み始めの 1 タップに相乗りできるかを見る）。<br>
+  [G] 親画面の最初の click ／ [H] 親画面の最初の touchend ／
+  [I] iframe 内の click → postMessage → 親で実行（yomikake の EPUB_TAP と同じ経路）／
+  [J] iframe 内の click から親の関数を直接呼ぶ
+</div>
+<div class="row">
+  <select id="autorun"></select>
+  <button onclick="saveAutorun()">保存</button>
+  <span id="status"></span>
+</div>
+
+<h2>ログ</h2>
+<div class="row">
+  <button class="primary" onclick="copyLog()">ログをコピー</button>
+  <button onclick="clearLog()">ログを消す</button>
+</div>
+<div id="log"></div>
+
+<script>
+// yomikake.html と同じクライアント・同じスコープ
+const GOOGLE_CLIENT_ID = '491729394813-3dm1apv1do4pmcsv1mpgdq26ji2iavdr.apps.googleusercontent.com';
+const SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
+const LS_EMAIL = 'probe_drive_email', LS_AUTO = 'probe_drive_autorun', LS_LOG = 'probe_drive_log';
+
+// prompt: undefined = 指定しない（いまの yomikake の初回呼び出しと同じ）
+const CONDS = [
+  { id:'A', label:'いまの yomikake と同じ',   prompt:undefined, hint:false },
+  { id:'B', label:"prompt:'' のみ",           prompt:'',        hint:false },
+  { id:'C', label:"prompt:'' ＋ hint（本命）", prompt:'',        hint:true  },
+  { id:'D', label:"prompt:'none' ＋ hint",    prompt:'none',    hint:true  },
+  { id:'E', label:'prompt 指定なし ＋ hint',   prompt:undefined, hint:true  },
+];
+
+let _lastToken = null;
+const T0 = performance.now();
+const ms = () => Math.round(performance.now() - T0);
+
+// ── ログ（リロードをまたいで残す） ──
+function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+function log(msg) {
+  const line = `[${new Date().toLocaleTimeString('ja-JP',{hour12:false})} +${ms()}ms] ${msg}`;
+  lsSet(LS_LOG, (lsGet(LS_LOG) || '') + line + '\n');
+  renderLog();
+}
+function renderLog() { document.getElementById('log').textContent = lsGet(LS_LOG) || ''; }
+function clearLog() { lsSet(LS_LOG, ''); renderLog(); }
+async function copyLog() {
+  const text = envLine() + '\n' + (lsGet(LS_LOG) || '');
+  try { await navigator.clipboard.writeText(text); alert('コピーしました'); }
+  catch (e) {
+    // クリップボード不可の環境では選択状態にして手でコピーしてもらう
+    const r = document.createRange(); r.selectNodeContents(document.getElementById('log'));
+    const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+    alert('自動コピーできませんでした。選択状態にしたので手でコピーしてください');
+  }
+}
+function envLine() {
+  const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+  return `ENV: ${navigator.userAgent} / standalone=${standalone} / origin=${location.origin}`;
+}
+
+// ── ポップアップが実際に出たかの客観的な手がかり ──
+// Android ではポップアップが新しいタブ／Custom Tab として前面に来るので、
+// 元のページが blur / hidden になる。一瞬で閉じたならその往復が短い時間で記録される。
+window.addEventListener('blur',  () => log('  event: window blur'));
+window.addEventListener('focus', () => log('  event: window focus'));
+document.addEventListener('visibilitychange', () => log('  event: visibility=' + document.visibilityState));
+
+// ── 本体 ──
+function waitGis() {
+  return new Promise((resolve, reject) => {
+    let i = 0;
+    (function poll() {
+      if (typeof google !== 'undefined' && google.accounts && google.accounts.oauth2) return resolve();
+      if (++i > 50) return reject(new Error('GIS が読み込まれませんでした'));
+      setTimeout(poll, 200);
+    })();
+  });
+}
+
+async function runCond(id, via) {
+  const c = CONDS.find(x => x.id === id);
+  const email = (lsGet(LS_EMAIL) || '').trim();
+  if (c.hint && !email) { log(`[${id}] SKIP: hint 用のメールアドレスが未保存`); return; }
+  // GIS が読み込み済みなら await を挟まない（Safari はユーザー操作の文脈が切れるとポップアップを止める）
+  if (!(typeof google !== 'undefined' && google.accounts && google.accounts.oauth2)) {
+    try { await waitGis(); } catch (e) { log(`[${id}] ERROR: ${e.message}`); return; }
+  }
+
+  const promptDesc = c.prompt === undefined ? '(未指定)' : `'${c.prompt}'`;
+  log(`[${id}] START via=${via} prompt=${promptDesc} hint=${c.hint ? 'あり' : 'なし'} ` +
+      `userActivation=${navigator.userActivation ? navigator.userActivation.isActive : '?'}`);
+  const t = performance.now();
+  const el = () => Math.round(performance.now() - t) + 'ms';
+
+  // 実際の起動と同じく、毎回まっさらなクライアントを作る
+  const cfg = {
+    client_id: GOOGLE_CLIENT_ID,
+    scope: SCOPE,
+    callback: r => {
+      if (r.error) { log(`[${id}] CALLBACK error=${r.error} desc=${r.error_description || ''} (${el()})`); return; }
+      _lastToken = r.access_token;
+      const all = google.accounts.oauth2.hasGrantedAllScopes(r, SCOPE);
+      log(`[${id}] OK token取得 expires_in=${r.expires_in} scope一致=${all} (${el()})`);
+    },
+    error_callback: e => log(`[${id}] ERROR_CALLBACK type=${e && e.type} msg=${e && e.message || ''} (${el()})`),
+  };
+  if (c.hint) cfg.hint = email;
+  let client;
+  try { client = google.accounts.oauth2.initTokenClient(cfg); }
+  catch (e) { log(`[${id}] init 例外: ${e.message}`); return; }
+
+  try {
+    if (c.prompt === undefined) client.requestAccessToken();
+    else client.requestAccessToken({ prompt: c.prompt });
+    log(`[${id}] requestAccessToken 呼び出し完了 (${el()})`);
+  } catch (e) { log(`[${id}] request 例外: ${e.message}`); }
+}
+
+async function probeAbout() {
+  if (!_lastToken) { log('[F] SKIP: 先に A〜E のどれかでトークンを取る'); return; }
+  try {
+    const res = await fetch('https://www.googleapis.com/drive/v3/about?fields=user(emailAddress,displayName)',
+                            { headers: { Authorization: 'Bearer ' + _lastToken } });
+    const body = await res.text();
+    if (!res.ok) { log(`[F] HTTP ${res.status}: ${body.slice(0, 200).replace(/\s+/g, ' ')}`); return; }
+    const j = JSON.parse(body);
+    const mail = j.user && j.user.emailAddress;
+    // 実アドレスは伏せ、取れたかどうかと保存値との一致だけ残す
+    const saved = (lsGet(LS_EMAIL) || '').trim().toLowerCase();
+    log(`[F] OK emailAddress=${mail ? '取得できた' : '無し'} 保存値と一致=${!!mail && mail.toLowerCase() === saved}`);
+  } catch (e) { log(`[F] 例外: ${e.message}`); }
+}
+
+// ── 最初のタップに相乗り（iOS 向け） ──
+const TAP_MODES = {
+  G: '最初のタップ: 親画面の click',
+  H: '最初のタップ: 親画面の touchend',
+  I: '最初のタップ: iframe → postMessage',
+  J: '最初のタップ: iframe → 親の関数を直接',
+};
+let _tapFired = false;
+function fireOnce(via) {
+  if (_tapFired) return;
+  _tapFired = true;
+  runCond('C', via);
+}
+function armFirstTap(mode) {
+  log(`[${mode}] 待機中: ${TAP_MODES[mode]}（条件は [C]）`);
+  if (mode === 'G') document.addEventListener('click', () => fireOnce('first-click'), { capture:true, once:true });
+  if (mode === 'H') document.addEventListener('touchend', () => fireOnce('first-touchend'), { capture:true, once:true });
+  if (mode === 'I') window.addEventListener('message', e => {
+    if (e.source !== document.getElementById('content').contentWindow) return;
+    if (e.data && e.data.type === 'PROBE_TAP') fireOnce('iframe-postMessage');
+  });
+}
+window.__probeTrigger = () => fireOnce('iframe-direct');
+function setupIframe(mode) {
+  // I: yomikake の EPUB_TAP と同じく postMessage / J: 同一オリジンなので親の関数を直接呼ぶ
+  const call = mode === 'J' ? "parent.__probeTrigger()" : "parent.postMessage({type:'PROBE_TAP'},'*')";
+  document.getElementById('content').srcdoc =
+    '<!DOCTYPE html><html><body style="margin:0;font:15px system-ui;display:flex;align-items:center;' +
+    'justify-content:center;height:100vh;background:#f6f1e7">本文の代わり（ここをタップ）' +
+    '<scr' + 'ipt>document.addEventListener("click",function(){' + call + '});</scr' + 'ipt></body></html>';
+}
+
+// ── UI ──
+function saveEmail() {
+  lsSet(LS_EMAIL, document.getElementById('email').value.trim());
+  log('メールアドレスを保存（値はログに出さない）');
+}
+function saveAutorun() {
+  const v = document.getElementById('autorun').value;
+  lsSet(LS_AUTO, v);
+  document.getElementById('status').textContent = v ? `次回起動時に [${v}] を実行` : '起動時は何もしない';
+}
+
+(function init() {
+  document.getElementById('email').value = lsGet(LS_EMAIL) || '';
+  const box = document.getElementById('conds');
+  for (const c of CONDS) {
+    const p = c.prompt === undefined ? '(未指定)' : `'${c.prompt}'`;
+    const d = document.createElement('div');
+    d.className = 'cond';
+    d.innerHTML = `<div><span class="tag">[${c.id}]</span> ${c.label}</div>
+      <div><code>prompt=${p} / hint=${c.hint ? 'メールアドレス' : 'なし'}</code></div>
+      <div class="row" style="margin-top:6px"><button>[${c.id}] をボタンで実行</button></div>`;
+    d.querySelector('button').onclick = () => runCond(c.id, 'button');
+    box.appendChild(d);
+  }
+  const sel = document.getElementById('autorun');
+  sel.innerHTML = '<option value="">（何もしない）</option>' +
+    CONDS.map(c => `<option value="${c.id}">[${c.id}] ${c.label}</option>`).join('') +
+    Object.entries(TAP_MODES).map(([k, v]) => `<option value="${k}">[${k}] ${v}</option>`).join('');
+  const auto = lsGet(LS_AUTO) || '';
+  sel.value = auto;
+  document.getElementById('status').textContent = auto ? `起動時に [${auto}] を実行` : '';
+  renderLog();
+  log('---- ページ読み込み ---- ' + envLine());
+  setupIframe(auto);
+  if (TAP_MODES[auto]) armFirstTap(auto);
+  // いまの yomikake と同じく、ユーザー操作なしの起動直後に走らせる
+  else if (auto) runCond(auto, 'load');
+})();
+</script>
+<script src="https://accounts.google.com/gsi/client" async></script>
+</body>
+</html>
