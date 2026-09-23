@@ -266,6 +266,11 @@ window.open noact -> NULL
 | Android Chrome | ✅ 同上 |
 | 自動同期 OFF→ON でアカウント選択 | ✅ PC Chrome・Android Chrome・iPhone・iPad とも出る |
 
+**iPad の Safari タブ（2026-09-24・§3-4-3 の修正後・診断版で記録）: ✅**
+起動時は `popup_failed_to_open`（`settled=true busy=false`＝固まらない）→ 一覧の「開く」「続きから」は除外されてファイルピッカー・本の表示が通る →
+**読書中の最初の本文タップで小窓が開き（`window.open ACT -> OPENED`）トークン取得** → 保留していた自動保存も送信 → 「リストへ」の保存も成功。
+2 回目の起動では記憶したアカウントで `prompt:'' hint=true`、タップから約 1 秒で取得。
+
 **iOS は起動直後に通った（ご本人）。** iPhone・iPad とも、タップせずに読書が始まった。
 probe（Safari のタブ・`standalone=false`）では起動直後は必ず `popup_failed_to_open` だったので、
 **普段の起動方法（ホーム画面から起動）ではユーザー操作なしでも認証の小窓を開ける**と読める（§2-3 の (1) が正しかった）。
