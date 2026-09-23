@@ -4,7 +4,7 @@
 
 関連: CLAUDE.md §Google Drive Bookmark Sync・`design_kosync.md`（資格情報を別キーに置く前例）
 
-**状態: 実装完了・実機確認待ち（2026-09-23）。** テスト `tests/cases/drive-auth.js`（両ファイル各 44 assertion）。決定事項: §3-2（OFF で記憶を消す）・§3-4（iOS は最初の click／EPUB_TAP に相乗り）。 実測は 2026-09-23（PC・Android・iPad・iPhone）。iOS の「最初のタップに相乗り」も測定済み。
+**状態: 実装完了・実機確認中（2026-09-23・PC / Android / iPhone / iPad は OK・OFF→ON のみ未確認）。** テスト `tests/cases/drive-auth.js`（両ファイル各 44 assertion）。決定事項: §3-2（OFF で記憶を消す）・§3-4（iOS は最初の click／EPUB_TAP に相乗り）。 実測は 2026-09-23（PC・Android・iPad・iPhone）。iOS の「最初のタップに相乗り」も測定済み。
 
 ---
 
@@ -204,6 +204,21 @@ hint を覚えると、別のアカウントに切り替える手段が要る。
 | Android Chrome（タブ） | 同上。約 1.2 秒で自動で戻る |
 | Android（ホーム画面の PWA） | 同上。standalone でもポップアップが開いて戻る |
 | iPhone / iPad | 起動直後は何も出ない → 最初のタップ（本文でもリストでも）で一瞬チラついて同期される。最初がスワイプなら次のタップで。**これまで iOS で自動同期が動いていなかったか**（§2-3）もあわせて確認 |
+
+### 5-1. 結果（2026-09-23・`https://www.ayati.com/tmp/` にデプロイ）
+
+| 環境 | 結果 |
+|---|---|
+| PC Chrome | ✅ 2 回目以降は一瞬の画面転換のあと、そのまま読書に入れる |
+| iPhone Safari（ホーム画面起動） | ✅ 同上 |
+| iPad Safari | ✅ 同上 |
+| Android Chrome | ✅ 同上 |
+| 自動同期 OFF→ON でアカウント選択 | （確認中） |
+
+**iOS は起動直後に通った（ご本人）。** iPhone・iPad とも、タップせずに読書が始まった。
+probe（Safari のタブ・`standalone=false`）では起動直後は必ず `popup_failed_to_open` だったので、
+**普段の起動方法（ホーム画面から起動）ではユーザー操作なしでも認証の小窓を開ける**と読める（§2-3 の (1) が正しかった）。
+最初のタップで取り直す仕掛け（§3-4）は、Safari のタブで開いたときの保険として残す。
 
 ---
 
