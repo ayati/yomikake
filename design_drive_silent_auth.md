@@ -4,7 +4,7 @@
 
 関連: CLAUDE.md §Google Drive Bookmark Sync・`design_kosync.md`（資格情報を別キーに置く前例）
 
-**状態: 実装完了・実機確認中（2026-09-23・PC / Android / iPhone / iPad は OK・OFF→ON のみ未確認）。** テスト `tests/cases/drive-auth.js`（両ファイル各 44 assertion）。決定事項: §3-2（OFF で記憶を消す）・§3-4（iOS は最初の click／EPUB_TAP に相乗り）。 実測は 2026-09-23（PC・Android・iPad・iPhone）。iOS の「最初のタップに相乗り」も測定済み。
+**状態: 実装完了・実装完了・実機確認済み（2026-09-23・4 環境）。リリース待ち。** テスト `tests/cases/drive-auth.js`（両ファイル各 44 assertion）。決定事項: §3-2（OFF で記憶を消す）・§3-4（iOS は最初の click／EPUB_TAP に相乗り）。 実測は 2026-09-23（PC・Android・iPad・iPhone）。iOS の「最初のタップに相乗り」も測定済み。
 
 ---
 
@@ -213,7 +213,7 @@ hint を覚えると、別のアカウントに切り替える手段が要る。
 | iPhone Safari（ホーム画面起動） | ✅ 同上 |
 | iPad Safari | ✅ 同上 |
 | Android Chrome | ✅ 同上 |
-| 自動同期 OFF→ON でアカウント選択 | （確認中） |
+| 自動同期 OFF→ON でアカウント選択 | ✅ PC Chrome・Android Chrome・iPhone・iPad とも出る |
 
 **iOS は起動直後に通った（ご本人）。** iPhone・iPad とも、タップせずに読書が始まった。
 probe（Safari のタブ・`standalone=false`）では起動直後は必ず `popup_failed_to_open` だったので、
