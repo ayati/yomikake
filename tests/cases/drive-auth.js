@@ -201,8 +201,8 @@
   await wait(30);
   T('取り直しも開けなければ仕掛け直す', _driveGestureRetry === true);
 
-  // ── 操作部品のクリック・キー操作では取り直さない（小窓がユーザー操作の権利を使い切り、
-  //    同じ操作のファイルピッカー・全画面・読み上げ開始を弾くため） ──
+  // ── ユーザー操作の権利が要る操作では取り直さない（小窓が権利を使い切り、同じ操作の
+  //    ファイルピッカー・全画面・読み上げ開始・共有を弾くため）。要らない操作では取り直す ──
   async function armed() {
     await resetAuth(); _driveGestureRetry = false;
     _driveAccountSet('reader@example.com');
@@ -210,27 +210,52 @@
     await settle(driveAuth());
     return gis.calls.length;
   }
+  // 本物のボタンを dispatch すると本来の処理（ファイルピッカー等）まで走るので、判定だけを直接呼ぶ
+  function skipped(el) { var before = gis.calls.length; driveRetryOnGesture({ target: el }); return gis.calls.length === before; }
+  function byId(id) { return document.getElementById(id); }
   n0 = await armed();
-  // 本物のボタンを dispatch すると本来の処理（ファイルピッカー）まで走るので、判定だけを直接呼ぶ
-  var ob = document.getElementById('open-btn');
-  driveRetryOnGesture({ target: ob });
-  T('「開く」ボタンのクリックでは取り直さない', gis.calls.length === n0 && _driveGestureRetry === true);
-  var probeEl = document.createElement('span'); probeEl.setAttribute('onclick', ''); document.body.appendChild(probeEl);
-  driveRetryOnGesture({ target: probeEl });
-  T('onclick を持つ要素のクリックでは取り直さない', gis.calls.length === n0);
-  probeEl.remove();
-  var card = document.createElement('div'); card.setAttribute('role', 'button'); card.setAttribute('tabindex', '-1');
+  var ob = byId('open-btn');
+  ob.classList.remove('reading');
+  T('本未オープンの「開く」（ファイルピッカー）では取り直さない', skipped(ob) && _driveGestureRetry === true);
+  T('「別の ePub を開く」では取り直さない', skipped(byId('reading-list-new-btn')));
+  T('全画面ボタンでは取り直さない', skipped(byId('fs-btn')));
+  T('読み上げボタンでは取り直さない', skipped(byId('tts-btn')));
+  T('設定パネルの中では取り直さない', skipped(byId('settings-popover').querySelector('button') || byId('settings-popover')));
+  T('ファイル入力では取り直さない', skipped(byId('file-input')));
+  var card = document.createElement('div'); card.className = 'rl-card';
   var cardChild = document.createElement('span'); card.appendChild(cardChild); document.body.appendChild(card);
-  driveRetryOnGesture({ target: cardChild });
-  T('読みかけリストのカード（role=button）の中のクリックでは取り直さない', gis.calls.length === n0);
+  T('読みかけリストのカードの中では取り直さない', skipped(cardChild));
   card.remove();
 
+  // 権利の要らない操作では取り直す（iOS 版のページ送りはスワイプかボタン。ボタンまで除外すると
+  // 読書中に取り直す機会が無く、閉じたときの保存が失敗した — 実機で発覚）
+  T('ページ送りの「次へ」ボタンでは取り直す', !skipped(byId('btn-scroll-fwd')));
+  await wait(30);
+  n0 = await armed();
+  ob.classList.add('reading');
+  T('読書中の「リストへ」では取り直す（閉じるときの保存が通るように）', !skipped(ob));
+  ob.classList.remove('reading');
+  await wait(30);
+
+  // 「リストへ」で取り直した認証を、閉じるときの保存（driveSaveNow）が待って使える
+  n0 = await armed();
+  var _u = driveUploadCore, _ss = saveSettings, uploaded = 0;
+  driveUploadCore = async function (tok) { uploaded++; return 1; };
+  _autoSaveDirty = true; _autoSaveBusy = false;
+  ob.classList.add('reading');
+  driveRetryOnGesture({ target: ob });   // capture の段
+  await driveSaveNow();                  // closeBook → finalizeCurrentBook の中で走るもの
+  T('取り直しの認証を待って閉じるときの保存が通る', uploaded === 1 && gis.calls.length === n0 + 1,
+    'uploaded=' + uploaded + ' calls=' + (gis.calls.length - n0));
+  ob.classList.remove('reading');
+  driveUploadCore = _u; _autoSaveDirty = false;
+  await wait(30);
+
   // #page-container は reclaimKeyFocus() で tabindex=-1 が付く。ここ（FXL のタップ）は弾かない
-  var pc = document.getElementById('page-container');
+  n0 = await armed();
+  var pc = byId('page-container');
   var pcHad = pc.getAttribute('tabindex'); pc.setAttribute('tabindex', '-1');
-  var fxl = document.getElementById('fxl-spread');
-  driveRetryOnGesture({ target: fxl });
-  T('tabindex=-1 の #page-container 内（FXL のタップ）では取り直す', gis.calls.length === n0 + 1, 'calls=' + gis.calls.length);
+  T('tabindex=-1 の #page-container 内（FXL のタップ）では取り直す', !skipped(byId('fxl-spread')));
   if (pcHad === null) pc.removeAttribute('tabindex');
   await wait(30);
 

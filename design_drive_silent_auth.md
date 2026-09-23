@@ -4,7 +4,7 @@
 
 関連: CLAUDE.md §Google Drive Bookmark Sync・`design_kosync.md`（資格情報を別キーに置く前例）
 
-**状態: 実装完了・実機確認済み（2026-09-23・4 環境）。リリース待ち。** テスト `tests/cases/drive-auth.js`（両ファイル各 49 assertion）。決定事項: §3-2（OFF で記憶を消す）・§3-4（iOS は最初の click／EPUB_TAP に相乗り）。 実測は 2026-09-23（PC・Android・iPad・iPhone）。iOS の「最初のタップに相乗り」も測定済み。
+**状態: 実装完了・実機確認済み（2026-09-23・4 環境）。リリース待ち。** テスト `tests/cases/drive-auth.js`（両ファイル各 56 assertion）。決定事項: §3-2（OFF で記憶を消す）・§3-4（iOS は最初の click／EPUB_TAP に相乗り）。 実測は 2026-09-23（PC・Android・iPad・iPhone）。iOS の「最初のタップに相乗り」も測定済み。
 
 ---
 
@@ -161,12 +161,17 @@ hint を覚えると、別のアカウントに切り替える手段が要る。
 
 - **相乗りする操作（§2-5 で確定・レビューで絞った）**: 親ドキュメントの `click`（capture で先に拾う）と **`EPUB_TAP` の受信**だけ。
   **`touchend` は使わない**（iPad で文脈が立っていない）。
-- **⚠ 操作部品のクリックとキー操作では取り直さない**（コードレビューで修正・2026-09-23）。
+- **⚠ ユーザー操作の権利が要る操作のクリックとキー操作では取り直さない**（コードレビューで修正 → 実機で是正・2026-09-23）。
   小窓（`window.open`）を開くとそのクリックの「ユーザー操作の権利」を使い切るので、同じ操作で続く
-  ファイルピッカー（「開く」）・全画面（`f`）・読み上げ開始（`r`）が弾かれうる。
-  除外は `DRIVE_RETRY_SKIP_SEL`（`button,a,input,select,textarea,label,summary,[onclick],[role="button"],[tabindex]:not([tabindex="-1"])`）。
-  **`[tabindex="-1"]` は除外しない** —— `reclaimKeyFocus()` が `#page-container` に付けるので、FXL のタップまで弾いてしまう。
-  本文タップ（ページ送り・タップメニュー表示）と何も無い場所のクリックは権利を要らないので干渉しない。
+  ファイルピッカー（「開く」）・全画面（`f`）・読み上げ開始（`r`）・共有が弾かれうる。
+  除外は `DRIVE_RETRY_SKIP_SEL`（入力欄・リンク・本未オープンの `#open-btn`・`.rl-card`・設定パネル・モーダル・読み上げバー・
+  `openFilePicker` / `toggleFullscreen` / `ttsPlay` / `Handoff` / `.click()` を呼ぶ onclick）。
+  - **最初は「操作部品すべて」を除外したが、実機（iPhone / iPad の Safari タブ）で失敗した。** iOS 版のページ送りは
+    スワイプ（`touchend`＝権利なし）か「次へ」ボタンなので、ボタンまで除外すると読書中に取り直す機会が無い。
+    本を閉じる「リストへ」も同じ `#open-btn` なので除外され、閉じるときの保存が `popup_failed_to_open` で失敗した。
+  - → **権利の要らないボタン（ページ送り・章送り・「リストへ」）では取り直す。** 「リストへ」で取り直せば、
+    `closeBook` → `driveSaveNow` の `driveAuth()` は進行中の認証を待つので保存が通る。
+  - `[tabindex="-1"]` を除外に入れない —— `reclaimKeyFocus()` が `#page-container` に付けるので、FXL のタップまで弾いてしまう。
   ホーム画面から起動すれば起動直後に通る（§5-1）ので、この経路を通るのは Safari のタブと、PC でタブが裏で開いた場合だけ。
 - 起動時にまず普通に試し、**`popup_failed_to_open` で失敗したときだけ**「最初の操作で取り直す」を仕掛ける。
   取れたら仕掛けを外す。取れなかった（別の理由で失敗した）ら、次の操作でまた試す。
