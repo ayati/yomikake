@@ -1546,6 +1546,7 @@ let _tokenClient      = null;  // GIS TokenClient インスタンス（再利用
 let _authPromise      = null;  // 進行中の driveAuth Promise（同時実行防止用）
 let _authOnToken      = null;  // 進行中の認証の成功ハンドラ（TokenClient は 1 個を使い回すので呼び出しごとに差し替える）
 let _driveAuthedOnce  = false; // このページで一度でもトークンを取れたか（localStorage が使えない環境の保険）
+let _driveAcctGen     = 0;     // _driveAccountForget のたびに進む。取得中に忘れられたアカウントを書き戻さないため
 let _driveGestureRetry = false; // 起動直後などユーザー操作なしで認証画面を開けなかった → 次の操作で取り直す
 let _authOnError      = null;  // 進行中の認証の失敗ハンドラ（error_callback の受け口。design_drive_silent_auth.md §3-3）
 let _refreshTimer     = null;  // トークン事前リフレッシュの setTimeout ID
@@ -6116,7 +6117,6 @@ window.addEventListener('message', e => {
     runTapAction(tapZoneAction(e.data.xr, e.data.yr));
   }
   if (e.data.type === 'EPUB_KEY') {
-    driveRetryOnGesture();
     // 本文クリックで iframe に移ったフォーカスを親へ引き取る。
     // これ以降のキーは転送を経ずに直接 handleKey へ届くので、
     // ユーザージェスチャが要る操作（全画面 API・読み上げ開始）も通るようになる。
@@ -12009,13 +12009,17 @@ function _driveAccountSet(email) {
 // 自動同期 OFF・回復不能な失敗で呼ぶ。次の認証はアカウント選択から始まる（＝選び直せる）
 function _driveAccountForget() {
   try { localStorage.removeItem(DRIVE_ACCOUNT_KEY); } catch (e) {}
+  _driveAcctGen++;
   _driveAuthedOnce = false;
   _driveToken = null; _driveTokenExpiry = 0; state.driveFileId = null;
   clearTimeout(_refreshTimer);
 }
 // トークンが取れたら「許可済み」の印を書き、login_hint 用のメールアドレスを drive.appdata の権限のまま取る
 // （about.get は drive.appdata でも user を返す — 4 環境で実測済み）。取れなくても印は残す。
+// ⚠ about の応答を待つ間に自動同期を OFF にされたら（＝_driveAccountForget）書き戻さない。
+//   戻すと「OFF→ON でアカウントを選び直す」が効かなくなる。
 async function _driveRememberAccount(token) {
+  const gen = _driveAcctGen;
   const cur = _driveAccountGet();
   if (cur && cur.email) return;
   if (!cur) _driveAccountSet('');
@@ -12025,18 +12029,27 @@ async function _driveRememberAccount(token) {
     if (!res.ok) return;
     const j = await res.json();
     const mail = j && j.user && j.user.emailAddress;
+    if (gen !== _driveAcctGen) return;
     if (typeof mail === 'string' && mail.length <= 320 && /^[^\s@]+@[^\s@]+$/.test(mail)) _driveAccountSet(mail);
   } catch (e) { /* 印だけで動く（prompt:'' のみ） */ }
 }
 
 // 起動直後に開けなかった認証を、最初のユーザー操作に相乗りして取り直す（design_drive_silent_auth.md §3-4）。
-// 親の click / keydown（capture）と、本文 iframe からの EPUB_TAP / EPUB_KEY の受信から呼ぶ。
+// 親の click（capture）と、本文 iframe からの EPUB_TAP の受信から呼ぶ。
 // iframe 内のタップはユーザー操作として親にも及ぶので、postMessage を受けた時点でも開ける（iPad・iPhone で実測）。
 // ⚠ touchend は使わない — iOS ではこの時点でまだユーザー操作と認められず、やはり開けない（実測）。
 // ⚠ ここから requestAccessToken までの間に await を挟まないこと。文脈が切れて開けなくなる。
 //   driveAuth() の Promise executor は同期で requestAccessToken まで進む。
-function driveRetryOnGesture() {
+// ⚠ ボタン等の操作部品のクリックとキー操作では取り直さない。小窓（window.open）を開くと
+//   そのクリックの「ユーザー操作の権利」を使い切るので、同じ操作で続くファイルピッカー・全画面・
+//   読み上げ開始が弾かれうる。本文タップ（ページ送り・メニュー）と何も無い場所のクリックは権利を要らない。
+// [tabindex="-1"] は除外しない — reclaimKeyFocus() が #page-container に付けるので、FXL のタップまで弾いてしまう
+// （読みかけリストのカードは role="button" で拾える）
+const DRIVE_RETRY_SKIP_SEL = 'button,a,input,select,textarea,label,summary,[onclick],[role="button"],[tabindex]:not([tabindex="-1"])';
+function driveRetryOnGesture(ev) {
   if (!_driveGestureRetry) return;
+  const tgt = ev && ev.target;
+  if (tgt && tgt.closest && tgt.closest(DRIVE_RETRY_SKIP_SEL)) return;
   if (!state.driveAutoSave) { _driveGestureRetry = false; return; }
   if (_authPromise || typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2) return;
   _driveGestureRetry = false;  // 再び開けなければ _authOnError が立て直す
@@ -13186,9 +13199,9 @@ if (location.protocol !== 'http:' && location.protocol !== 'https:') {
 
 // 起動時: 自動保存ON なら Drive の最新しおりをサイレント取り込み（本を開く前に最新化）
 if (state.driveAutoSave) driveSyncPull({ force: true });
-// iOS は起動直後に認証画面を開けない → 最初の操作で取り直す。capture で各ハンドラより先に拾う
+// iOS（Safari のタブ）は起動直後に認証画面を開けない → 最初のクリックで取り直す。capture で各ハンドラより先に拾う
+// （操作部品のクリックは driveRetryOnGesture が除外する）
 document.addEventListener('click', driveRetryOnGesture, true);
-document.addEventListener('keydown', driveRetryOnGesture, true);
 
 // ══════════════════════════════════════════
 //  PWA: Service Worker 登録 ＋ Web Share Target 受信

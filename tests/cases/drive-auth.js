@@ -25,7 +25,7 @@
 
   // about.get（メールアドレス取得）のモック。aboutMode: 'ok' / 'fail'
   var aboutMode = 'ok', aboutCalls = 0, _origFetch = window.fetch;
-  window.fetch = function (url, opt) {
+  var mockFetch = window.fetch = function (url, opt) {
     if (String(url).indexOf('/drive/v3/about') >= 0) {
       aboutCalls++;
       if (aboutMode === 'fail') return Promise.resolve(new Response('{}', { status: 403 }));
@@ -109,6 +109,23 @@
   T('アドレス無しの印でも prompt:\'\'（login_hint は付けない）',
     !!gis.calls[0] && gis.calls[0].prompt === '' && !('login_hint' in gis.calls[0]), JSON.stringify(gis.calls[0]));
 
+  // about の応答待ちの間に自動同期 OFF（＝忘れる）されたら書き戻さない
+  await resetAuth();
+  var releaseAbout;
+  window.fetch = function (url) {
+    if (String(url).indexOf('/drive/v3/about') >= 0)
+      return new Promise(function (r) { releaseAbout = function () {
+        r(new Response(JSON.stringify({ user: { emailAddress: 'reader@example.com' } }), { status: 200 })); }; });
+    return Promise.reject(new Error('unexpected'));
+  };
+  await settle(driveAuth());
+  await wait(10);
+  _driveAccountForget();              // toggleDriveAutoSave の OFF と同じ
+  releaseAbout(); await wait(30);
+  T('取得中に忘れたアカウントは書き戻さない', localStorage.getItem('epub_drive_account') === null,
+    localStorage.getItem('epub_drive_account'));
+  window.fetch = mockFetch;
+
   // 失敗した認証では覚えない
   await resetAuth();
   gis.seq.push('closed');
@@ -184,25 +201,54 @@
   await wait(30);
   T('取り直しも開けなければ仕掛け直す', _driveGestureRetry === true);
 
-  // keydown
-  await resetAuth(); _driveGestureRetry = false;
-  gis.seq.push('failopen');
-  await settle(driveAuth());
-  n0 = gis.calls.length;
-  document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Shift', bubbles: true }));
-  T('keydown でも取り直す', gis.calls.length === n0 + 1);
+  // ── 操作部品のクリック・キー操作では取り直さない（小窓がユーザー操作の権利を使い切り、
+  //    同じ操作のファイルピッカー・全画面・読み上げ開始を弾くため） ──
+  async function armed() {
+    await resetAuth(); _driveGestureRetry = false;
+    _driveAccountSet('reader@example.com');
+    gis.seq.push('failopen');
+    await settle(driveAuth());
+    return gis.calls.length;
+  }
+  n0 = await armed();
+  // 本物のボタンを dispatch すると本来の処理（ファイルピッカー）まで走るので、判定だけを直接呼ぶ
+  var ob = document.getElementById('open-btn');
+  driveRetryOnGesture({ target: ob });
+  T('「開く」ボタンのクリックでは取り直さない', gis.calls.length === n0 && _driveGestureRetry === true);
+  var probeEl = document.createElement('span'); probeEl.setAttribute('onclick', ''); document.body.appendChild(probeEl);
+  driveRetryOnGesture({ target: probeEl });
+  T('onclick を持つ要素のクリックでは取り直さない', gis.calls.length === n0);
+  probeEl.remove();
+  var card = document.createElement('div'); card.setAttribute('role', 'button'); card.setAttribute('tabindex', '-1');
+  var cardChild = document.createElement('span'); card.appendChild(cardChild); document.body.appendChild(card);
+  driveRetryOnGesture({ target: cardChild });
+  T('読みかけリストのカード（role=button）の中のクリックでは取り直さない', gis.calls.length === n0);
+  card.remove();
+
+  // #page-container は reclaimKeyFocus() で tabindex=-1 が付く。ここ（FXL のタップ）は弾かない
+  var pc = document.getElementById('page-container');
+  var pcHad = pc.getAttribute('tabindex'); pc.setAttribute('tabindex', '-1');
+  var fxl = document.getElementById('fxl-spread');
+  driveRetryOnGesture({ target: fxl });
+  T('tabindex=-1 の #page-container 内（FXL のタップ）では取り直す', gis.calls.length === n0 + 1, 'calls=' + gis.calls.length);
+  if (pcHad === null) pc.removeAttribute('tabindex');
   await wait(30);
 
-  // 本文 iframe からの EPUB_TAP / EPUB_KEY（yomikake の本文タップの経路）
+  n0 = await armed();
+  document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'f', bubbles: true }));
+  T('keydown では取り直さない（f＝全画面などを弾かないため）', gis.calls.length === n0);
+
+  // 本文 iframe からの EPUB_TAP（yomikake の本文タップの経路）で取り直す／EPUB_KEY では取り直さない
   var ifr = document.getElementById('content-iframe');
   var origRunTap = runTapAction, origHandleKey = handleKey;
   runTapAction = function () {}; handleKey = function () {};
-  ['EPUB_TAP', 'EPUB_KEY'].forEach(function (type) {
+  [['EPUB_TAP', 1], ['EPUB_KEY', 0]].forEach(function (c) {
     _driveGestureRetry = true; _driveToken = null; _authPromise = null;
     var before = gis.calls.length;
     window.dispatchEvent(new MessageEvent('message', {
-      data: { type: type, xr: 0.5, yr: 0.5, key: 'Shift' }, source: ifr.contentWindow }));
-    T(type + ' の受信で取り直す', gis.calls.length === before + 1, 'calls ' + before + '→' + gis.calls.length);
+      data: { type: c[0], xr: 0.5, yr: 0.5, key: 'Shift' }, source: ifr.contentWindow }));
+    T(c[0] + (c[1] ? ' の受信で取り直す' : ' の受信では取り直さない'),
+      gis.calls.length === before + c[1], 'calls ' + before + '→' + gis.calls.length);
   });
   runTapAction = origRunTap; handleKey = origHandleKey;
   await wait(30);
