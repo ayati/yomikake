@@ -717,6 +717,14 @@ iOS Safari の iframe 内では `scrollLeft` 代入・`window.scrollTo` が正�
 - `postMessage` の送信先 origin は `file://` 制約により `"*"` を使用（受信側で `e.source === iframe.contentWindow` を検証して対応）
 - GIS（Google Identity Services）スクリプトは SRI 非対応（Google 提供 CDN のため同等の信頼レベル）
 
+### スクリーンショット
+
+![スクリーンショット　PC1](Screenshot_yomikake_chrome1.png)
+![スクリーンショット　PC2](Screenshot_yomikake_chrome2.png)
+![スクリーンショット　スマホ1](Screenshot_yomikake_cAndroid1.png)
+![スクリーンショット　スマホ2](Screenshot_yomikake_cAndroid3.png)
+![スクリーンショット　スマホ3](Screenshot_yomikake_cAndroid3.png)
+
 ## ライセンス
 
 MIT License © 2026 N.Aono
