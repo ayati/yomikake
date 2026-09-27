@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>オフラインのフォントと読み上げの検査</title>
+<style>
+  body { font:15px/1.7 system-ui,-apple-system,"Hiragino Kaku Gothic ProN",sans-serif;
+         margin:0; padding:16px; background:#FDF8F0; color:#222; }
+  h1 { font-size:18px; margin:0 0 8px; }
+  h2 { font-size:15px; margin:22px 0 6px; border-bottom:1px solid #d8cbb8; padding-bottom:2px; }
+  .note { font-size:13px; color:#555; background:#fff; border:1px solid #ddd;
+          border-radius:6px; padding:10px 12px; margin:0 0 14px; }
+  .note ol { margin:4px 0 0; padding-left:20px; }
+  .row { display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin:0 0 8px; }
+  button { font:14px system-ui; padding:6px 12px; border-radius:6px; border:1px solid #999;
+           background:#fff; cursor:pointer; }
+  button.primary { background:#8a5a2b; color:#fff; border-color:#8a5a2b; }
+  select { font:14px system-ui; padding:5px; max-width:100%; }
+  .sample { font-size:22px; background:#fff; border:1px solid #ccc; border-radius:6px;
+            padding:6px 10px; margin:0 0 6px; overflow-wrap:anywhere; }
+  .res { font:13px ui-monospace,SFMono-Regular,Menlo,monospace; margin:0 0 6px; overflow-wrap:anywhere; }
+  .ok { color:#1a7f37; font-weight:700; } .ng { color:#c62828; font-weight:700; }
+  iframe { width:100%; height:120px; border:1px solid #ccc; border-radius:6px; background:#fff; }
+  table { border-collapse:collapse; font-size:12px; width:100%; }
+  td, th { border:1px solid #ddd; padding:3px 5px; text-align:left; }
+  #status { font:13px ui-monospace,SFMono-Regular,Menlo,monospace; background:#fff; border:1px solid #ccc;
+            border-radius:6px; padding:8px; white-space:pre-wrap; overflow-wrap:anywhere; }
+  #log { white-space:pre-wrap; font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;
+         background:#fff; border:1px solid #ccc; border-radius:6px; padding:8px; min-height:80px;
+         max-height:50vh; overflow:auto; overflow-wrap:anywhere; }
+  code { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
+</style>
+</head>
+<body>
+
+<h1>オフラインのフォントと読み上げの検査</h1>
+
+<div class="note">
+  <b>知りたいこと</b><br>
+  (1) 本文 iframe（<code>srcdoc</code>）の中のフォント読み込みを Service Worker が拾えるか —— 拾えなければ sw.js で保存しても本文には効かない<br>
+  (2) 保存したフォントが機内モードで本当に使われるか<br>
+  (3) 日本語フォント 1 書体を丸ごと先読みしたときの時間と容量<br>
+  (4) 読み上げの音声が端末内のものか、機内モードで声が出るか<br><br>
+  <b>置き場所</b>: <code>https://www.ayati.com/book/tests/probe/</code> に
+  <code>offline-fonts.html</code> と <code>offline-fonts-sw.js</code> の 2 つを置く。
+  この検査専用の SW はこのフォルダだけを担当するので、yomikake 本体の SW には影響しない。<br><br>
+  <b>手順</b>
+  <ol>
+    <li>オンラインで開き「① SW を登録」→ ページを再読み込み → 状態欄が <code>制御中: はい</code> になる</li>
+    <li>「保存を消す」→ A・B を押す（オンライン）。ログで B の行の <code>client=about:srcdoc</code> を確認</li>
+    <li>機内モードにして再読み込み → もう一度 A・B を押す（C はまだ押さない）</li>
+    <li>B の「まだ出ていない漢字」を押す（未保存のはず）</li>
+    <li>オンラインに戻して C を押す → 機内モードで再読み込み → B の「まだ出ていない漢字」をもう一度</li>
+    <li>D: オンラインで音声一覧を見る → 機内モードで日本語の音声をいくつか再生</li>
+    <li>「ログをコピー」で結果を送る（端末ごとに 1 回）</li>
+  </ol>
+</div>
+
+<div class="row">
+  <button class="primary" onclick="registerSW()">① SW を登録</button>
+  <button onclick="clearFonts()">保存を消す</button>
+  <button onclick="showCache()">保存の中身</button>
+  <button onclick="copyLog()">ログをコピー</button>
+  <button onclick="document.getElementById('log').textContent=''">ログを消す</button>
+</div>
+<div id="status">…</div>
+
+<h2>A. 親ページのフォント（Klee One・&lt;link&gt; で読む）</h2>
+<div class="row"><button onclick="testParent()">A を試す</button></div>
+<div class="sample" id="a-sample" style="font-family:'Klee One',serif">吾輩は猫である。名前はまだ無い。</div>
+<div class="res" id="a-res"></div>
+
+<h2>B. 本文 iframe のフォント（Zen Antique・srcdoc 内の @import）</h2>
+<div class="note">yomikake の本文と同じ作り（<code>sandbox</code> の属性・CSP・<code>@import</code>）で iframe を作る。</div>
+<div class="row">
+  <button onclick="testFrame(COMMON)">B を試す（よく出る字）</button>
+  <button onclick="testFrame(RARE)">まだ出ていない漢字</button>
+</div>
+<iframe id="bf" sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox" src="about:blank"></iframe>
+<div class="res" id="b-res"></div>
+
+<h2>C. 1 書体を丸ごと先読み</h2>
+<div class="row">
+  <select id="c-fam">
+    <option value="Zen+Antique">Zen Antique（B で使う書体）</option>
+    <option value="Noto+Serif+JP">Noto Serif JP</option>
+    <option value="Klee+One">Klee One</option>
+  </select>
+  <button onclick="prefetchAll()">C を試す</button>
+</div>
+<div class="res" id="c-res"></div>
+
+<h2>D. 読み上げの音声</h2>
+<div class="row">
+  <button onclick="listVoices()">音声一覧</button>
+  <select id="d-voice"></select>
+  <button onclick="speakTest()">この音声で読む</button>
+</div>
+<div class="res" id="d-res"></div>
+<div id="d-table"></div>
+
+<h2>ログ</h2>
+<div id="log"></div>
+
+<script>
+const COMMON = '吾輩は猫である。名前はまだ無い。どこで生れたかとんと見当がつかぬ。';
+const RARE   = '鼈甲の齟齬、魑魅魍魎と饕餮、罍と甑';
+const FRAME_FONT = 'Zen Antique';
+const FRAME_URL  = 'https://fonts.googleapis.com/css2?family=Zen+Antique&display=swap';
+const PARENT_URL = 'https://fonts.googleapis.com/css2?family=Klee+One&display=swap';
+const FONT_CACHE = 'probe-offline-fonts';
+
+function ts() { const d = new Date(); return d.toTimeString().slice(0, 8) + '.' + String(d.getMilliseconds()).padStart(3, '0'); }
+function log(s) { const el = document.getElementById('log'); el.textContent += ts() + ' ' + s + '\n'; el.scrollTop = el.scrollHeight; }
+function short(u) { try { const x = new URL(u); return x.hostname.replace('fonts.', '') + x.pathname.slice(0, 40) + (x.search ? x.search.slice(0, 30) : ''); } catch (e) { return u; } }
+function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function status() {
+  const c = navigator.serviceWorker && navigator.serviceWorker.controller;
+  document.getElementById('status').textContent =
+    'onLine: ' + navigator.onLine + '\n' +
+    '制御中: ' + (c ? 'はい (' + c.scriptURL.split('/').pop() + ')' : 'いいえ') + '\n' +
+    'UA: ' + navigator.userAgent + '\n' +
+    'standalone: ' + (matchMedia('(display-mode: standalone)').matches || navigator.standalone === true);
+}
+window.addEventListener('online', () => { status(); log('event online'); });
+window.addEventListener('offline', () => { status(); log('event offline'); });
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.addEventListener('message', ev => {
+    const d = ev.data || {};
+    if (d.type === 'probe-fetch')
+      log('SW ' + d.via + (d.size ? ' ' + Math.round(d.size / 1024) + 'KB' : '') + ' ' + short(d.url) +
+          ' dest=' + d.dest + ' mode=' + d.mode + ' client=' + (d.client || '-') + (d.err ? ' err=' + d.err : ''));
+    else if (d.type === 'cleared') log('保存を消しました');
+  });
+}
+
+async function registerSW() {
+  if (!('serviceWorker' in navigator)) { log('serviceWorker 非対応'); return; }
+  try {
+    const r = await navigator.serviceWorker.register('offline-fonts-sw.js', { scope: './' });
+    log('登録 OK scope=' + r.scope + ' → ページを再読み込みしてください');
+  } catch (e) { log('登録失敗 ' + e); }
+  status();
+}
+
+function clearFonts() {
+  const c = navigator.serviceWorker && navigator.serviceWorker.controller;
+  if (!c) { log('制御されていないので消せません（①→再読み込み）'); return; }
+  c.postMessage({ type: 'clear-fonts' });
+}
+
+async function showCache() {
+  try {
+    const c = await caches.open(FONT_CACHE);
+    const keys = await c.keys();
+    let css = 0, woff = 0, bytes = 0;
+    for (const k of keys) {
+      const r = await c.match(k);
+      const b = await r.clone().blob();
+      bytes += b.size;
+      if (k.url.indexOf('fonts.gstatic.com') >= 0) woff++; else css++;
+    }
+    let est = '';
+    if (navigator.storage && navigator.storage.estimate) {
+      const e = await navigator.storage.estimate();
+      est = ' / origin 使用量 ' + Math.round(e.usage / 1048576 * 10) / 10 + 'MB（上限 ' + Math.round(e.quota / 1048576) + 'MB）';
+    }
+    log('保存: CSS ' + css + ' 件・フォント ' + woff + ' 件・計 ' + Math.round(bytes / 1024) + 'KB' + est);
+  } catch (e) { log('保存の中身を読めない ' + e); }
+}
+
+// FontFaceSet に目的のファミリーが現れるまで待つ（= CSS が取れたか）
+async function waitFace(fonts, family, ms) {
+  const t0 = performance.now();
+  while (performance.now() - t0 < ms) {
+    for (const f of fonts) if (f.family.replace(/["']/g, '') === family) return true;
+    await wait(100);
+  }
+  return false;
+}
+
+async function checkFonts(fonts, family, text, outId, label) {
+  const out = document.getElementById(outId);
+  const t0 = performance.now();
+  const hasCss = await waitFace(fonts, family, 6000);
+  if (!hasCss) {
+    const m = label + ': CSS が取れない（@font-face が 1 つも無い）→ 端末のフォントで表示されている';
+    out.innerHTML = '<span class="ng">✗</span> ' + m; log(m); return;
+  }
+  try {
+    const loaded = await fonts.load('22px "' + family + '"', text);
+    const ok = loaded.length > 0 && loaded.every(f => f.status === 'loaded');
+    const all = fonts.check('22px "' + family + '"', text);
+    const m = label + ': ' + (ok && all ? 'そのフォントで表示できた' : '一部が取れていない') +
+              '（面 ' + loaded.length + ' 個・' + Math.round(performance.now() - t0) + 'ms・check=' + all + '）';
+    out.innerHTML = (ok && all ? '<span class="ok">✓</span> ' : '<span class="ng">✗</span> ') + m; log(m);
+  } catch (e) {
+    const m = label + ': フォント本体が取れない（' + (e && e.name) + '）→ 端末のフォントで表示されている';
+    out.innerHTML = '<span class="ng">✗</span> ' + m; log(m);
+  }
+}
+
+function testParent() {
+  status();
+  log('── A 開始 onLine=' + navigator.onLine);
+  if (!document.getElementById('a-link')) {
+    const l = document.createElement('link');
+    l.id = 'a-link'; l.rel = 'stylesheet'; l.href = PARENT_URL;
+    l.onerror = () => log('A: <link> の読み込みエラー');
+    document.head.appendChild(l);
+  }
+  checkFonts(document.fonts, 'Klee One', document.getElementById('a-sample').textContent, 'a-res', 'A 親ページ');
+}
+
+function testFrame(text) {
+  status();
+  log('── B 開始 onLine=' + navigator.onLine + ' 文字=' + (text === RARE ? 'まだ出ていない漢字' : 'よく出る字'));
+  const csp = ["default-src 'none'", "style-src 'unsafe-inline' data: https://fonts.googleapis.com",
+               "font-src data: https://fonts.gstatic.com", "img-src data: blob: https:"].join('; ');
+  const html = '<!DOCTYPE html><html><head><meta charset="utf-8">' +
+    '<meta http-equiv="Content-Security-Policy" content="' + csp + '">' +
+    '<style>@import url(\'' + FRAME_URL + '\');\nbody{margin:6px 10px;font:22px/1.6 "' + FRAME_FONT + '",serif;}</style>' +
+    '</head><body>' + text + '</body></html>';
+  const f = document.getElementById('bf');
+  f.onload = () => {
+    let d;
+    try { d = f.contentDocument; } catch (e) {}
+    if (!d) { log('B: iframe の中を覗けない'); return; }
+    checkFonts(d.fonts, FRAME_FONT, text, 'b-res', 'B 本文 iframe');
+  };
+  f.srcdoc = html;
+}
+
+async function prefetchAll() {
+  status();
+  const fam = document.getElementById('c-fam').value;
+  const out = document.getElementById('c-res');
+  const url = 'https://fonts.googleapis.com/css2?family=' + fam + '&display=swap';
+  log('── C 開始 ' + fam);
+  const t0 = performance.now();
+  try {
+    const css = await (await fetch(url, { mode: 'cors' })).text();
+    const urls = Array.from(new Set((css.match(/https:\/\/fonts\.gstatic\.com\/[^)'"]+/g) || [])));
+    let done = 0, bytes = 0, fail = 0;
+    const q = urls.slice();
+    async function worker() {
+      while (q.length) {
+        const u = q.shift();
+        try { const r = await fetch(u, { mode: 'cors' }); const b = await r.blob(); bytes += b.size; done++; }
+        catch (e) { fail++; }
+        out.textContent = done + '/' + urls.length + ' 件 ' + Math.round(bytes / 1024) + 'KB';
+      }
+    }
+    await Promise.all([worker(), worker(), worker(), worker()]);
+    const m = 'C ' + fam + ': ' + done + '/' + urls.length + ' 件・' + Math.round(bytes / 1024) + 'KB・失敗 ' + fail +
+              '・' + Math.round(performance.now() - t0) + 'ms';
+    out.textContent = m; log(m);
+    log('注: C は親ページの CSS と B の iframe の CSS が同じ URL のときだけ B に効く（URL は UA ごとに同じ）');
+  } catch (e) { const m = 'C 失敗 ' + e; out.textContent = m; log(m); }
+}
+
+function voices() { return speechSynthesis.getVoices(); }
+function listVoices() {
+  if (!('speechSynthesis' in window)) { log('D: speechSynthesis 非対応'); return; }
+  let vs = voices();
+  const sel = document.getElementById('d-voice');
+  const ja = vs.filter(v => /^ja/i.test(v.lang));
+  sel.innerHTML = ja.map((v, i) => '<option value="' + vs.indexOf(v) + '">' +
+    (v.localService ? '端末 ' : 'ネット ') + v.name + (v.default ? '（既定）' : '') + '</option>').join('');
+  let t = '<table><tr><th>名前</th><th>lang</th><th>端末内</th><th>既定</th></tr>';
+  for (const v of ja) t += '<tr><td>' + v.name + '</td><td>' + v.lang + '</td><td>' + v.localService + '</td><td>' + v.default + '</td></tr>';
+  document.getElementById('d-table').innerHTML = t + '</table>';
+  log('D: 音声 全 ' + vs.length + ' 件・日本語 ' + ja.length + ' 件（端末内 ' + ja.filter(v => v.localService).length + '）');
+  for (const v of ja) log('  ' + (v.localService ? '端末 ' : 'ネット ') + v.name + ' [' + v.lang + ']' + (v.default ? ' 既定' : ''));
+}
+if ('speechSynthesis' in window) speechSynthesis.onvoiceschanged = () => { if (document.getElementById('d-voice').options.length === 0) listVoices(); };
+
+function speakTest() {
+  const vs = voices();
+  const v = vs[Number(document.getElementById('d-voice').value)];
+  if (!v) { log('D: 先に「音声一覧」を押してください'); return; }
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance('吾輩は猫である。名前はまだ無い。');
+  u.voice = v; u.lang = v.lang;
+  const t0 = performance.now();
+  const tag = 'D ' + v.name + ' (' + (v.localService ? '端末' : 'ネット') + ') onLine=' + navigator.onLine;
+  const out = document.getElementById('d-res');
+  let started = false;
+  u.onstart = () => { started = true; log(tag + ': onstart ' + Math.round(performance.now() - t0) + 'ms'); };
+  u.onend = () => { const m = tag + ': onend ' + Math.round(performance.now() - t0) + 'ms' + (started ? '' : '（onstart 無し）'); log(m); out.textContent = m + ' — 声は出ましたか？'; };
+  u.onerror = e => { const m = tag + ': onerror ' + e.error + ' ' + Math.round(performance.now() - t0) + 'ms'; log(m); out.textContent = m; };
+  setTimeout(() => { if (!started) log(tag + ': 8 秒たっても onstart が来ない'); }, 8000);
+  speechSynthesis.speak(u);
+  log(tag + ': speak');
+}
+
+async function copyLog() {
+  const s = document.getElementById('status').textContent + '\n\n' + document.getElementById('log').textContent;
+  try { await navigator.clipboard.writeText(s); log('コピーしました'); }
+  catch (e) {
+    const ta = document.createElement('textarea'); ta.value = s; document.body.appendChild(ta);
+    ta.select(); try { document.execCommand('copy'); log('コピーしました'); } catch (e2) { log('コピー失敗'); } ta.remove();
+  }
+}
+
+status();
+</script>
+</body>
+</html>
