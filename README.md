@@ -745,6 +745,7 @@ iOS Safari の iframe 内では `scrollLeft` 代入・`window.scrollTo` が正�
 ![スクリーンショット　スマホ1](Screenshot_yomikake_cAndroid1.png)
 ![スクリーンショット　スマホ2](Screenshot_yomikake_cAndroid2.png)
 ![スクリーンショット　スマホ3](Screenshot_yomikake_cAndroid3.png)
+![スクリーンショット　スマホ4](Screenshot_yomikake_cAndroid4.png)
 
 ## ライセンス
 
