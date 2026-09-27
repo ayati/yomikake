@@ -371,6 +371,72 @@
   clearTimeout(_autoSaveTimer);
   _autoSaveDirty = false;
 
+  // ── オフラインでは認証の小窓を開かない（Android の PWA・機内モードで恐竜画面が居座っていた） ──
+  var online = true;
+  Object.defineProperty(navigator, 'onLine', { configurable: true, get: function () { return online; } });
+  var toasts = [], _origToast = showToast;
+  showToast = function (m) { toasts.push(m); };
+
+  await resetAuth();
+  _driveAccountSet('reader@example.com');
+  _lastAutoSaveAt = 0; _autoSaveBusy = false; _driveGestureRetry = false; _driveWaitOnline = false;
+  state.driveAutoSave = true;
+  online = false;
+  var r9 = await settle(driveAuth());
+  T('オフラインの driveAuth は offline で reject', !r9.ok && r9.e.message === 'offline', r9.e && r9.e.message);
+  T('オフラインでは requestAccessToken を呼ばない', gis.calls.length === 0, 'calls=' + gis.calls.length);
+  T('オフラインで失敗しても _authPromise が残らない', _authPromise === null);
+  T('オフラインでは操作待ちの取り直しを立てない', _driveGestureRetry === false);
+
+  await driveSyncPull({ force: true });
+  T('起動時の同期もオフラインでは小窓を開かない', gis.calls.length === 0);
+
+  var up4 = 0; driveUploadCore = async function () { up4++; return 1; };
+  _autoSaveDirty = true;
+  await runAutoSave();
+  await wait(100);
+  T('オフラインの自動保存は小窓を開かない', gis.calls.length === 0);
+  T('オフラインの自動保存は再試行タイマーを組まない', _autoSaveTimer === null || up4 === 0, 'uploads=' + up4);
+  T('オフラインの未送信は持ち越し', _autoSaveDirty === true);
+  clearTimeout(_autoSaveTimer);
+
+  scheduleAutoSave(); await wait(50);
+  T('オフライン中は scheduleAutoSave しても送らない', up4 === 0 && gis.calls.length === 0);
+
+  _driveGestureRetry = true;
+  driveRetryOnGesture({ target: document.body });
+  await wait(30);
+  T('オフライン中はタップでも取り直さない', gis.calls.length === 0);
+  T('取り直しの予約はオフライン明けまで残す', _driveGestureRetry === true);
+  _driveGestureRetry = false;
+
+  toasts.length = 0;
+  await driveSaveNow();
+  T('閉じるときの保存はオフラインなら持ち越しを告知', toasts[0] === t('toast.driveOfflineDeferred'), toasts[0]);
+  T('閉じるときの保存も小窓を開かない', gis.calls.length === 0);
+  T('告知したあとも未送信は持ち越し', _autoSaveDirty === true);
+
+  // 手動の「Drive に保存」: alert ではなくトースト
+  var alerted = 0, _origAlert = window.alert; window.alert = function () { alerted++; };
+  toasts.length = 0;
+  await driveUpload();
+  T('手動保存はオフラインならトーストで知らせる', toasts[0] === t('toast.driveOffline') && alerted === 0, toasts[0]);
+  window.alert = _origAlert;
+
+  // 接続が戻ったら保留分を送る
+  T('送れなかった同期を覚えている', _driveWaitOnline === true);
+  online = true;
+  window.dispatchEvent(new Event('online'));
+  await wait(200);
+  T('接続が戻ったら認証を取り直す', gis.calls.length >= 1, 'calls=' + gis.calls.length);
+  T('接続が戻ったら持ち越した保存を送る', up4 === 1, 'uploads=' + up4);
+  T('送ったら覚えを消す', _driveWaitOnline === false);
+  clearTimeout(_autoSaveTimer);
+
+  showToast = _origToast;
+  delete navigator.onLine;
+  _autoSaveDirty = false;
+
   driveUploadCore = _origUpload; saveSettings = _origSaveSettings;
   state.driveAutoSave = false; _autoSaveDirty = false;
   await resetAuth();

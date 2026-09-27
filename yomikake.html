@@ -1547,6 +1547,7 @@ let _authPromise      = null;  // 進行中の driveAuth Promise（同時実行�
 let _authOnToken      = null;  // 進行中の認証の成功ハンドラ（TokenClient は 1 個を使い回すので呼び出しごとに差し替える）
 let _driveAuthedOnce  = false; // このページで一度でもトークンを取れたか（localStorage が使えない環境の保険）
 let _driveAcctGen     = 0;     // _driveAccountForget のたびに進む。取得中に忘れられたアカウントを書き戻さないため
+let _driveWaitOnline = false;   // オフラインで送れなかった同期がある → online イベントで送る
 let _driveGestureRetry = false; // 起動直後などユーザー操作なしで認証画面を開けなかった → 次の操作で取り直す
 let _authOnError      = null;  // 進行中の認証の失敗ハンドラ（error_callback の受け口。design_drive_silent_auth.md §3-3）
 let _refreshTimer     = null;  // トークン事前リフレッシュの setTimeout ID
@@ -1818,6 +1819,8 @@ const I18N = {
     'toast.resumeHint':     '同じファイル「{title}」を開いてください',
     'toast.driveUploaded':       '☁️ Driveにしおりを保存しました（{count}冊分）',
     'toast.driveSaveFailed':     'Driveへのしおり保存に失敗しました（電波状況をご確認ください）',
+    'toast.driveOffline':        'オフラインのため Google Drive に接続できません',
+    'toast.driveOfflineDeferred':'オフラインです。Drive へのしおり保存は接続が戻ってから行います',
     'toast.driveSyncAvailable':  '☁️ 別の端末で読み進めた位置があります（タップで移動）',
     'toast.syncFinished':        '☑ この本は別の端末で読み終えています（タップで最終ページへ）',
     'toast.driveDownloaded':     '☁️ Driveからしおりを読み込みました（{count}冊分）',
@@ -2278,6 +2281,8 @@ const I18N = {
     'toast.resumeHint':     'Please open "{title}"',
     'toast.driveUploaded':       '☁️ Bookmarks saved to Drive ({count} book(s))',
     'toast.driveSaveFailed':     'Failed to save bookmarks to Drive (check your connection)',
+    'toast.driveOffline':        'You are offline — cannot connect to Google Drive',
+    'toast.driveOfflineDeferred':'You are offline. Bookmarks will be saved to Drive when the connection is back',
     'toast.driveSyncAvailable':  '☁️ A newer position from another device is available (tap to move)',
     'toast.syncFinished':        '☑ You finished this book on another device (tap for the last page)',
     'toast.driveDownloaded':     '☁️ Bookmarks loaded from Drive ({count} book(s))',
@@ -2738,6 +2743,8 @@ const I18N = {
     'toast.resumeHint':     '請開啟「{title}」',
     'toast.driveUploaded':       '☁️ 書籤已儲存至 Drive（{count} 本書）',
     'toast.driveSaveFailed':     '書籤儲存至 Drive 失敗（請檢查網路連線）',
+    'toast.driveOffline':        '目前離線，無法連線至 Google Drive',
+    'toast.driveOfflineDeferred':'目前離線。書籤將於恢復連線後儲存至 Drive',
     'toast.driveSyncAvailable':  '☁️ 有來自其他裝置的較新閱讀位置（點擊跳轉）',
     'toast.syncFinished':        '☑ 您已在其他裝置讀完本書（點擊前往最後一頁）',
     'toast.driveDownloaded':     '☁️ 已從 Drive 載入書籤（{count} 本書）',
@@ -3198,6 +3205,8 @@ const I18N = {
     'toast.resumeHint':     '请打开「{title}」',
     'toast.driveUploaded':       '☁️ 书签已保存至 Drive（{count} 本书）',
     'toast.driveSaveFailed':     '书签保存至 Drive 失败（请检查网络连接）',
+    'toast.driveOffline':        '当前离线，无法连接 Google Drive',
+    'toast.driveOfflineDeferred':'当前离线。书签将在恢复连接后保存至 Drive',
     'toast.driveSyncAvailable':  '☁️ 有来自其他设备的较新阅读位置（点击跳转）',
     'toast.syncFinished':        '☑ 您已在其他设备读完本书（点击前往最后一页）',
     'toast.driveDownloaded':     '☁️ 已从 Drive 加载书签（{count} 本书）',
@@ -11942,6 +11951,12 @@ function driveAuth() {
   // 既に認証フロー進行中なら同じ Promise を返す（_tokenClient.callback 競合を防止）
   if (_authPromise) return _authPromise;
   if (!GOOGLE_CLIENT_ID) { showToast(t('toast.driveNoClientId')); return Promise.reject(new Error('no_client_id')); }
+  // ⚠ オフラインでは認証の小窓を開かない。開くと accounts.google.com を読みに行った小窓が
+  //   Chrome の恐竜画面になり、利用者がバツで閉じるまで居座る（Android の PWA・機内モードで実機確認）。
+  //   起動時の同期・自動保存・トークン更新・タップでの取り直しはすべてここを通るので、1 箇所で止まる。
+  //   接続が戻ったら online イベント（_driveOnOnline）で取り直す。
+  //   限界: Wi-Fi にはつながっているが外へ出られない状態では onLine が true のままなので防げない。
+  if (_isOffline()) { _driveWaitOnline = true; return Promise.reject(new Error('offline')); }
   if (typeof google === 'undefined' || !google.accounts) {
     return Promise.reject(new Error('Google Identity Services が読み込まれていません。HTTP サーバー経由で開いてください。'));
   }
@@ -12076,11 +12091,24 @@ function driveRetryOnGesture(ev) {
   if (tgt && tgt.closest && tgt.closest(DRIVE_RETRY_SKIP_SEL)) return;
   if (!state.driveAutoSave) { _driveGestureRetry = false; return; }
   if (_authPromise || typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2) return;
+  if (_isOffline()) return;   // 小窓が恐竜画面になるだけ。フラグは残して接続が戻ってからにする
   _driveGestureRetry = false;  // 再び開けなければ _authOnError が立て直す
   driveAuth().then(() => {
     driveSyncPull({ force: true });
     if (_autoSaveDirty) scheduleAutoSave();  // 待たせていた自動保存を送る
   }, () => {});
+}
+
+// 端末がオフラインか。onLine が無い環境ではオンライン扱い（従来どおり）
+function _isOffline() { return navigator.onLine === false; }
+
+// 接続が戻ったら、オフラインで送れなかった同期・保存を送る（ユーザー操作なし。
+// iOS の Safari タブで小窓を開けなければ、従来どおり次の操作で driveRetryOnGesture が取り直す）
+function _driveOnOnline() {
+  if (!_driveWaitOnline) return;
+  _driveWaitOnline = false;
+  if (!state.driveAutoSave || !GOOGLE_CLIENT_ID) return;
+  driveSyncPull({ force: true }).then(() => { if (_autoSaveDirty) scheduleAutoSave(); });
 }
 
 // 認証ポップアップ由来の失敗か（閉じた／開けなかった）。回復不能な失敗と区別する —
@@ -12344,7 +12372,8 @@ async function driveUpload() {
     const count = await driveUploadCore(token);
     showToast(t('toast.driveUploaded', {count}));
   } catch(err) {
-    if (err.message !== 'no_client_id') alert(t('err.driveFailed', {msg: err.message}));
+    if (err.message === 'offline') showToast(t('toast.driveOffline'));
+    else if (err.message !== 'no_client_id') alert(t('err.driveFailed', {msg: err.message}));
   } finally {
     btn.disabled = false;
   }
@@ -12360,6 +12389,8 @@ function scheduleAutoSave() {
   // 認証画面を開けず次のユーザー操作を待っている間は送らない（送っても毎回 popup_failed_to_open で終わる）。
   // 取れたら driveRetryOnGesture が保留分を送る
   if (_driveGestureRetry && !_driveToken) return;
+  // オフライン中は送らない（変更は _autoSaveDirty で持ち越し、online で送る）
+  if (_isOffline()) { _driveWaitOnline = true; return; }
   clearTimeout(_autoSaveTimer);
   const elapsed = Date.now() - _lastAutoSaveAt;
   const delay = Math.max(0, AUTO_SAVE_INTERVAL - elapsed);
@@ -12388,6 +12419,8 @@ async function runAutoSave() {
   } catch(e) {
     failed = true;
     if (_isDrivePopupError(e)) waitGesture = true;
+    // オフライン: 再試行は online イベントに任せる（30 秒ごとに空振りさせない）
+    if (_isOffline()) { _driveWaitOnline = true; waitGesture = true; }
     if (e.message && e.message.startsWith('401')) {
       // 万一トークンが失効していた場合: サイレントリフレッシュを試みてリトライ
       _driveToken = null;
@@ -12435,6 +12468,8 @@ async function driveSaveNow() {
   // 進行中の自動保存があれば終わるまで待つ（最大 ~3 秒）。古いデータでの上書きを防ぐ。
   for (let i = 0; i < 20 && _autoSaveBusy; i++) { await new Promise(r => setTimeout(r, 150)); }
   if (!_autoSaveDirty || _autoSaveBusy) return; // 直近の自動保存で既に最新が上がっている
+  // オフライン: 失敗トーストではなく「戻ったら送る」と伝える（しおりは端末に保存済み）
+  if (_isOffline()) { _driveWaitOnline = true; showToast(t('toast.driveOfflineDeferred')); return; }
   _autoSaveBusy = true;
   _autoSaveDirty = false;
   try {
@@ -12477,7 +12512,8 @@ async function toggleDriveAutoSave() {
     saveSettings();
     showToast(t('toast.driveAutoSaveOn'));
   } catch(e) {
-    if (e.message !== 'no_client_id') showToast(t('err.driveFailed', {msg: e.message}));
+    if (e.message === 'offline') showToast(t('toast.driveOffline'));
+    else if (e.message !== 'no_client_id') showToast(t('err.driveFailed', {msg: e.message}));
   } finally {
     btn.disabled = false;
     updateAutoSaveToggleUI();
@@ -12584,7 +12620,8 @@ async function driveDownload() {
     if (finishedNotice) showSyncFinishedToast();   // アクショントーストは後勝ちなので件数トーストの後
     showResumeBanner();
   } catch(err) {
-    if (err.message !== 'no_client_id') alert(t('err.driveFailed', {msg: err.message}));
+    if (err.message === 'offline') showToast(t('toast.driveOffline'));
+    else if (err.message !== 'no_client_id') alert(t('err.driveFailed', {msg: err.message}));
   } finally {
     btn.disabled = false;
   }
@@ -12645,6 +12682,7 @@ async function driveSyncPull(opts) {
   if (!state.driveAutoSave || !GOOGLE_CLIENT_ID) return;
   if (_driveSyncBusy || _autoSaveBusy) return;
   if (!opts.force && Date.now() - _lastSyncPullAt < SYNC_PULL_THROTTLE) return;
+  if (_isOffline()) { _driveWaitOnline = true; return; }
   // GIS が未ロードなら少し待つ（起動直後は async ロード未完のことがある）
   for (let i = 0; i < 30 && (typeof google === 'undefined' || !google.accounts); i++) {
     await new Promise(r => setTimeout(r, 200));
@@ -13240,6 +13278,8 @@ if (state.driveAutoSave) driveSyncPull({ force: true });
 // iOS（Safari のタブ）は起動直後に認証画面を開けない → 最初のクリックで取り直す。capture で各ハンドラより先に拾う
 // （操作部品のクリックは driveRetryOnGesture が除外する）
 document.addEventListener('click', driveRetryOnGesture, true);
+// オフラインで見送った同期・保存を、接続が戻ったときに送る
+window.addEventListener('online', _driveOnOnline);
 
 // ══════════════════════════════════════════
 //  PWA: Service Worker 登録 ＋ Web Share Target 受信
