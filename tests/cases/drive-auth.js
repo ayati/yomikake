@@ -433,6 +433,53 @@
   T('送ったら覚えを消す', _driveWaitOnline === false);
   clearTimeout(_autoSaveTimer);
 
+  // トークンが有効なままでも、オフラインならエラーのダイアログではなく告知（判定をトークン判定より前に置いた）
+  _driveToken = 'tok-valid'; _driveTokenExpiry = Date.now() + 3600000;
+  online = false; toasts.length = 0; alerted = 0; window.alert = function () { alerted++; };
+  var r10 = await settle(driveAuth());
+  T('有効なトークンがあってもオフラインなら offline で断る', !r10.ok && r10.e.message === 'offline');
+  await driveUpload();
+  T('トークンが有効でも手動保存はオフラインの告知になる', toasts[0] === t('toast.driveOffline') && alerted === 0, toasts[0]);
+  window.alert = _origAlert;
+  _driveToken = null; _driveTokenExpiry = 0;
+
+  // 401 → 取り直す前に圏外になった: 回復不能ではないので自動同期を止めない
+  online = true; _driveWaitOnline = false; _autoSaveBusy = false;
+  state.driveAutoSave = true; _driveAccountSet('reader@example.com');
+  gis.seq.length = 0; gis.seq.push('ok');
+  driveUploadCore = async function () { online = false; throw new Error('401 Unauthorized'); };
+  await runAutoSave();
+  clearTimeout(_autoSaveTimer);
+  T('401 の取り直しで圏外になっても自動同期は ON のまま', state.driveAutoSave === true);
+  T('401 の取り直しで圏外になってもアカウントを忘れない', localStorage.getItem('epub_drive_account') !== null);
+  T('その分は接続が戻ってから送る', _autoSaveDirty === true && _driveWaitOnline === true);
+
+  // 接続が戻った瞬間に保存の途中だったら、予約を残して待つ（黙って見送らない）
+  online = true; _driveWaitOnline = true; _autoSaveBusy = true;
+  _driveOnOnline();
+  T('保存中に接続が戻ったら予約を残す', _driveWaitOnline === true);
+  _autoSaveBusy = false; _lastAutoSaveAt = 0;  // 「前回の保存から 1 分」の待ちを外す
+  var up5 = 0; driveUploadCore = async function () { up5++; return 1; };
+  gis.seq.length = 0;
+  await wait(2300);
+  T('保存が終わったあとで保留分を送る', _driveWaitOnline === false && up5 === 1, 'uploads=' + up5);
+  clearTimeout(_autoSaveTimer);
+
+  // オフラインで起動して GIS の読み込みに失敗していたら、接続が戻ったときに読み込み直す
+  var _g = window.google; delete window.google; _gisLoading = null;
+  var nScripts = document.querySelectorAll('script[src*="gsi/client"]').length;
+  window._gisFailed = false;
+  var pending = await _driveEnsureGis();
+  T('GIS が読み込み中なら重ねて入れない', pending === false &&
+    document.querySelectorAll('script[src*="gsi/client"]').length === nScripts);
+  window._gisFailed = true;
+  var pr = _driveEnsureGis();
+  T('GIS の読み込みに失敗していたら入れ直す', document.querySelectorAll('script[src*="gsi/client"]').length === nScripts + 1);
+  T('入れ直しは同時に 1 本だけ', _driveEnsureGis() === pr);
+  await Promise.race([pr, wait(5000)]);
+  window.google = _g; window._gisFailed = false; _gisLoading = null;
+  T('起動時の <script> が失敗を記録する', !!document.querySelector('script[src*="gsi/client"][onerror*="_gisFailed=true"]'));
+
   showToast = _origToast;
   delete navigator.onLine;
   _autoSaveDirty = false;

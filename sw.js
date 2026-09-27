@@ -362,21 +362,47 @@ function fontSerial(fn) {
   return p;
 }
 
+const FONT_PREFETCH_DELAY = 8000;   // 書体を選んでから丸ごと先読みを始めるまで（見比べている間は落とさない）
+const FONT_TOUCH_MIN = 60000;       // 「最近使った」の書き戻しの最小間隔（毎章索引を書き直さない）
 const _fontPrefetched = new Set();  // この SW の寿命の中で先読みを済ませた CSS（毎章 124 件を照合しない）
+const _fontPending = new Set();     // 先読みを待っている CSS（章送りのたびに予約を重ねない）
+const _fontRevalidated = new Set(); // この SW の寿命の中で CSS を取り直した（Google 側の更新を拾う）
 
-// 書体を使った: 索引を更新 → 溢れた書体を消す → 初回なら全ファイルを先読み
+function fontSleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// 書体を使った（CSS をネットから取れた）: 索引を更新 → 溢れた書体・版上げで外れたファイルを消す
 async function fontTrack(cache, cssUrl, cssText) {
   const idx = await fontIndexLoad(cache);
   const files = fontCssUrls(cssText);
+  const before = (idx.fam[cssUrl] && idx.fam[cssUrl].files) || [];
   idx.fam[cssUrl] = { t: Date.now(), files };
   const plan = fontEvictPlan(idx, FONT_KEEP);
-  for (const k of plan.dropCss) delete idx.fam[k];
+  for (const k of plan.dropCss) { delete idx.fam[k]; _fontPrefetched.delete(k); }
   await fontIndexSave(cache, idx);
   fontSetTracked(idx);
-  await Promise.all(plan.dropCss.concat(plan.dropFiles).map(k => cache.delete(k).catch(() => {})));
-  if (_fontPrefetched.has(cssUrl)) return;
-  _fontPrefetched.add(cssUrl);
-  await fontPrefetch(cache, files);
+  // Google が書体の版を上げると CSS の指すファイル URL が丸ごと変わる。古い版は
+  // どの書体の一覧にも載らなくなり追い出しの対象からも外れるので、ここで消す
+  const stale = before.filter(f => !_fontTracked.has(f));
+  if (stale.length) _fontPrefetched.delete(cssUrl);
+  await Promise.all(plan.dropCss.concat(plan.dropFiles, stale).map(k => cache.delete(k).catch(() => {})));
+}
+
+// 少し待ってから丸ごと先読みする。待っている間に別の書体へ切り替えられたら落とさない
+// （フォントを見比べるたびに 1 書体 3.5MB を取りに行かないように）
+async function fontPrefetchLater(cache, cssUrl) {
+  if (_fontPrefetched.has(cssUrl) || _fontPending.has(cssUrl)) return;
+  _fontPending.add(cssUrl);
+  try {
+    await fontSleep(FONT_PREFETCH_DELAY);
+    const idx = await fontIndexLoad(cache);
+    const me = idx.fam[cssUrl];
+    if (!me) return;
+    for (const k of Object.keys(idx.fam)) if ((idx.fam[k].t || 0) > (me.t || 0)) return;
+    _fontPrefetched.add(cssUrl);
+    await fontPrefetch(cache, me.files || []);
+  } finally {
+    _fontPending.delete(cssUrl);
+  }
 }
 
 // 足りないファイルを 4 本並行で取る。失敗しても次に書体を使ったとき（SW の再起動後）にまた埋める
@@ -388,7 +414,8 @@ async function fontPrefetch(cache, files) {
       const f = q.shift();
       try {
         const r = await fetch(f, { mode: 'cors', credentials: 'omit' });
-        if (r.ok) await cache.put(f, r);
+        // 先読みの間に追い出された書体のファイルは置かない（索引に載らない孤児になる）
+        if (r.ok && _fontTracked && _fontTracked.has(f)) await cache.put(f, r);
       } catch (e) {
         // 通信断・容量不足。残りも同じ結果になるので打ち切る
         q.length = 0;
@@ -399,27 +426,48 @@ async function fontPrefetch(cache, files) {
   await Promise.all([worker(), worker(), worker(), worker()]);
 }
 
-// CSS: network-first（Google 側の更新を拾う）→ 取れなければ保存分
+// CSS をネットから取って保存し、索引を更新する
+async function fontCssFetch(cache, cssUrl) {
+  const res = await fetch(cssUrl, { mode: 'cors', credentials: 'omit' });
+  if (!res.ok) return res;
+  const text = await res.clone().text();
+  try { await cache.put(cssUrl, res.clone()); } catch (e) {}
+  await fontSerial(() => fontTrack(cache, cssUrl, text));
+  return res;
+}
+
+// CSS: 保存分があればそれを即座に返し（章送りのたびに待たせない・つながらない Wi-Fi でも固まらない）、
+// Google 側の更新は SW の寿命ごとに 1 回だけ裏で取り直す。保存分が無ければネットから
 async function fontCss(ev, cssUrl) {
   let cache = null;
   try { cache = await caches.open(FONT_CACHE); } catch (e) {}
+  const hit = cache && await cache.match(cssUrl);
+  if (hit) {
+    ev.waitUntil((async () => {
+      await fontSerial(async () => {
+        const idx = await fontIndexLoad(cache);
+        const me = idx.fam[cssUrl];
+        // オフラインで使った書体も「最近使った」に数える（機内モードの間に追い出されないように）
+        if (me && Date.now() - (me.t || 0) > FONT_TOUCH_MIN) { me.t = Date.now(); await fontIndexSave(cache, idx); }
+        if (!_fontTracked) fontSetTracked(idx);
+      });
+      if (!_fontRevalidated.has(cssUrl)) {
+        _fontRevalidated.add(cssUrl);
+        try { await fontCssFetch(cache, cssUrl); } catch (e) { _fontRevalidated.delete(cssUrl); }
+      }
+      await fontPrefetchLater(cache, cssUrl);
+    })().catch(() => {}));
+    return hit;
+  }
   try {
-    const res = await fetch(cssUrl, { mode: 'cors', credentials: 'omit' });
-    if (!res.ok || !cache) return res;
-    const text = await res.clone().text();
-    try { await cache.put(cssUrl, res.clone()); } catch (e) {}
-    ev.waitUntil(fontSerial(() => fontTrack(cache, cssUrl, text)).catch(() => {}));
+    if (!cache) return await fetch(cssUrl, { mode: 'cors', credentials: 'omit' });
+    const res = await fontCssFetch(cache, cssUrl);
+    if (res.ok) {
+      _fontRevalidated.add(cssUrl);
+      ev.waitUntil(fontPrefetchLater(cache, cssUrl).catch(() => {}));
+    }
     return res;
   } catch (e) {
-    const hit = cache && await cache.match(cssUrl);
-    if (hit) {
-      // オフラインで使った書体も「最近使った」に数える（機内モードの間に追い出されないように）
-      ev.waitUntil(fontSerial(async () => {
-        const idx = await fontIndexLoad(cache);
-        if (idx.fam[cssUrl]) { idx.fam[cssUrl].t = Date.now(); await fontIndexSave(cache, idx); }
-      }).catch(() => {}));
-      return hit;
-    }
     return Response.error();
   }
 }
