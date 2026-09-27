@@ -3,6 +3,7 @@
  *  1) Android の共有シートから POST された ePub を退避し、?shared=1 でページへ橋渡し
  *     （退避先は専用 IDB → 駄目なら Cache Storage。失敗時は ?shared=err&r=<理由> で返す）
  *  2) HTML ナビゲーションを network-first（更新即反映・圏外時のみキャッシュ）で提供しオフライン起動を可能にする
+ *  3) 本文で使った Google Fonts の書体を丸ごと保存し、オフラインでも同じ書体で読めるようにする（直近 FONT_KEEP 書体）
  * リリースで yomikake.html を更新したら VERSION を上げること（§運用メモ）。
  * ロールバック: このファイルを「全 caches 削除＋self.registration.unregister()」の空実装に差し替える。
  */
@@ -18,6 +19,12 @@ const SHELL = [
 const SHARE_CACHE = 'yomikake-share-stash';
 const SHARE_STASH_PATH = '__yomikake_share_stash';
 
+// Web フォントの保存先（tests/probe/offline-fonts.html で 4 環境を実測して決めた方式）。
+// VERSION と別の名前にして、リリースのたびに消えないようにする（activate で除外）。
+const FONT_CACHE = 'yomikake-fonts';
+const FONT_INDEX_PATH = '__yomikake_font_index';  // どの書体の CSS がどのファイルを持つか・最終使用時刻
+const FONT_KEEP = 3;                              // 保存しておく書体の数（日本語 1 書体 ≒ 124 ファイル・約 3.5MB）
+
 self.addEventListener('install', ev => {
   ev.waitUntil((async () => {
     try { const c = await caches.open(VERSION); await c.addAll(SHELL); } catch (e) {}
@@ -28,8 +35,8 @@ self.addEventListener('install', ev => {
 self.addEventListener('activate', ev => {
   ev.waitUntil((async () => {
     const keys = await caches.keys();
-    // ⚠ SHARE_CACHE は共有ファイルの退避先。VERSION と違うからといって消さない
-    await Promise.all(keys.filter(k => k !== VERSION && k !== SHARE_CACHE).map(k => caches.delete(k)));
+    // ⚠ SHARE_CACHE は共有ファイルの退避先、FONT_CACHE は保存したフォント。VERSION と違うからといって消さない
+    await Promise.all(keys.filter(k => k !== VERSION && k !== SHARE_CACHE && k !== FONT_CACHE).map(k => caches.delete(k)));
     await self.clients.claim();
   })());
 });
@@ -69,6 +76,19 @@ self.addEventListener('fetch', ev => {
   }
 
   if (req.method !== 'GET') return;
+
+  // 1.5) Google Fonts（本文 iframe の @import もここを通る — srcdoc の iframe は親の SW の管轄。4 環境で実測）
+  if (url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com') {
+    if (url.hostname === 'fonts.googleapis.com') {
+      // 本文用の 1 書体の CSS だけを扱う。フォント選びの見本（22 書体まとめて 1 本）は
+      // 丸ごと保存すると 22 書体ぶん落としに行くので、今までどおりネットに任せる
+      if (!fontIsReadingCss(url)) return;
+      ev.respondWith(fontCss(ev, req.url));
+    } else {
+      ev.respondWith(fontFile(req.url));
+    }
+    return;
+  }
 
   // 2) ナビゲーション（HTML）: network-first → 失敗時にキャッシュ（圏外でもアプリ起動）
   if (req.mode === 'navigate') {
@@ -270,4 +290,154 @@ function shareIdbPut(file) {
       } catch (e) { reject(e); }
     };
   });
+}
+
+// ══════════════════════════════════════════
+//  Web フォントの保存（オフラインでも同じ書体で読む）
+// ══════════════════════════════════════════
+// 方式: 本文で書体を使ったら、その CSS が指すファイルを全部取っておく（日本語は 124 分割・約 3.5MB）。
+//   使った分だけにすると、オフラインで初めて出る漢字だけ端末のフォントになって字体が混ざる。
+//   直近 FONT_KEEP 書体を超えたら、いちばん長く使っていない書体から消す。
+// ⚠ 取得は必ず mode:'cors' で取り直す。CSS は <link>/@import から、フォントは iOS だと no-cors
+//   （中身の見えない opaque 応答）で来る。opaque のまま保存すると Chrome は 1 件ごとに数 MB 水増しして
+//   容量を数える。Google Fonts は ACAO:* を返すので、CORS の応答を no-cors の要求に返してよい（実測済み）。
+
+// 本文用の CSS か（family が 1 つだけ・text= による部分集合でない）
+function fontIsReadingCss(url) {
+  return url.pathname === '/css2' &&
+         url.searchParams.getAll('family').length === 1 &&
+         !url.searchParams.has('text');
+}
+
+// CSS が指すフォントファイルの URL（重複なし）
+function fontCssUrls(cssText) {
+  return Array.from(new Set(String(cssText || '').match(/https:\/\/fonts\.gstatic\.com\/[^)'"\s]+/g) || []));
+}
+
+// 何を消すか。idx.fam = { cssUrl: { t: 最終使用, files: [...] } }。
+// 新しい順に keep 書体を残し、残りの CSS と「残す書体が使っていない」ファイルを返す（純関数）
+function fontEvictPlan(idx, keep) {
+  const fam = (idx && idx.fam) || {};
+  const order = Object.keys(fam).sort((a, b) => (fam[b].t || 0) - (fam[a].t || 0));
+  const kept = order.slice(0, keep), dropCss = order.slice(keep);
+  const keptFiles = new Set();
+  for (const k of kept) for (const f of (fam[k].files || [])) keptFiles.add(f);
+  const dropFiles = new Set();
+  for (const k of dropCss) for (const f of (fam[k].files || [])) if (!keptFiles.has(f)) dropFiles.add(f);
+  return { dropCss, dropFiles: Array.from(dropFiles) };
+}
+
+function fontIndexKey() { return new URL(FONT_INDEX_PATH, self.registration.scope).href; }
+async function fontIndexLoad(cache) {
+  try {
+    const r = await cache.match(fontIndexKey());
+    const j = r ? await r.json() : null;
+    if (j && j.fam && typeof j.fam === 'object') return j;
+  } catch (e) {}
+  return { v: 1, fam: {} };
+}
+async function fontIndexSave(cache, idx) {
+  try {
+    await cache.put(fontIndexKey(), new Response(JSON.stringify(idx),
+                    { headers: { 'content-type': 'application/json' } }));
+  } catch (e) {}
+}
+
+// 保存対象のファイルか（どれかの書体の CSS に載っている）。SW が起きるたびに索引から作り直す
+let _fontTracked = null;
+function fontSetTracked(idx) {
+  _fontTracked = new Set();
+  for (const k of Object.keys(idx.fam)) for (const f of (idx.fam[k].files || [])) _fontTracked.add(f);
+}
+async function fontIsTracked(cache, url) {
+  if (!_fontTracked) fontSetTracked(await fontIndexLoad(cache));
+  return _fontTracked.has(url);
+}
+
+// 索引の読み書きは 1 本ずつ（章をめくるたびに CSS が来るので、並ぶと書き戻しで先祖返りする）
+let _fontQueue = Promise.resolve();
+function fontSerial(fn) {
+  const p = _fontQueue.then(fn, fn);
+  _fontQueue = p.catch(() => {});
+  return p;
+}
+
+const _fontPrefetched = new Set();  // この SW の寿命の中で先読みを済ませた CSS（毎章 124 件を照合しない）
+
+// 書体を使った: 索引を更新 → 溢れた書体を消す → 初回なら全ファイルを先読み
+async function fontTrack(cache, cssUrl, cssText) {
+  const idx = await fontIndexLoad(cache);
+  const files = fontCssUrls(cssText);
+  idx.fam[cssUrl] = { t: Date.now(), files };
+  const plan = fontEvictPlan(idx, FONT_KEEP);
+  for (const k of plan.dropCss) delete idx.fam[k];
+  await fontIndexSave(cache, idx);
+  fontSetTracked(idx);
+  await Promise.all(plan.dropCss.concat(plan.dropFiles).map(k => cache.delete(k).catch(() => {})));
+  if (_fontPrefetched.has(cssUrl)) return;
+  _fontPrefetched.add(cssUrl);
+  await fontPrefetch(cache, files);
+}
+
+// 足りないファイルを 4 本並行で取る。失敗しても次に書体を使ったとき（SW の再起動後）にまた埋める
+async function fontPrefetch(cache, files) {
+  const q = [];
+  for (const f of files) if (!(await cache.match(f))) q.push(f);
+  async function worker() {
+    while (q.length) {
+      const f = q.shift();
+      try {
+        const r = await fetch(f, { mode: 'cors', credentials: 'omit' });
+        if (r.ok) await cache.put(f, r);
+      } catch (e) {
+        // 通信断・容量不足。残りも同じ結果になるので打ち切る
+        q.length = 0;
+        _fontPrefetched.clear();
+      }
+    }
+  }
+  await Promise.all([worker(), worker(), worker(), worker()]);
+}
+
+// CSS: network-first（Google 側の更新を拾う）→ 取れなければ保存分
+async function fontCss(ev, cssUrl) {
+  let cache = null;
+  try { cache = await caches.open(FONT_CACHE); } catch (e) {}
+  try {
+    const res = await fetch(cssUrl, { mode: 'cors', credentials: 'omit' });
+    if (!res.ok || !cache) return res;
+    const text = await res.clone().text();
+    try { await cache.put(cssUrl, res.clone()); } catch (e) {}
+    ev.waitUntil(fontSerial(() => fontTrack(cache, cssUrl, text)).catch(() => {}));
+    return res;
+  } catch (e) {
+    const hit = cache && await cache.match(cssUrl);
+    if (hit) {
+      // オフラインで使った書体も「最近使った」に数える（機内モードの間に追い出されないように）
+      ev.waitUntil(fontSerial(async () => {
+        const idx = await fontIndexLoad(cache);
+        if (idx.fam[cssUrl]) { idx.fam[cssUrl].t = Date.now(); await fontIndexSave(cache, idx); }
+      }).catch(() => {}));
+      return hit;
+    }
+    return Response.error();
+  }
+}
+
+// フォントファイル: cache-first（URL に版が入っていて中身は変わらない）。
+// 保存するのは保存対象の書体のものだけ（見本の 22 書体ぶんが溜まらないように）
+async function fontFile(fileUrl) {
+  let cache = null;
+  try { cache = await caches.open(FONT_CACHE); } catch (e) {}
+  const hit = cache && await cache.match(fileUrl);
+  if (hit) return hit;
+  try {
+    const res = await fetch(fileUrl, { mode: 'cors', credentials: 'omit' });
+    if (res.ok && cache && await fontIsTracked(cache, fileUrl)) {
+      try { await cache.put(fileUrl, res.clone()); } catch (e) {}
+    }
+    return res;
+  } catch (e) {
+    return Response.error();
+  }
 }

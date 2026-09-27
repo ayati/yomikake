@@ -44,6 +44,8 @@ declare -A CASE_FLAGS=(
   [blank-lines]="--allow-file-access-from-files --window-size=520,900"
   # sw.js を fetch して中身（multipart パーサ）を直接叩く
   [share-receive]="--allow-file-access-from-files"
+  # sw.js を fetch してフォント保存の判定関数を叩く
+  [sw-fonts]="--allow-file-access-from-files"
 )
 
 pass=0; fail=0; failed_lines=()
