@@ -76,6 +76,11 @@
   details.set-group[open] > summary { background:color-mix(in srgb, var(--accent) 10%, transparent); margin-bottom:4px; }
   details.set-group[open] > summary:hover { background:color-mix(in srgb, var(--accent) 16%, transparent); }
   details.set-group > summary > h4 { margin:0; font-size:14px; opacity:1; text-transform:none; letter-spacing:0; }
+  .pop-header-actions { display:flex; align-items:center; gap:8px; }
+  .pop-collapse-btn { display:inline-flex; align-items:center; gap:4px; border:1px solid var(--ui-border); border-radius:999px; padding:4px 10px; font-size:12px; font-weight:600; font-family:inherit; line-height:1.2; white-space:nowrap; background:var(--ui-bg); color:var(--ui-text); cursor:pointer; transition:background .15s, opacity .15s; }
+  .pop-collapse-btn svg { width:14px; height:14px; flex:none; }
+  .pop-collapse-btn:hover:not(:disabled) { background:var(--hover-bg); }
+  .pop-collapse-btn:disabled { opacity:.35; cursor:default; }
   .set-group h4 { font-size:12px; font-weight:600; color:var(--ui-text); opacity:0.6; text-transform:uppercase; margin:0 8px 12px; letter-spacing:0.5px; }
   .set-row { display:flex; align-items:center; justify-content:space-between; padding:8px; border-radius:8px; }
   .set-row:hover { background:var(--hover-bg); }
@@ -874,7 +879,14 @@
   <div class="pop-grabber"></div>
   <div class="pop-header">
     <span data-i18n="settings.title">表示設定</span>
-    <button class="icon-btn" onclick="toggleSettings()" style="padding:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    <div class="pop-header-actions">
+      <!-- すべて閉じる（design_settings_groups.md §3-2）。開いているカテゴリが無いときは消さずに disabled（消すと ✕ の位置が揺れる） -->
+      <button id="collapse-all-btn" class="pop-collapse-btn" onclick="collapseAllSetGroups()" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="7 11 12 6 17 11"/><polyline points="7 18 12 13 17 18"/></svg>
+        <span data-i18n="settings.collapseAll">すべて閉じる</span>
+      </button>
+      <button class="icon-btn" onclick="toggleSettings()" style="padding:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
   </div>
   <div class="pop-body">
     <details class="set-group" id="color-group">
@@ -1631,6 +1643,7 @@ const I18N = {
     'btn.scrollFwd':        '次へ（Space/↓）',
     'app.title':            'ePub viewer yomikake',
     'settings.title':       '表示設定',
+    'settings.collapseAll': 'すべて閉じる',
     'settings.language':    '言語 / Language',
     'settings.color':       'カラー',
     'settings.theme':       'テーマ',
@@ -2093,6 +2106,7 @@ const I18N = {
     'btn.scrollFwd':        'Forward (Space/↓)',
     'app.title':            'ePub viewer yomikake',
     'settings.title':       'Display Settings',
+    'settings.collapseAll': 'Collapse all',
     'settings.language':    'Language / 言語',
     'settings.color':       'Color',
     'settings.theme':       'Theme',
@@ -2555,6 +2569,7 @@ const I18N = {
     'btn.scrollFwd':        '前進（空白/↓）',
     'app.title':            'ePub viewer yomikake',
     'settings.title':       '顯示設定',
+    'settings.collapseAll': '全部收合',
     'settings.language':    '語言 / Language',
     'settings.color':       '顏色',
     'settings.theme':       '主題',
@@ -3017,6 +3032,7 @@ const I18N = {
     'btn.scrollFwd':        '前进（空格/↓）',
     'app.title':            'ePub viewer yomikake',
     'settings.title':       '显示设置',
+    'settings.collapseAll': '全部收起',
     'settings.language':    '语言 / Language',
     'settings.color':       '颜色',
     'settings.theme':       '主题',
@@ -6784,6 +6800,7 @@ function toggleSettings() {
     document.getElementById('settings-btn').classList.add('active');
     updateThemeBtnUI();
     updateCacheGroupUI();
+    updateCollapseAllUI();  // FXL 本の開閉で「見えているカテゴリ」が変わるので開くたびに判定し直す
   }
 }
 
@@ -10553,6 +10570,37 @@ function applySetGroupsOpen() {
     const el = document.getElementById(id);
     if (el && el.tagName === 'DETAILS') el.open = !!state.setGroupsOpen[id];
   });
+  updateCollapseAllUI();
+}
+
+// 「すべて閉じる」を押せるのは、見えているカテゴリが1つでも開いているときだけ。
+// 「見えている」を条件に入れるのは、FXL 本ではタイポグラフィが display:none のまま開いていることがあり、
+// 押しても見た目が何も変わらないボタンを有効にしないため（閉じる対象は隠れているものも含めてすべて）。
+function updateCollapseAllUI() {
+  const btn = document.getElementById('collapse-all-btn');
+  if (!btn) return;
+  btn.disabled = !Object.keys(SET_GROUP_DEFAULT_OPEN).some(id => {
+    const el = document.getElementById(id);
+    return el && el.tagName === 'DETAILS' && el.open && el.getClientRects().length > 0;
+  });
+}
+
+function collapseAllSetGroups() {
+  let changed = false;
+  Object.keys(SET_GROUP_DEFAULT_OPEN).forEach(id => {
+    const el = document.getElementById(id);
+    if (!el || el.tagName !== 'DETAILS') return;
+    // state を先に書く：toggle リスナーは state と一致していれば何もしないので、保存は下の 1 回で済む
+    if (state.setGroupsOpen[id] !== false) { state.setGroupsOpen[id] = false; changed = true; }
+    if (el.open) el.open = false;
+  });
+  if (changed) saveSettings();
+  const body = document.querySelector('#settings-popover .pop-body');
+  if (body) body.scrollTop = 0;
+  updateCollapseAllUI();
+  // disabled になったボタンからフォーカスが宙に浮くので、先頭のカテゴリへ渡す（キーボードで続けられるように）
+  const first = document.querySelector('#settings-popover details.set-group > summary');
+  if (first) first.focus({ preventScroll: true });
 }
 
 function _wireSetGroupToggles() {
@@ -10560,6 +10608,7 @@ function _wireSetGroupToggles() {
     const el = document.getElementById(id);
     if (!el || el.tagName !== 'DETAILS') return;
     el.addEventListener('toggle', () => {
+      updateCollapseAllUI();
       if (state.setGroupsOpen[id] === el.open) return;
       state.setGroupsOpen[id] = el.open;
       saveSettings();

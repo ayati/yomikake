@@ -164,3 +164,62 @@ setTimeout(function () {
   IDS.forEach(function (id) { document.getElementById(id).open = !!SET_GROUP_DEFAULT_OPEN[id]; });
   localStorage.clear();
 }, 50);
+
+// ── すべて閉じる（design_settings_groups.md §3-2）──
+(function () {
+  var btn = document.getElementById('collapse-all-btn');
+  T('「すべて閉じる」はパネル上部（ヘッダー）にある',
+    !!btn && !!btn.closest('.pop-header'));
+  ['ja', 'en', 'zh-TW', 'zh-CN'].forEach(function (lg) {
+    T('i18n settings.collapseAll (' + lg + ')',
+      !!(I18N[lg] && I18N[lg]['settings.collapseAll']));
+  });
+})();
+
+setTimeout(function () {
+  var btn = document.getElementById('collapse-all-btn');
+  IDS.forEach(function (id) { document.getElementById(id).open = false; });
+  setTimeout(function () {
+    T('どれも開いていなければ押せない（消さずに disabled）',
+      btn.disabled === true && getComputedStyle(btn).display !== 'none');
+    // ⚠ kosync / Drive のグループは file:// で丸ごと隠れる（＝開いても押せないのが正しい）ので、常に見える言語で試す
+    document.getElementById('lang-group').open = true;
+    setTimeout(function () {
+      T('1つ開くと押せるようになる（toggle に追従）', btn.disabled === false);
+
+      // 押すと全部閉じる。state・localStorage に反映し、保存は1回だけ
+      document.getElementById('color-group').open = true;
+      document.getElementById('cache-group').open = true;
+      setTimeout(function () {
+        var body = document.querySelector('.pop-body');
+        body.scrollTop = 200;
+        var saves = 0, orig = window.saveSettings;
+        window.saveSettings = function () { saves++; return orig.apply(this, arguments); };
+        btn.click();
+        setTimeout(function () {
+          window.saveSettings = orig;
+          T('押すとすべて閉じる', IDS.every(function (id) { return !document.getElementById(id).open; }),
+            IDS.filter(function (id) { return document.getElementById(id).open; }).join(','));
+          T('state も全部 false', IDS.every(function (id) { return state.setGroupsOpen[id] === false; }));
+          var saved = JSON.parse(localStorage.getItem('epub_settings') || '{}').setGroupsOpen || {};
+          T('永続化される', IDS.every(function (id) { return saved[id] === false; }), JSON.stringify(saved));
+          T('保存は1回だけ', saves === 1, String(saves));
+          T('先頭までスクロールを戻す', body.scrollTop === 0, String(body.scrollTop));
+          T('押した後は disabled に戻る', btn.disabled === true);
+
+          // FXL 本：タイポグラフィは隠れる。隠れたカテゴリだけが開いていても押せない
+          document.getElementById('typography-group').open = true;
+          document.body.classList.add('mode-fxl');
+          updateCollapseAllUI();
+          T('FXL で隠れたタイポグラフィだけが開いているときは押せない', btn.disabled === true);
+          document.body.classList.remove('mode-fxl');
+          updateCollapseAllUI();
+          T('隠れていなければ押せる', btn.disabled === false);
+          collapseAllSetGroups();
+          T('隠れていたものも含めて閉じる', !document.getElementById('typography-group').open);
+          localStorage.clear();
+        }, 50);
+      }, 50);
+    }, 50);
+  }, 50);
+}, 200);
