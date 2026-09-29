@@ -66,7 +66,7 @@
   details.set-group { margin-top:0; padding-bottom:0; position:relative; border-bottom:1px solid var(--ui-border); }
   .pop-body > details.set-group:first-child { margin-top:8px; }
   details.set-group[open] { padding-bottom:8px; }
-  details.set-group[open]::before { content:''; position:absolute; left:0; top:0; bottom:0; width:3px; border-radius:2px; background:var(--accent); opacity:.45; pointer-events:none; }
+  details.set-group[open]::before { content:''; position:absolute; left:0; top:0; bottom:0; width:1px; background:var(--accent); opacity:.7; pointer-events:none; }  /* 区切りの横線と同じ 1px（3px だと線だけ重く見えた・実機確認で調整） */
   details.set-group > summary { list-style:none; cursor:pointer; display:flex; align-items:center; min-height:44px; box-sizing:border-box; padding:0 8px; border-radius:8px; }
   details.set-group > summary::-webkit-details-marker { display:none; }
   details.set-group > summary::after { content:'▾'; margin-left:auto; padding-left:8px; font-size:14px; opacity:.6; color:var(--ui-text); transition:transform .15s; }

@@ -62,7 +62,7 @@ T('markup にも open 属性が無い（ちらつき防止の open を外した�
   var bf = getComputedStyle(g, '::before');
   T('開いたカテゴリは帯の色が変わる', bgOpen !== bgClosed, bgClosed + ' → ' + bgOpen);
   T('開いたカテゴリは左端に線（閉じると出ない）',
-    (beforeClosed === 'none' || beforeClosed === 'normal') && bf.position === 'absolute' && bf.width === '3px',
+    (beforeClosed === 'none' || beforeClosed === 'normal') && bf.position === 'absolute' && bf.width === '1px',
     beforeClosed + ' → ' + bf.position + ' ' + bf.width);
   // 中身を字下げしない＝スマホ幅で select を窮屈にしない
   var row = g.querySelector('.set-row');

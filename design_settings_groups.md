@@ -50,9 +50,9 @@ v2.14.0 で設定パネルの 10 カテゴリを `<details>` にして折りた�
 - **見出し**：14px・`font-weight:600`・`opacity:1`・大文字化なし（中身の行と同じ大きさで太字＝見出しとして読める）。
 - **帯**：`summary` を `min-height:44px`（タッチの推奨サイズ）の押せる帯にする。hover で `--hover-bg`。
 - **区切り**：各カテゴリの下に `1px solid var(--ui-border)`。
-- **開いたカテゴリ**：帯の背景を `color-mix(in srgb, var(--accent) 10%, transparent)`、カテゴリ全体の左端に幅 3px の線。線は `details[open]::before`（`position:absolute`・`background:var(--accent)`・`opacity:.45`）で描く。
+- **開いたカテゴリ**：帯の背景を `color-mix(in srgb, var(--accent) 10%, transparent)`、カテゴリ全体の左端に幅 1px の線（区切りの横線と同じ太さ。当初の 3px は線だけ重く見えたので実機確認後に変更）。線は `details[open]::before`（`position:absolute`・`background:var(--accent)`・`opacity:.7`）で描く。
   - `color-mix` は Safari 16.2 / Chrome 111 以降。非対応の古いブラウザでは帯の背景色が付かないだけで、線（`color-mix` を使わない）は残るので「開いている」ことは分かる。
-  - 線を `border-left` にしないのは中身が 3px 右へずれるため。`absolute` の疑似要素なら幅を取らない。
+  - 線を `border-left` にしないのは中身が右へずれるため。`absolute` の疑似要素なら幅を取らない。
 - **▾**：14px・`opacity:.6`。開いているときは上向き（既存の回転をそのまま使う）。
 
 **スマホの幅で使いにくくならないか（ご本人の懸念）**
