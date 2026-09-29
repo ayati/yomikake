@@ -10,8 +10,27 @@ T('各 details に summary がある',
   IDS.every(function (id) { return !!document.getElementById(id).querySelector(':scope > summary > h4'); }));
 
 // 折りたたみ対象外
-T('FXL グループは details 化しない（レイアウトの続きとして見せる設計）',
-  document.getElementById('fxl-settings-group').tagName === 'DIV');
+T('FXL の行は独立したグループではない（div・set-group クラスなし）',
+  document.getElementById('fxl-settings-group').tagName === 'DIV' &&
+  !document.getElementById('fxl-settings-group').classList.contains('set-group'));
+// 「レイアウト」の外にあった頃は、FXL 本でレイアウトを閉じても FXL の行だけが見出しなしで残っていた
+T('FXL の行は「レイアウト」の中にある',
+  document.getElementById('layout-group').contains(document.getElementById('fxl-settings-group')));
+(function () {
+  var lg = document.getElementById('layout-group'), fx = document.getElementById('fxl-settings-group');
+  var wasOpen = lg.open;
+  fx.style.display = 'block';
+  lg.open = true;
+  var hOpen = fx.getBoundingClientRect().height;
+  lg.open = false;
+  var lgClosedH = lg.getBoundingClientRect().height;
+  var sumH = lg.querySelector(':scope > summary').getBoundingClientRect().height;
+  T('FXL 表示中でも「レイアウト」を閉じると FXL の行も隠れる',
+    hOpen > 60 && lgClosedH - sumH < 8,
+    'open=' + hOpen.toFixed(0) + ' closedGroup=' + lgClosedH.toFixed(0) + ' summary=' + sumH.toFixed(0));
+  fx.style.display = 'none';
+  lg.open = wasOpen;
+})();
 T('リセットグループも details 化しない',
   document.getElementById('reset-group').tagName === 'DIV');
 

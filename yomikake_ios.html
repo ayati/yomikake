@@ -59,8 +59,8 @@
 
   .set-group { margin-top:20px; padding-bottom:4px; }
   /* 設定グループの折りたたみ（B-5）。9グループが縦に並ぶとスマホで下端まで遠い。
-     #fxl-settings-group は <h4> を持たず「レイアウトの続き」として連続表示させる設計なので
-     折りたたみ対象にしない。#reset-group も1行なので対象外。 */
+     #fxl-settings-group は #layout-group の中に置いた行の束（レイアウトを閉じれば一緒に隠れる）。
+     #reset-group は1行なので畳まない。 */
   details.set-group > summary { list-style:none; cursor:pointer; display:flex; align-items:center; padding:2px 0 10px; border-radius:8px; }
   details.set-group > summary::-webkit-details-marker { display:none; }
   details.set-group > summary::after { content:'▾'; margin-left:auto; margin-right:8px; font-size:11px; opacity:.5; transition:transform .15s; }
@@ -1044,40 +1044,40 @@
           <option value="center" data-i18n="tapZone.center">ボタン（上下＋章送り）</option>
         </select>
       </div>
+      <!-- FXL 専用の行。「レイアウト」の中に置くので、レイアウトを閉じれば一緒に隠れる（display は updateCloseBookBtnVisibility が切り替える） -->
+      <div id="fxl-settings-group" style="display:none">
+        <div class="set-row">
+          <span class="set-label" data-i18n="settings.spreadMode">見開き表示</span>
+          <select class="modern-select" id="spread-mode-select" onchange="changeSpreadMode(this.value)">
+            <option value="auto" data-i18n="spread.auto">自動</option>
+            <option value="single" data-i18n="spread.single">単ページ</option>
+            <option value="spread" data-i18n="spread.spread">見開き</option>
+          </select>
+        </div>
+        <div class="set-row fxl-2d-only">
+          <span class="set-label" data-i18n="settings.fxlZoomLevel">拡大倍率</span>
+          <select class="modern-select" id="fxl-zoom-level-select" onchange="changeFxlZoomLevel(this.value)">
+            <option value="1.5">1.5x</option>
+            <option value="2.0" selected>2.0x</option>
+            <option value="2.5">2.5x</option>
+          </select>
+        </div>
+        <div class="set-row">
+          <span class="set-label" data-i18n="settings.fxlRegionOrder">ズームモード</span>
+          <select class="modern-select" id="fxl-region-order-select" onchange="changeFxlRegionOrder(this.value)">
+            <option value="story" data-i18n="region.story">ストーリーまんが</option>
+            <option value="yonkoma" data-i18n="region.yonkoma">4コマまんが</option>
+            <option value="vfill" data-i18n="region.vfill">縦合わせ・横スクロール</option>
+            <option value="hfill" data-i18n="region.hfill">横合わせ・縦スクロール</option>
+          </select>
+        </div>
+        <div class="set-row fxl-2d-only">
+          <span class="set-label" data-i18n="settings.fxlLtrAutoFlip">LTR書籍で反転</span>
+          <button id="fxl-ltr-flip-toggle" onclick="toggleFxlLtrAutoFlip()"
+                  style="border:1px solid var(--ui-border);border-radius:8px;padding:6px 16px;min-width:60px;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;">ON</button>
+        </div>
+      </div>
     </details>
-
-    <div class="set-group" id="fxl-settings-group" style="display:none">
-      <div class="set-row">
-        <span class="set-label" data-i18n="settings.spreadMode">見開き表示</span>
-        <select class="modern-select" id="spread-mode-select" onchange="changeSpreadMode(this.value)">
-          <option value="auto" data-i18n="spread.auto">自動</option>
-          <option value="single" data-i18n="spread.single">単ページ</option>
-          <option value="spread" data-i18n="spread.spread">見開き</option>
-        </select>
-      </div>
-      <div class="set-row fxl-2d-only">
-        <span class="set-label" data-i18n="settings.fxlZoomLevel">拡大倍率</span>
-        <select class="modern-select" id="fxl-zoom-level-select" onchange="changeFxlZoomLevel(this.value)">
-          <option value="1.5">1.5x</option>
-          <option value="2.0" selected>2.0x</option>
-          <option value="2.5">2.5x</option>
-        </select>
-      </div>
-      <div class="set-row">
-        <span class="set-label" data-i18n="settings.fxlRegionOrder">ズームモード</span>
-        <select class="modern-select" id="fxl-region-order-select" onchange="changeFxlRegionOrder(this.value)">
-          <option value="story" data-i18n="region.story">ストーリーまんが</option>
-          <option value="yonkoma" data-i18n="region.yonkoma">4コマまんが</option>
-          <option value="vfill" data-i18n="region.vfill">縦合わせ・横スクロール</option>
-          <option value="hfill" data-i18n="region.hfill">横合わせ・縦スクロール</option>
-        </select>
-      </div>
-      <div class="set-row fxl-2d-only">
-        <span class="set-label" data-i18n="settings.fxlLtrAutoFlip">LTR書籍で反転</span>
-        <button id="fxl-ltr-flip-toggle" onclick="toggleFxlLtrAutoFlip()"
-                style="border:1px solid var(--ui-border);border-radius:8px;padding:6px 16px;min-width:60px;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;">ON</button>
-      </div>
-    </div>
 
     <details class="set-group" id="toolbar-settings-group">
       <summary><h4 data-i18n="settings.toolbarGroup">ツールバーに表示</h4></summary>
@@ -10327,9 +10327,8 @@ function updateOrientationLockUI() {
 // ══════════════════════════════════════════
 //  設定グループの折りたたみ（B-5）
 // ══════════════════════════════════════════
-// 既定はよく使う3つだけ開く。#fxl-settings-group と #reset-group は
-// <details> 化していない（前者は「レイアウトの続き」として連続表示させる設計、
-// 後者は1行なので畳む意味がない）。
+// 既定はよく使う3つだけ開く。#reset-group は1行なので <details> 化していない。
+// #fxl-settings-group は #layout-group の中の行の束（独立したグループではない）。
 const SET_GROUP_DEFAULT_OPEN = {
   'color-group': true, 'typography-group': true, 'layout-group': true,
   'toolbar-settings-group': false, 'tts-settings-group': false,
