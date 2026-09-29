@@ -36,8 +36,9 @@ function checkLayout(lg, width) {
   T('名前が折り返さない (' + lg + ')', over.length === 0, over.join(','));
   T('2行に並ぶ (' + lg + ')', Object.keys(tops).length === 2, Object.keys(tops).join('/'));
 }
-// 設定パネルを開いた状態で計測する
+// 設定パネルを開いた状態で計測する（カラーは既定で閉じているので開く＝閉じた <details> の中身は寸法を持たない）
 toggleSettings();
+document.getElementById('color-group').open = true;
 ['ja', 'en', 'zh-TW', 'zh-CN'].forEach(function (lg) { checkLayout(lg, 0); });
 setLang('ja');
 T('popover 幅', true, Math.round(document.getElementById('settings-popover').getBoundingClientRect().width) + 'px');

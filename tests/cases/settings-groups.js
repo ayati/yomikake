@@ -34,19 +34,44 @@ T('FXL の行は「レイアウト」の中にある',
 T('リセットグループも details 化しない',
   document.getElementById('reset-group').tagName === 'DIV');
 
-// 既定の開閉
-T('既定でカラー/タイポグラフィ/レイアウトが開く',
-  document.getElementById('color-group').open &&
-  document.getElementById('typography-group').open &&
-  document.getElementById('layout-group').open);
-T('既定でツールバー/読み上げ/Drive/KOReader/しおり/キャッシュ/言語が閉じる',
-  !document.getElementById('toolbar-settings-group').open &&
-  !document.getElementById('tts-settings-group').open &&
-  !document.getElementById('drive-auto-group').open &&
-  !document.getElementById('kosync-group').open &&
-  !document.getElementById('bookmark-io-group').open &&
-  !document.getElementById('cache-group').open &&
-  !document.getElementById('lang-group').open);
+// 既定の開閉：すべて閉じる（design_settings_groups.md §3-3）
+T('既定ですべてのカテゴリが閉じている',
+  IDS.every(function (id) { return SET_GROUP_DEFAULT_OPEN[id] === false && !document.getElementById(id).open; }),
+  IDS.filter(function (id) { return document.getElementById(id).open; }).join(',') || '(すべて閉)');
+T('markup にも open 属性が無い（ちらつき防止の open を外した）',
+  IDS.every(function (id) { return !document.getElementById(id).hasAttribute('open'); }));
+
+// 見出しは「押せる帯」（§3-1）
+(function () {
+  var g = document.getElementById('color-group');
+  var sm = g.querySelector(':scope > summary'), h = sm.querySelector('h4');
+  var cs = getComputedStyle(h);
+  T('帯の高さが 44px 以上（タッチの推奨サイズ）', sm.getBoundingClientRect().height >= 44 - 0.5,
+    sm.getBoundingClientRect().height.toFixed(1));
+  T('見出しは 14px・不透明・大文字化なし',
+    cs.fontSize === '14px' && cs.opacity === '1' && cs.textTransform === 'none',
+    cs.fontSize + ' / ' + cs.opacity + ' / ' + cs.textTransform);
+  T('カテゴリの下に区切り線', parseFloat(getComputedStyle(g).borderBottomWidth) >= 1,
+    getComputedStyle(g).borderBottomWidth);
+  T('閉じたカテゴリ 1 つの高さが 48px 以下（以前の余白 20px＋見出しより短い）',
+    g.getBoundingClientRect().height <= 48, g.getBoundingClientRect().height.toFixed(1));
+  var bgClosed = getComputedStyle(sm).backgroundColor;
+  var beforeClosed = getComputedStyle(g, '::before').content;
+  g.open = true;
+  var bgOpen = getComputedStyle(sm).backgroundColor;
+  var bf = getComputedStyle(g, '::before');
+  T('開いたカテゴリは帯の色が変わる', bgOpen !== bgClosed, bgClosed + ' → ' + bgOpen);
+  T('開いたカテゴリは左端に線（閉じると出ない）',
+    (beforeClosed === 'none' || beforeClosed === 'normal') && bf.position === 'absolute' && bf.width === '3px',
+    beforeClosed + ' → ' + bf.position + ' ' + bf.width);
+  // 中身を字下げしない＝スマホ幅で select を窮屈にしない
+  var row = g.querySelector('.set-row');
+  var pb = document.querySelector('.pop-body').getBoundingClientRect();
+  var pl = parseFloat(getComputedStyle(document.querySelector('.pop-body')).paddingLeft) || 0;
+  T('中身の行は字下げしない', Math.abs(row.getBoundingClientRect().left - (pb.left + pl)) < 1,
+    'row=' + row.getBoundingClientRect().left.toFixed(1) + ' body=' + (pb.left + pl).toFixed(1));
+  g.open = false;
+})();
 
 // 閉じているグループの中身は見えない
 // 中身の可視判定は getClientRects では測れない（閉じた <details> の子孫も
@@ -55,6 +80,7 @@ T('既定でツールバー/読み上げ/Drive/KOReader/しおり/キャッシ�
 (function () {
   var closed = document.getElementById('lang-group');
   var opened = document.getElementById('color-group');
+  opened.open = true;
   var ch = closed.getBoundingClientRect().height;
   var oh = opened.getBoundingClientRect().height;
   var sh = closed.querySelector(':scope > summary').getBoundingClientRect().height;
@@ -63,6 +89,7 @@ T('既定でツールバー/読み上げ/Drive/KOReader/しおり/キャッシ�
   T('閉じたグループは summary の高さしか占めない', Math.abs(ch - sh - pad) < 2,
     'group=' + ch.toFixed(0) + ' summary=' + sh.toFixed(0) + ' pad=' + pad);
   T('開いたグループは中身のぶん高い', oh > ch * 3, oh.toFixed(0) + ' > ' + ch.toFixed(0));
+  opened.open = false;
 })();
 
 // summary のマーカーを消して自前の ▾ を出している
@@ -98,19 +125,21 @@ setTimeout(function () {
   state.setGroupsOpen = Object.assign({}, SET_GROUP_DEFAULT_OPEN);
   loadSettings();
   T('未知キーは取り込まない', !('NOPE-group' in state.setGroupsOpen));
-  T('boolean 以外は無視', state.setGroupsOpen['color-group'] === true);
+  T('boolean 以外は無視', state.setGroupsOpen['color-group'] === false);
 
   // リセットで既定に戻る（DISPLAY_DEFAULTS の参照を壊さないこと）
   document.getElementById('cache-group').open = true;
-  document.getElementById('color-group').open = false;
+  document.getElementById('color-group').open = true;
+  state.setGroupsOpen['cache-group'] = true;
+  state.setGroupsOpen['color-group'] = true;
   window.confirm = function () { return true; };
   resetDisplaySettings();
-  T('リセットで既定の開閉に戻る',
-    document.getElementById('color-group').open === true &&
+  T('リセットで既定の開閉（すべて閉）に戻る',
+    document.getElementById('color-group').open === false &&
     document.getElementById('cache-group').open === false);
   T('リセットが DISPLAY_DEFAULTS を汚さない',
     SET_GROUP_DEFAULT_OPEN['cache-group'] === false &&
-    DISPLAY_DEFAULTS.setGroupsOpen['color-group'] === true);
+    DISPLAY_DEFAULTS.setGroupsOpen['color-group'] === false);
   T('state と DISPLAY_DEFAULTS が別オブジェクト',
     state.setGroupsOpen !== DISPLAY_DEFAULTS.setGroupsOpen);
 

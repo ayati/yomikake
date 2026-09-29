@@ -26,6 +26,9 @@ toggleSettings();
 T('再度開ける', getComputedStyle(pop).visibility === 'visible');
 // 最下部の項目まで到達できる（スクロール可能）
 var body = document.querySelector('.pop-body');
+// 既定はすべて閉じている（design_settings_groups.md）ので、この検査の目的＝「最下部まで届く」を
+// 確かめるために全カテゴリを開いてから測る
+Object.keys(SET_GROUP_DEFAULT_OPEN).forEach(function (id) { document.getElementById(id).open = true; });
 T('pop-body がスクロール可能', body.scrollHeight > body.clientHeight,
   body.scrollHeight + '>' + body.clientHeight);
 body.scrollTop = body.scrollHeight;

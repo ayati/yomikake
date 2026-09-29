@@ -59,13 +59,23 @@
   .set-group { margin-top:20px; padding-bottom:4px; }
   /* 設定グループの折りたたみ（B-5）。9グループが縦に並ぶとスマホで下端まで遠い。
      #fxl-settings-group は #layout-group の中に置いた行の束（レイアウトを閉じれば一緒に隠れる）。
-     #reset-group は1行なので畳まない。 */
-  details.set-group > summary { list-style:none; cursor:pointer; display:flex; align-items:center; padding:2px 0 10px; border-radius:8px; }
+     #reset-group は1行なので畳まない。
+     見出しは「押せる帯」（design_settings_groups.md §3-1）。以前は 12px・半透明の見出しが中身の行より弱く、
+     区切りも余白だけだったので、いくつか開くとカテゴリの境目が見えなくなっていた。
+     ⚠ 中身は字下げしない（スマホ幅で select が窮屈になる）。開いている印の左端の線は absolute の疑似要素なので幅を取らない。 */
+  details.set-group { margin-top:0; padding-bottom:0; position:relative; border-bottom:1px solid var(--ui-border); }
+  .pop-body > details.set-group:first-child { margin-top:8px; }
+  details.set-group[open] { padding-bottom:8px; }
+  details.set-group[open]::before { content:''; position:absolute; left:0; top:0; bottom:0; width:3px; border-radius:2px; background:var(--accent); opacity:.45; pointer-events:none; }
+  details.set-group > summary { list-style:none; cursor:pointer; display:flex; align-items:center; min-height:44px; box-sizing:border-box; padding:0 8px; border-radius:8px; }
   details.set-group > summary::-webkit-details-marker { display:none; }
-  details.set-group > summary::after { content:'▾'; margin-left:auto; margin-right:8px; font-size:11px; opacity:.5; transition:transform .15s; }
+  details.set-group > summary::after { content:'▾'; margin-left:auto; padding-left:8px; font-size:14px; opacity:.6; color:var(--ui-text); transition:transform .15s; }
   details.set-group[open] > summary::after { transform:rotate(180deg); }
-  details.set-group > summary > h4 { margin-bottom:0; }
-  details.set-group > summary:hover > h4 { opacity:.9; }
+  details.set-group > summary:hover { background:var(--hover-bg); }
+  /* color-mix 非対応（Safari 16.1 以前など）では帯の色が付かないだけ。左端の線は残る */
+  details.set-group[open] > summary { background:color-mix(in srgb, var(--accent) 10%, transparent); margin-bottom:4px; }
+  details.set-group[open] > summary:hover { background:color-mix(in srgb, var(--accent) 16%, transparent); }
+  details.set-group > summary > h4 { margin:0; font-size:14px; opacity:1; text-transform:none; letter-spacing:0; }
   .set-group h4 { font-size:12px; font-weight:600; color:var(--ui-text); opacity:0.6; text-transform:uppercase; margin:0 8px 12px; letter-spacing:0.5px; }
   .set-row { display:flex; align-items:center; justify-content:space-between; padding:8px; border-radius:8px; }
   .set-row:hover { background:var(--hover-bg); }
@@ -867,7 +877,7 @@
     <button class="icon-btn" onclick="toggleSettings()" style="padding:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
   </div>
   <div class="pop-body">
-    <details class="set-group" id="color-group" open>
+    <details class="set-group" id="color-group">
       <summary><h4 data-i18n="settings.color">カラー</h4></summary>
       <div class="set-row set-row-stack">
         <span class="set-label" data-i18n="settings.theme">テーマ</span>
@@ -955,7 +965,7 @@
       </div>
     </details>
 
-    <details class="set-group fxl-hide-group" id="typography-group" open>
+    <details class="set-group fxl-hide-group" id="typography-group">
       <summary><h4 data-i18n="settings.typography">タイポグラフィ</h4></summary>
       <div class="set-row">
         <span class="set-label" data-i18n="settings.font">フォント</span>
@@ -1022,7 +1032,7 @@
       </div>
     </details>
 
-    <details class="set-group" id="layout-group" open>
+    <details class="set-group" id="layout-group">
       <summary><h4 data-i18n="settings.layout">レイアウト</h4></summary>
       <div class="set-row fxl-hide-row">
         <span class="set-label" data-i18n="settings.writingMode">組方向</span>
@@ -10528,10 +10538,11 @@ function updateOrientationLockUI() {
 // ══════════════════════════════════════════
 //  設定グループの折りたたみ（B-5）
 // ══════════════════════════════════════════
-// 既定はよく使う3つだけ開く。#reset-group は1行なので <details> 化していない。
+// 既定はすべて閉じる（design_settings_groups.md §3-3。いくつも開いているとカテゴリの境目が
+// 見えにくい）。#reset-group は1行なので <details> 化していない。
 // #fxl-settings-group は #layout-group の中の行の束（独立したグループではない）。
 const SET_GROUP_DEFAULT_OPEN = {
-  'color-group': true, 'typography-group': true, 'layout-group': true,
+  'color-group': false, 'typography-group': false, 'layout-group': false,
   'toolbar-settings-group': false, 'tts-settings-group': false,
   'drive-auto-group': false, 'kosync-group': false, 'bookmark-io-group': false,
   'cache-group': false, 'lang-group': false,
