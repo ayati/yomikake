@@ -5346,7 +5346,8 @@ function buildScrollScript(scrollTarget, writingMode, readySeq) {
     '    }',
     '    return false;',
     '  }',
-    '  var _mL = null, _mR = null, _maskTs = 0, _maskTimer = null;',
+    '  var _mL = null, _mR = null, _maskTs = 0, _maskTimer = null, _maskRo = null;',
+    '  function scheduleMask(){ clearTimeout(_maskTimer); _maskTimer = setTimeout(updateMasks, 120); }',
     '  function ensureMasks(){',
     '    if(_mL || !document.body) return;',
     '    var bg = getComputedStyle(document.body).backgroundColor || getComputedStyle(document.documentElement).backgroundColor || "#fff";',
@@ -5354,6 +5355,7 @@ function buildScrollScript(scrollTarget, writingMode, readySeq) {
     '    _mL = document.createElement("div"); _mL.setAttribute("aria-hidden", "true"); _mL.style.cssText = base + "left:0;";',
     '    _mR = document.createElement("div"); _mR.setAttribute("aria-hidden", "true"); _mR.style.cssText = base + "right:0;";',
     '    document.body.appendChild(_mL); document.body.appendChild(_mR);',
+    '    if(typeof ResizeObserver === "function" && !_maskRo){ _maskRo = new ResizeObserver(scheduleMask); _maskRo.observe(document.body); }',
     '  }',
     '  function clearMasks(){ if(_mL) _mL.style.width = "0"; if(_mR) _mR.style.width = "0"; }',
     '  function updateMasks(){',
@@ -5378,8 +5380,13 @@ function buildScrollScript(scrollTarget, writingMode, readySeq) {
     '    clearMasks();',
     '    clearTimeout(_maskTimer); _maskTimer = setTimeout(updateMasks, 180);',
     '  }, true);',
-    '  window.addEventListener("resize", function(){ clearTimeout(_maskTimer); _maskTimer = setTimeout(updateMasks, 120); });',
-    '  if(document.fonts && document.fonts.ready) document.fonts.ready.then(updateMasks);',
+    '  window.addEventListener("resize", scheduleMask);',
+    '  window.addEventListener("load", scheduleMask);',
+    '  document.addEventListener("load", function(ev){ if(ev.target && ev.target.tagName === "IMG") scheduleMask(); }, true);',
+    '  if(document.fonts){',
+    '    if(document.fonts.ready) document.fonts.ready.then(scheduleMask);',
+    '    if(document.fonts.addEventListener) document.fonts.addEventListener("loadingdone", scheduleMask);',
+    '  }',
   ];
 
   // ── ePub指定 (publisher): 実行時に writing-mode を検出し、dedicated モードと同じ余白＋スクロールロジックを適用 ──
