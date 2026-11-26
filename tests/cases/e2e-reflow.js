@@ -5,6 +5,10 @@ fetch('tests/.fixtures/reflow.epub')
 .then(function (b) { return loadEpub(new File([b], 'reflow.epub', { type: 'application/epub+zip' })); })
 .then(function () {
   T('本が開けた', !!state.epub, state.bookTitle + ' / spine=' + state.spine.length);
+  T('読書中はタブのタイトルが書籍名', document.title === state.bookTitle, document.title);
+  setLang('en');
+  T('読書中の言語切替でもタブのタイトルは書籍名のまま', document.title === state.bookTitle, document.title);
+  setLang('ja');
   T('リフローとして開いた', state.renderMode === 'reflow', state.renderMode);
   T('目次を読めた', state.toc.length === 4, String(state.toc.length));
   T('読書中はツールバーが「リストへ」', document.getElementById('open-btn').classList.contains('reading'));
@@ -64,6 +68,7 @@ fetch('tests/.fixtures/reflow.epub')
     T('closeBook できる', !state.epub);
     T('closeBook でツールバーが「開く」に戻る',
       !document.getElementById('open-btn').classList.contains('reading'));
+    T('closeBook でタブのタイトルがアプリ名に戻る', document.title === t('app.title'), document.title);
     localStorage.clear();
   });
 })

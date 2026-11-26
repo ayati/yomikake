@@ -8,6 +8,7 @@
 <link rel="manifest" href="manifest_ios.webmanifest">
 <meta name="theme-color" content="#fdf8f0">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="yomikake">
 <meta name="mobile-web-app-capable" content="yes">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <style>
@@ -3642,8 +3643,10 @@ function setLang(lang) {
 
 function applyI18n() {
   document.documentElement.lang = _lang;
-  document.title = t('app.title');
-  if (!state.epub) document.getElementById('book-title').textContent = t('app.title');
+  if (!state.epub) {
+    document.title = t('app.title');
+    document.getElementById('book-title').textContent = t('app.title');
+  }
   document.querySelectorAll('[data-i18n]').forEach(el => {
     'i18nHtml' in el.dataset
       ? (el.innerHTML = t(el.dataset.i18n))
@@ -4477,6 +4480,7 @@ async function loadEpub(file) {
     state.bookTags = _subjectsFromOpf(opfDoc).filter(v => v !== state.bookGenreRaw);
     buildTtsVoiceSelect();
     document.getElementById('book-title').textContent = titleText;
+    document.title = titleText || t('app.title');
     state.bookKey = makeBookKey(titleText, state.bookCreator);
     // 旧形式エントリ (epub_pos_{title}_{spineCount}) からのワンショット移行
     if (!localStorage.getItem(state.bookKey)) {
@@ -11143,6 +11147,7 @@ function closeBook() {
   if (imgA) imgA.removeAttribute('src');
   if (imgB) { imgB.removeAttribute('src'); imgB.classList.add('hidden'); }
   document.getElementById('book-title').textContent = t('app.title');
+  document.title = t('app.title');
   document.getElementById('page-container').classList.remove('visible');
   resetSearch();
   document.getElementById('search-input').disabled = true;
