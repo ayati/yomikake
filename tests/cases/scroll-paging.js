@@ -128,12 +128,12 @@ if (IS_IOS) {
     });
   }
 
-  // 画像が端に掛かるときマスクが出ないこと
-  function runMediaCase() {
+  // 画像が端に掛かるときマスクが抑止されること（見切れ行ありで画像なし wL>0 vs 画像あり wL===0）
+  function runMediaCase(withSvg) {
     return new Promise(function (resolve) {
       var src = buildScrollScript('start', 'vertical', 1);
       var f = document.createElement('iframe');
-      f.style.cssText = 'position:absolute;left:-10000px;top:0;width:400px;height:400px;border:0';
+      f.style.cssText = 'position:absolute;left:-10000px;top:0;width:788px;height:400px;border:0';
       document.body.appendChild(f);
       f.addEventListener('load', function () {
         setTimeout(function () {
@@ -145,17 +145,67 @@ if (IS_IOS) {
               wL = parseFloat(divs[i].style.width) || 0;
             }
           }
-          T('画像が左端に掛かるときはマスクを出さない', wL === 0, 'wL=' + wL);
+          if (withSvg) {
+            T('画像が左端に掛かるときはマスクを抑止する', wL === 0, 'wL=' + wL);
+          } else {
+            T('画像がなければ見切れ行に左端マスクが付く', wL > 0, 'wL=' + wL);
+          }
           f.remove();
           resolve();
         }, 180);
       });
       var css =
         'html{font-size:16px;line-height:2;writing-mode:vertical-rl;padding-left:100vw;height:100%;overflow-y:hidden;margin:0;background:#fff;}' +
-        'body{writing-mode:vertical-rl;margin:0;height:100%;overflow-y:hidden;box-sizing:border-box;background:#fff;}' +
-        'svg{display:block;width:500px;height:300px;}';
+        'body{writing-mode:vertical-rl;margin:0;height:100%;overflow-y:hidden;box-sizing:border-box;line-height:2;background:#fff;}' +
+        'p{margin:0;padding:0;}' +
+        'svg.edge-fig{position:fixed;left:0;top:10px;width:40px;height:40px;}';
+      var body = plainPs + (withSvg ? '<svg class="edge-fig" width="40" height="40"></svg>' : '');
       f.srcdoc = '<!DOCTYPE html><html><head><meta charset="utf-8"><style>' + css +
-        '</style></head><body><svg width="500" height="300"></svg>' +
+        '</style></head><body>' + body +
+        '<' + 'script>' + src + '<' + '/' + 'script></body></html>';
+    });
+  }
+
+  // スクロールなしでレイアウトが変わったとき（ResizeObserver）にマスク幅が再計算されること
+  function runLayoutChangeCase() {
+    return new Promise(function (resolve) {
+      var src = buildScrollScript('start', 'vertical', 1);
+      var f = document.createElement('iframe');
+      f.style.cssText = 'position:absolute;left:-10000px;top:0;width:788px;height:400px;border:0';
+      document.body.appendChild(f);
+      f.addEventListener('load', function () {
+        setTimeout(function () {
+          var doc = f.contentDocument;
+          function readWL() {
+            var divs = doc.querySelectorAll('div[aria-hidden="true"]');
+            for (var i = 0; i < divs.length; i++) {
+              if (divs[i].style.position === 'fixed' && divs[i].style.left === '0px') {
+                return parseFloat(divs[i].style.width) || 0;
+              }
+            }
+            return 0;
+          }
+          var before = readWL();
+          // 先頭に 12px 幅の要素を差し込んで行を左へずらす（788 - 12 = 776 相当 → 行25の見切れ位置が変わる）
+          var spacer = doc.createElement('div');
+          spacer.style.cssText = 'width:12px;height:100%;';
+          doc.body.insertBefore(spacer, doc.body.firstChild);
+          setTimeout(function () {
+            var after = readWL();
+            T('スクロールなしのレイアウト変化で端マスクが再計算される',
+              before > 0 && after !== before,
+              'before=' + before + ' after=' + after);
+            f.remove();
+            resolve();
+          }, 260);
+        }, 180);
+      });
+      var css =
+        'html{font-size:16px;line-height:2;writing-mode:vertical-rl;padding-left:100vw;height:100%;overflow-y:hidden;margin:0;background:#fff;}' +
+        'body{writing-mode:vertical-rl;margin:0;height:100%;overflow-y:hidden;box-sizing:border-box;line-height:2;background:#fff;}' +
+        'p{margin:0;padding:0;}';
+      f.srcdoc = '<!DOCTYPE html><html><head><meta charset="utf-8"><style>' + css +
+        '</style></head><body>' + plainPs +
         '<' + 'script>' + src + '<' + '/' + 'script></body></html>';
     });
   }
@@ -171,6 +221,8 @@ if (IS_IOS) {
     .then(function () { return runPagingCase('vertical', 788, 16, 2.0, rubyPs, 'ルビ付き'); })
     .then(function () { return runPagingCase('vertical', 900, 16, 2.0, rubyPs, 'ルビ付き右端'); })
     .then(function () { return runPagingCase('publisher', 788, 16, 2.0, plainPs, 'ePub指定縦書き'); })
-    .then(runMediaCase)
+    .then(function () { return runMediaCase(false); })
+    .then(function () { return runMediaCase(true); })
+    .then(runLayoutChangeCase)
     .catch(function (e) { T('scroll-paging 例外', false, e && (e.stack || e.message)); });
 }
